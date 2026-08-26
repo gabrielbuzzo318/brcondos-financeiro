@@ -10,6 +10,7 @@ import {
   consultarLoteRpsGiss,
   consultarNfsePorNumeroGiss,
   consultarNfsePorRpsGiss,
+  consultarNfsePorRpsEndpointGiss,
   emitirNfseGiss,
   getGissConfigStatus,
   testGissWsdl
@@ -18,6 +19,7 @@ import {
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
+const GISS_HISTORY_SERVICE_URL = 'https://ws-sjrp.giss.com.br/service-ws/nf/nfse-ws';
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '4mb' }));
@@ -62,6 +64,12 @@ app.post('/api/nfse/emitir', route(req => emitirNfseGiss(req.body)));
 app.get('/api/nfse/consultar-lote', route(req => consultarLoteRpsGiss(req.query.protocolo)));
 app.get('/api/nfse/consultar-numero', route(req => consultarNfsePorNumeroGiss({ numero: req.query.numero, pagina: req.query.pagina })));
 app.get('/api/nfse/consultar-rps', route(req => consultarNfsePorRpsGiss({ numero: req.query.numero, serie: req.query.serie, tipo: req.query.tipo })));
+app.get('/api/nfse/consultar-rps-historico', route(req => consultarNfsePorRpsEndpointGiss({
+  numero: req.query.numero,
+  serie: req.query.serie || 'RPS',
+  tipo: req.query.tipo || 1,
+  serviceUrl: GISS_HISTORY_SERVICE_URL
+})));
 
 app.post('/api/boletos', (_req, res) => res.status(503).json({ error: 'Integração Sicredi ainda não configurada neste servidor.' }));
 app.get('/api/boletos/:nossoNumero', (_req, res) => res.status(503).json({ error: 'Integração Sicredi ainda não configurada neste servidor.' }));
