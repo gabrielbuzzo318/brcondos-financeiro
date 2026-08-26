@@ -1,0 +1,169 @@
+d)}
+.report-help{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45}
+.bulk-progress-track{height:12px;background:#edf1f3;border-radius:999px;overflow:hidden;margin:12px 0 7px}
+.bulk-progress-bar{height:100%;background:var(--green);width:0%;transition:width .2s ease}
+.bulk-log{max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px;background:#fafbfc;font-size:11px;line-height:1.5;margin-top:12px}
+
+@media(max-width:1050px){
+  .cards{grid-template-columns:repeat(2,1fr)}.two-cols{grid-template-columns:1fr}.form-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:760px){
+  .sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}.mobile-menu{display:block}.topbar{padding:0 14px}.content{padding:18px 14px}
+  .cards{grid-template-columns:1fr}.form-grid,.modal-grid{grid-template-columns:1fr}.pin-btn{display:none}
+  .login-card{width:92%;max-width:350px}.city{height:24vh}
+}
+</style>
+</head>
+<body>
+
+<section id="loginScreen">
+  <button class="pin-btn" type="button">CRIAR CADASTRO COM PIN</button>
+  <div class="login-card">
+    <div class="login-logo" style="font-size:28px;font-weight:900;color:#f36c2f;text-align:center">BRCONDOS</div>
+    <div class="login-subtitle">Financeiro - Sjrp</div>
+    <div class="login-row">
+      <div class="login-icon">👤</div>
+      <input id="loginEmail" type="email" value="financeiro@brcondos.com.br" placeholder="E-mail">
+    </div>
+    <div class="login-row">
+      <div class="login-icon">🔑</div>
+      <input id="loginPass" type="password" placeholder="Senha">
+    </div>
+    <button class="login-btn" onclick="login()">ENTRAR →</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-link">Esqueceu sua senha?</div>
+  </div>
+  <div class="city"></div>
+  <div class="login-footer">BRCondos © 2026. Todos os direitos reservados.</div>
+</section>
+
+<section id="app" class="hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div style="font-size:20px;font-weight:900;color:#f36c2f">BRCONDOS</div>
+      <small>Financeiro - Sjrp</small>
+    </div>
+    <nav class="nav">
+      <button data-view="dashboard" class="active" onclick="showView('dashboard',this)"><span class="ico">▦</span>Dashboard</button>
+      <button data-view="financeiro" onclick="showView('financeiro',this)"><span class="ico">▰</span>A Pagar</button>
+      <button data-view="reembolsos" onclick="showView('reembolsos',this)"><span class="ico">↩</span>Reembolsos</button>
+      <button data-view="fluxo" onclick="showView('fluxo',this)"><span class="ico">⇄</span>Fluxo de Caixa</button>
+      <button data-view="dre" onclick="showView('dre',this)"><span class="ico">▥</span>DRE</button>
+      <button data-view="plano" onclick="showView('plano',this)"><span class="ico">≡</span>Plano de Contas</button>
+      <button data-view="clientes" onclick="showView('clientes',this)"><span class="ico">♙</span>Clientes</button>
+      <button data-view="fornecedores" onclick="showView('fornecedores',this)"><span class="ico">▣</span>Fornecedores</button>
+      <button data-view="boletos" onclick="showView('boletos',this)"><span class="ico">▤</span>Boletos</button>
+      <button data-view="nfse" onclick="showView('nfse',this)"><span class="ico">NF</span>Notas Fiscais</button>
+      <button data-view="recibos" onclick="showView('recibos',this)"><span class="ico">R$</span>Recibos</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="user-mini">
+        <div class="avatar">F</div>
+        <div><b>Financeiro Sjrp</b><small id="userEmailMini">financeiro@brcondos.com.br</small></div>
+      </div>
+      <button class="logout" onclick="logout()">Sair do sistema</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn mobile-menu" onclick="toggleSidebar()">☰</button>
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSubtitle">Visão geral do financeiro</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="status-line"><span class="status-dot"></span>Sistema online</div>
+      </div>
+    </header>
+
+    <div class="content">
+      <section id="view-dashboard" class="view"></section>
+      <section id="view-financeiro" class="view hidden"></section>
+      <section id="view-reembolsos" class="view hidden"></section>
+      <section id="view-fluxo" class="view hidden"></section>
+      <section id="view-dre" class="view hidden"></section>
+      <section id="view-plano" class="view hidden"></section>
+      <section id="view-clientes" class="view hidden"></section>
+      <section id="view-fornecedores" class="view hidden"></section>
+      <section id="view-boletos" class="view hidden"></section>
+      <section id="view-nfse" class="view hidden"></section>
+      <section id="view-recibos" class="view hidden"></section>
+    </div>
+  </main>
+</section>
+
+<div id="modal" class="modal hidden"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// PROTEÇÃO DE ACESSO E DADOS LOCAIS
+// O sistema deve ser aberto pelo servidor local para usar o mesmo localStorage.
+if (location.protocol === 'file:') {
+  alert('Abra o sistema pelo endereço http://localhost:3001.\n\nAbrir o arquivo HTML diretamente faz o navegador usar outro armazenamento e pode mostrar NFS-e como zeradas.');
+  location.replace('http://localhost:3001/');
+}
+
+// Mantém uma cópia automática das NFS-e no próprio navegador e restaura
+// caso a chave principal apareça vazia por algum erro local.
+(function protegerNfseLocalStorage(){
+  try{
+    const key='brcondos_nfse';
+    const backupKey='brcondos_nfse_backup_auto';
+    const raw=localStorage.getItem(key);
+    const backup=localStorage.getItem(backupKey);
+
+    let atual=[];
+    let copia=[];
+    try{ atual=raw?JSON.parse(raw):[]; }catch(e){ atual=[]; }
+    try{ copia=backup?JSON.parse(backup):[]; }catch(e){ copia=[]; }
+
+    if(Array.isArray(atual) && atual.length){
+      localStorage.setItem(backupKey,JSON.stringify(atual));
+    }else if(Array.isArray(copia) && copia.length){
+      localStorage.setItem(key,JSON.stringify(copia));
+    }
+  }catch(e){}
+})();
+const money = v => Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+function parseMoneyBR(v){
+  let s=String(v??'').trim().replace(/R\$/gi,'').replace(/\s/g,'');
+  if(!s) return 0;
+  if(s.includes(',') && s.includes('.')){
+    // Formato brasileiro: 1.234,56
+    s=s.replace(/\./g,'').replace(',','.');
+  }else if(s.includes(',')){
+    // Formato brasileiro sem milhar: 1234,56
+    s=s.replace(',','.');
+  }
+  const n=Number(s);
+  return Number.isFinite(n)?n:0;
+}
+function moneyInputBR(v){
+  if(v==='' || v===null || v===undefined) return '';
+  return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+const today = () => new Date().toISOString().slice(0,10);
+
+const defaults = {
+  transactions:[
+    {id:1,date:'2026-08-03',type:'entrada',description:'Recebimento - Condomínio Jardim Europa',category:'Receitas de serviços',party:'Jardim Europa',value:14850,status:'pago'},
+    {id:2,date:'2026-08-05',type:'saida',description:'Fornecedor - manutenção predial',category:'Manutenção',party:'Alpha Serviços',value:3250,status:'pago'},
+    {id:3,date:'2026-08-10',type:'entrada',description:'Recebimento - Residencial Prime',category:'Receitas de serviços',party:'Residencial Prime',value:12100,status:'pago'},
+    {id:4,date:'2026-08-14',type:'saida',description:'Material de escritório',category:'Administrativo',party:'Papelaria Central',value:890,status:'pago'},
+    {id:5,date:'2026-08-28',type:'saida',description:'Prestador de serviços',category:'Prestadores',party:'Tech Predial',value:4600,status:'agendado'}
+  ],
+  clients:[
+    {id:1001,name:"AKADIA",tradeName:'',doc:"27.964.630/0001-32",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1002,name:"ALTOS DE IBORUNA",tradeName:'',doc:"19.888.907/0001-67",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1003,name:"ASSOCIACAO DOS MORADORES DO CONDOMINIO RESIDENCIAL BOM JARDIM II",tradeName:'',doc:"25.529.263/0001-13",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1004,name:"ASSOCIACAO DOS MORADORES EPLENUM AMO EPLENUM",tradeName:'',doc:"46.806.088/0001-34",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1005,name:"ASSOCIACAO DOS PROP. DO RECANTO DOS CURIMBATAS",tradeName:'',doc:"03.197.870/0001-90",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1006,name:"ASSOCIACAO ECO VILLAGE",tradeName:'',doc:"08.986.504/0001-34",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1007,name:"ASSOCIACAO ECO VILLAGE I",tradeName:'',doc:"08.218.781/0001-05",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1008,name:"ASSOCIACAO LOTEAMENTO EUROPARK I",tradeName:'',doc:"26.717.974/0001-84",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1009,name:"ASSOCIACAO LOTEAMENTO EUROPARK II",tradeName:'',doc:"50.569.834/0001-90",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',city:'',state:'',status:'',cnae:'',dataUpdated:''},
+    {id:1010,name:"ASSOCIACAO QUINTA DO GOLFE HORIZONTES",tradeName:'',doc:"23.818.526/0001-89",email:'',phone:'',zip:'',street:'',number:'',complement:'',district:'',cit
