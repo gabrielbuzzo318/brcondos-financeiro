@@ -1,0 +1,143 @@
+      x.receiptNumber,x.client,x.competence,receiptCompetenceLabel(x.competence),
+        x.issueDate,x.status,x.value,money(x.value)
+      ],q)
+    ).sort((a,b)=>(a.issueDate||'').localeCompare(b.issueDate||'')||String(a.client||'').localeCompare(String(b.client||''),'pt-BR'));
+
+    const total=data.reduce((s,x)=>s+Number(x.value||0),0);
+    const generated=data.filter(x=>x.status==='gerado').length;
+    const pending=data.filter(x=>x.status!=='gerado').length;
+
+    title='Relatório de Recibos';
+    summary=`
+      <div class="sum"><small>TOTAL DE RECIBOS</small><b>${data.length}</b></div>
+      <div class="sum"><small>PENDENTES</small><b>${pending}</b></div>
+      <div class="sum"><small>GERADOS</small><b>${generated}</b></div>
+      <div class="sum"><small>VALOR TOTAL</small><b>${money(total)}</b></div>`;
+
+    headers=['Recibo','Cliente','Competência','Data','Status','Valor'];
+    rows=data.map(x=>[
+      `<b>${esc(x.receiptNumber||'-')}</b>`,
+      esc(x.client||'-'),
+      esc(receiptCompetenceLabel(x.competence)),
+      x.issueDate?formatDate(x.issueDate):'-',
+      x.status==='gerado'?'Gerado':'Pendente',
+      money(x.value)
+    ]);
+
+  }else if(type==='payables'){
+    let data=payables.map(x=>({...x,status:payableEffectiveStatus(x)})).filter(x=>
+      reportDateOk(x.due,from,to) &&
+      (!status || x.status===status) &&
+      reportMatchesSearch([x.supplier,x.description,x.category,x.paymentMethod,x.status,x.value,money(x.value),x.notes],q)
+    ).sort((a,b)=>(a.due||'').localeCompare(b.due||''));
+    const total=data.reduce((a,b)=>a+Number(b.value||0),0);
+    const paid=data.filter(x=>x.status==='pago').reduce((a,b)=>a+Number(b.value||0),0);
+    const open=data.filter(x=>x.status!=='pago').reduce((a,b)=>a+Number(b.value||0),0);
+    const overdue=data.filter(x=>x.status==='vencido').reduce((a,b)=>a+Number(b.value||0),0);
+    title='Relatório de Contas a Pagar';
+    summary=`<div class="sum"><small>TOTAL</small><b>${money(total)}</b></div><div class="sum"><small>EM ABERTO</small><b>${money(open)}</b></div><div class="sum"><small>VENCIDO</small><b>${money(overdue)}</b></div><div class="sum"><small>PAGO</small><b>${money(paid)}</b></div>`;
+    headers=['Vencimento','Fornecedor','Descrição / Categoria','Pagamento','Status','Baixa','Valor'];
+    rows=data.map(x=>[
+      formatDate(x.due),esc(x.supplier||'-'),`${esc(x.description||'-')}<br><small>${esc(x.category||'-')}</small>`,
+      esc(x.paymentMethod||'-'),esc(statusLabelPayable(x.status)),x.paymentDate?formatDate(x.paymentDate):'-',money(x.value)
+    ]);
+  }else if(type==='reimbursements'){
+    let data=reimbursements.map(x=>({...x,status:reimbursementEffectiveStatus(x)})).filter(x=>
+      reportDateOk(x.date,from,to) &&
+      (!status || x.status===status) &&
+      reportMatchesSearch([x.paidBy,x.reimbursedBy,x.description,x.category,x.notes,x.status,x.value,money(x.value)],q)
+    ).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    const total=data.reduce((a,b)=>a+Number(b.value||0),0);
+    const received=data.filter(x=>x.status==='recebido').reduce((a,b)=>a+Number(b.value||0),0);
+    const pending=data.filter(x=>!['recebido','cancelado'].includes(x.status)).reduce((a,b)=>a+Number(b.value||0),0);
+    const overdue=data.filter(x=>x.status==='vencido').reduce((a,b)=>a+Number(b.value||0),0);
+    title='Relatório de Reembolsos';
+    summary=`<div class="sum"><small>TOTAL</small><b>${money(total)}</b></div><div class="sum"><small>A RECEBER</small><b>${money(pending)}</b></div><div class="sum"><small>VENCIDO</small><b>${money(overdue)}</b></div><div class="sum"><small>RECEBIDO</small><b>${money(received)}</b></div>`;
+    headers=['Data paga','Favorecido','Reembolsado por','Observação','Status','Data recebida','Valor'];
+    rows=data.map(x=>[
+      formatDate(x.date),esc(x.paidBy||'-'),esc(x.reimbursedBy||'-'),esc(x.notes||x.description||'-'),
+      esc(statusLabelReimbursement(x.status)),x.receivedDate?formatDate(x.receivedDate):'-',money(x.value)
+    ]);
+  }else if(type==='cashflow'){
+    let data=transactions.filter(x=>
+      reportDateOk(x.date,from,to) &&
+      (!status || x.status===status) &&
+      (!typeFilter || x.type===typeFilter) &&
+      reportMatchesSearch([x.party,x.description,x.category,x.type,x.status,x.value,money(x.value)],q)
+    ).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    const entrances=data.filter(x=>x.type==='entrada').reduce((a,b)=>a+Number(b.value||0),0);
+    const exits=data.filter(x=>x.type==='saida').reduce((a,b)=>a+Number(b.value||0),0);
+    title='Relatório de Fluxo de Caixa';
+    summary=`<div class="sum"><small>ENTRADAS</small><b>${money(entrances)}</b></div><div class="sum"><small>SAÍDAS</small><b>${money(exits)}</b></div><div class="sum"><small>SALDO</small><b>${money(entrances-exits)}</b></div><div class="sum"><small>LANÇAMENTOS</small><b>${data.length}</b></div>`;
+    headers=['Data','Tipo','Descrição','Categoria','Cliente / Fornecedor','Status','Valor'];
+    rows=data.map(x=>[
+      formatDate(x.date),x.type==='entrada'?'Entrada':'Saída',esc(x.description||'-'),esc(x.category||'-'),
+      esc(x.party||'-'),esc(statusLabelFlow(x.status)),`${x.type==='saida'?'- ':''}${money(x.value)}`
+    ]);
+  }else if(type==='boletos'){
+    let data=boletos.filter(x=>{
+      const st=x.status==='recebido'?'recebido':(!x.due?'pendente_vencimento':'aberto');
+      return reportDateOk(x.due,from,to) &&
+        (!status || st===status) &&
+        reportMatchesSearch([x.client,x.docNumber,x.description,x.details,x.bank,st,x.value,money(x.value)],q);
+    }).sort((a,b)=>(a.due||'').localeCompare(b.due||''));
+    const total=data.reduce((a,b)=>a+Number(b.value||0),0);
+    const received=data.filter(x=>x.status==='recebido').reduce((a,b)=>a+Number(b.value||0),0);
+    const open=total-received;
+    title='Relatório de Boletos';
+    summary=`<div class="sum"><small>TOTAL EMITIDO</small><b>${money(total)}</b></div><div class="sum"><small>EM ABERTO</small><b>${money(open)}</b></div><div class="sum"><small>RECEBIDO</small><b>${money(received)}</b></div><div class="sum"><small>BOLETOS</small><b>${data.length}</b></div>`;
+    headers=['Boleto','Cliente','Vencimento','Descrição','Detalhes','Status','Data recebimento','Valor'];
+    rows=data.map(x=>[
+      esc(x.docNumber||'-'),esc(x.client||'-'),x.due?formatDate(x.due):'Sem vencimento',esc(x.description||'-'),esc(x.details||'-'),
+      x.status==='recebido'?'Recebido':(x.due?'Em aberto':'Sem vencimento'),x.receiptDate?formatDate(x.receiptDate):'-',money(x.value)
+    ]);
+  }
+
+  closeModal();
+  const subtitle=type==='clients'
+    ? `Cadastro de clientes${statusText}${searchText}`
+    : `${periodText}${statusText}${typeFilter?` • Tipo: ${typeFilter}`:''}${searchText}`;
+  printableReport(title,subtitle,summary,headers,rows);
+}
+function statusLabelPayable(s){
+  return {aberto:'A pagar',vencido:'Vencido',agendado:'Agendado',pago:'Pago'}[s]||s;
+}
+function statusLabelReimbursement(s){
+  return {a_solicitar:'A solicitar',solicitado:'Solicitado / A receber',vencido:'Vencido',recebido:'Recebido',cancelado:'Cancelado'}[s]||s;
+}
+function statusLabelFlow(s){
+  return {pago:'Realizado',agendado:'Agendado',aberto:'A pagar',vencido:'Vencido'}[s]||s;
+}
+
+function openTransaction(id=null){
+  const x=id?transactions.find(t=>t.id===id):{date:today(),type:'saida',description:'',category:'',party:'',value:'',status:'aberto'};
+  openModal('Lançamento financeiro',`
+    <div class="modal-grid">
+      ${field('Data',`<input id="m_date" type="date" value="${x.date}">`)}
+      ${field('Tipo',`<select id="m_type" onchange="refreshTransactionAccountOptions()"><option value="entrada" ${x.type==='entrada'?'selected':''}>Entrada</option><option value="saida" ${x.type==='saida'?'selected':''}>Saída</option></select>`)}
+      ${field('Descrição',`<input id="m_desc" value="${esc(x.description)}">`)}
+      ${field('Plano de contas',`<div style="display:flex;gap:7px"><select id="m_cat" style="flex:1">${accountOptions(x.type,x.category||'')}</select><button class="btn" type="button" onclick="quickCreateAccount(document.getElementById('m_type').value,'m_cat')">+</button></div>`)}
+      ${field('Cliente / Fornecedor',`<input id="m_party" value="${esc(x.party||'')}">`)}
+      ${field('Valor',`<input id="m_value" type="number" step="0.01" value="${x.value}">`)}
+      ${field('Status',`<select id="m_status"><option value="pago" ${x.status==='pago'?'selected':''}>Pago</option><option value="agendado" ${x.status==='agendado'?'selected':''}>Agendado</option><option value="aberto" ${x.status==='aberto'?'selected':''}>A pagar</option><option value="vencido" ${x.status==='vencido'?'selected':''}>Vencido</option></select>`)}
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveTransaction(${id||'null'})">Salvar</button></div>`);
+}
+function saveTransaction(id){
+  const obj={id:id||Date.now(),date:val('m_date'),type:val('m_type'),description:val('m_desc'),category:val('m_cat'),party:val('m_party'),value:Number(val('m_value')),status:val('m_status')};
+  if(!obj.date||!obj.description||!obj.value)return alert('Preencha data, descrição e valor.');
+  if(id)transactions=transactions.map(x=>x.id===id?obj:x);else transactions.push(obj);
+  saveData('transactions',transactions);closeModal();renderAll();
+}
+function delTransaction(id){if(confirm('Excluir este lançamento?')){transactions=transactions.filter(x=>x.id!==id);saveData('transactions',transactions);renderAll()}}
+
+const MONTH_NAMES={JANEIRO:1,FEVEREIRO:2,MARCO:3,MARÇO:3,ABRIL:4,MAIO:5,JUNHO:6,JULHO:7,AGOSTO:8,SETEMBRO:9,OUTUBRO:10,NOVEMBRO:11,DEZEMBRO:12};
+
+function nextBillingMonth(year,month){
+  const dt=new Date(Number(year),Number(month),1);
+  return {year:dt.getFullYear(),month:dt.getMonth()+1};
+}
+
+function parseCompetenceFromPdfText(text,fileName=''){
+  const upper=String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  f
