@@ -1,0 +1,125 @@
+"CONDOMINIO EDIFICIO MONTE SANTO"}, {"doc": "56.358.211/0001-55", "name": "CONDOMINIO EDIFICIO PIONNER"}, {"doc": "52.265.304/0001-84", "name": "CONDOMINIO EDIFICIO RIOMAGGIORE"}, {"doc": "18.537.810/0001-47", "name": "CONDOMINIO GIARDINO CASAS DE VENEZA"}, {"doc": "39.226.339/0001-46", "name": "CONDOMINIO GREEN HOME"}, {"doc": "53.262.260/0001-00", "name": "CONDOMINIO HIGH REDENTORA"}, {"doc": "46.806.062/0001-96", "name": "CONDOMINIO IPE DA MATA"}, {"doc": "46.743.203/0001-79", "name": "CONDOMINIO PARK PRIME RESIDENCE"}, {"doc": "52.657.163/0001-45", "name": "CONDOMINIO RAIZES IMPERIAL"}, {"doc": "37.381.644/0001-87", "name": "CONDOMINIO RESERVA DOS GUYRAS"}, {"doc": "65.708.778/0001-03", "name": "CONDOMINIO RESIDENCIAL GREEN GARDEN"}, {"doc": "57.155.439/0001-00", "name": "CONDOMINIO SENSE RESIDENCE"}, {"doc": "58.266.872/0001-86", "name": "CONDOMINIO TIME"}, {"doc": "55.088.275/0001-10", "name": "CONDOMINIO TORRES CIDADE NORTE"}, {"doc": "17.173.529/0001-00", "name": "CONDOMINIO TOTALITE"}, {"doc": "09.292.689/0001-40", "name": "EDIFICIO ALFREDO AUGUSTO"}, {"doc": "23.237.645/0001-48", "name": "EDIFICIO FLOR DE MAIO"}, {"doc": "49.223.103/0001-00", "name": "EDIFICIO HAUT RESIDENCE"}, {"doc": "05.535.681/0001-06", "name": "EDIFICIO MAJORELLE"}, {"doc": "24.057.826/0001-55", "name": "EDIFICIO MANUEL FELIPE"}, {"doc": "05.003.794/0001-60", "name": "EDIFICIO MARTELLI"}, {"doc": "48.136.052/0001-16", "name": "EDIFICIO TOSCANA"}, {"doc": "33.042.262/0001-78", "name": "HG 419 EMPREENDIMENTO IMOBILIARIO SPE LTDA"}, {"doc": "65.608.103/0001-84", "name": "HUBLOT HIGIENOPOLIS"}, {"doc": "63.125.965/0001-20", "name": "HYPE"}, {"doc": "63.714.334/0001-47", "name": "MURANO"}, {"doc": "61.747.482/0001-32", "name": "MYRA JK"}, {"doc": "60.913.927/0001-44", "name": "NAU VIVENDAS"}, {"doc": "46.600.362/0001-14", "name": "NOVA RESIDENCE QUINTA DAS PAINEIRAS"}, {"doc": "12.567.401/0002-98", "name": "PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA"}, {"doc": "63.717.459/0001-20", "name": "ALAMEDA IGUATEMI"}, {"doc": "15.633.941/0001-30", "name": "TERRA NOVA GREEN LIFE"}, {"doc": "65.735.820/0001-77", "name": "VILLES DES ALPES RESIDENCE"}];
+(function mergeSeedClients(){
+  const demoDocs=new Set(['12345678000190','21222333000144']);
+  clients=clients.filter(c=>!demoDocs.has(String(c.doc||'').replace(/\D/g,'')));
+  const byDoc=new Map(clients.map(c=>[String(c.doc||'').replace(/\D/g,''),c]));
+  BRCONDOS_CLIENT_SEED.forEach((s,i)=>{
+    const key=s.doc.replace(/\D/g,'');
+    if(!byDoc.has(key)){
+      const c=normalizeParty({...s,id:900000+i});
+      clients.push(c);byDoc.set(key,c);
+    }
+  });
+  clients=clients.filter((c,idx,arr)=>{
+    const key=String(c.doc||'').replace(/\D/g,'');
+    return !key || arr.findIndex(z=>String(z.doc||'').replace(/\D/g,'')===key)===idx;
+  });
+  saveData('clients',clients);
+})();
+
+function login(){
+  const email=document.getElementById('loginEmail').value.trim(), pass=document.getElementById('loginPass').value.trim();
+  if(!email || !pass){document.getElementById('loginError').textContent='Informe e-mail e senha.';return;}
+  localStorage.setItem('brcondos_session',email);
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userEmailMini').textContent=email;
+  renderAll();
+}
+function logout(){ localStorage.removeItem('brcondos_session'); location.reload(); }
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open')}
+
+const titles={
+  dashboard:['Dashboard','Visão geral do financeiro'],
+  financeiro:['A Pagar','Contas a pagar e rotina de pagamentos'],
+  reembolsos:['Reembolsos','Valores pagos e pendentes de reembolso'],
+  fluxo:['Fluxo de Caixa','Entradas, saídas e previsões'],
+  dre:['DRE','Demonstrativo de resultado gerencial'],
+  plano:['Plano de Contas','Categorias financeiras usadas nos lançamentos'],
+  clientes:['Clientes','Cadastro e gestão de clientes'],
+  fornecedores:['Fornecedores','Cadastro e gestão de fornecedores'],
+  boletos:['Boletos','Emissão, acompanhamento e baixa'],
+  nfse:['Notas Fiscais','Emissão e acompanhamento de NFS-e pelo GissOnline'],
+  recibos:['Recibos','Geração e acompanhamento de recibos de prestação de serviço']
+};
+function showView(name,btn){
+  document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));
+  document.getElementById('view-'+name).classList.remove('hidden');
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+  (btn||document.querySelector(`[data-view="${name}"]`)).classList.add('active');
+  document.getElementById('pageTitle').textContent=titles[name][0];
+  document.getElementById('pageSubtitle').textContent=titles[name][1];
+  document.getElementById('sidebar').classList.remove('open');
+  renderAll();
+}
+
+function statusBadge(s){
+  const map={
+    pago:['Pago','green'],agendado:['Agendado','blue'],vencido:['Vencido','red'],aberto:['A pagar','yellow'],
+    emitido:['Emitido','blue'],emitido_externo:['emitido no banco','blue'],recebido:['Recebido','green'],pago_boleto:['Recebido','green'],aguardando_integracao:['Aguardando emissão','yellow'],pendente_vencimento:['Sem vencimento','red'],
+    rascunho:['Rascunho','gray'],pronto_nfse:['Pronta','yellow'],enviando_nfse:['Enviando','blue'],emitida_nfse:['NFS-e emitida','green'],erro_nfse:['Erro Giss','red'],cancelada_nfse:['Cancelada','gray'],
+    pendente_recibo:['Pendente','yellow'],gerado_recibo:['Gerado','green']
+  };
+  const x=map[s]||[s,'gray']; return `<span class="badge ${x[1]}">${x[0]}</span>`;
+}
+function sum(list,type,statuses=null){
+  return list.filter(x=>(!type||x.type===type)&&(!statuses||statuses.includes(x.status))).reduce((a,b)=>a+Number(b.value||0),0)
+}
+function renderAll(){renderDashboard();renderFinanceiro();renderReimbursements();renderFluxo();renderDRE();renderChartAccounts();renderClients();renderSuppliers();renderBoletos();renderNfse();renderReceipts()}
+
+function renderDashboard(){
+  const entradas=sum(transactions,'entrada',['pago']), saidas=sum(transactions,'saida',['pago']);
+  const saldo=entradas-saidas, agendado=sum(transactions,'saida',['agendado','aberto','vencido']);
+  const boletoOpen=boletos.filter(x=>x.status!=='recebido').reduce((a,b)=>a+Number(b.value||0),0);
+  const recent=[...transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  document.getElementById('view-dashboard').innerHTML=`
+    <div class="cards grid">
+      <div class="card accent-slate"><div class="kpi-label">SALDO REALIZADO</div><div class="kpi-value">${money(saldo)}</div><div class="kpi-foot">Entradas pagas - saídas pagas</div></div>
+      <div class="card accent-green"><div class="kpi-label">ENTRADAS DO MÊS</div><div class="kpi-value">${money(entradas)}</div><div class="kpi-foot">Valores recebidos</div></div>
+      <div class="card accent-orange"><div class="kpi-label">SAÍDAS DO MÊS</div><div class="kpi-value">${money(saidas)}</div><div class="kpi-foot">Valores pagos</div></div>
+      <div class="card accent-blue"><div class="kpi-label">BOLETOS EM ABERTO</div><div class="kpi-value">${money(boletoOpen)}</div><div class="kpi-foot">${boletos.filter(x=>x.status!=='recebido').length} boleto(s)</div></div>
+    </div>
+    <div class="grid two-cols">
+      <div class="card">
+        <div class="section-title"><div><h2 style="font-size:16px">Movimentações recentes</h2><span>Últimos lançamentos financeiros</span></div><button class="btn small primary" onclick="showView('fluxo')">Ver fluxo</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Parte</th><th>Status</th><th>Valor</th></tr></thead><tbody>
+        ${recent.map(x=>`<tr><td>${formatDate(x.date)}</td><td>${x.description}</td><td>${x.party||'-'}</td><td>${statusBadge(x.status)}</td><td class="amount ${x.type==='entrada'?'pos':'neg'}">${x.type==='saida'?'- ':''}${money(x.value)}</td></tr>`).join('')}
+        </tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="panel-title">Resumo do caixa</div>
+        <div class="dre-row"><span>Recebido</span><b style="color:#278c3a">${money(entradas)}</b></div>
+        <div class="dre-row"><span>Pago</span><b style="color:#c94848">${money(saidas)}</b></div>
+        <div class="dre-row"><span>Saídas previstas</span><b>${money(agendado)}</b></div>
+        <div class="dre-row total"><span>Saldo após previsões</span><span>${money(saldo-agendado)}</span></div>
+        <div class="boleto-box" style="margin-top:18px"><h3>Boletos</h3><p>A área já está preparada para integração com API bancária.</p></div>
+      </div>
+    </div>`;
+}
+
+
+function payableEffectiveStatus(p){
+  if(p.status==='pago' || p.status==='agendado') return p.status;
+  if(p.due && p.due < today()) return 'vencido';
+  return 'aberto';
+}
+function recurrenceBadge(p){
+  if(!p.recurring) return '<span class="badge gray">Única</span>';
+  const map={monthly:'Mensal',weekly:'Semanal',yearly:'Anual'};
+  return `<span class="badge blue">${map[p.frequency]||'Recorrente'}</span>`;
+}
+function attachmentCell(p){
+  return p.attachmentName
+    ? `<button class="btn small" onclick="openAttachment(${p.id})">📎 ${esc(p.attachmentName.length>18?p.attachmentName.slice(0,18)+'…':p.attachmentName)}</button>`
+    : '<span class="subtle">Sem anexo</span>';
+}
+function renderFinanceiro(){
+  const normalized=payables.map(x=>({...x,status:payableEffectiveStatus(x)}));
+  const aberto=normalized.filter(x=>x.status==='aberto').reduce((a,b)=>a+Number(b.value||0),0);
+  const vencido=normalized.filter(x=>x.status==='vencido').reduce((a,b)=>a+Number(b.value||0),0);
+  const agendado=normalized.filter(x=>x.status==='agendado').reduce((a,b)=>a+Number(b.value||0),0);
+  const pago=normalized.filter(x=>x.status==='pago').reduce((a,b)=>a+Number(b.value||0),0);
+  const rows=[...normalized].sort((a,b)=>a.due.localeCompare(b.due));
+  document.getElementById('view-financeiro').innerHTML=`
+    <div class="section-title">
+      <div><h2>Contas a Pagar</h2><spa
