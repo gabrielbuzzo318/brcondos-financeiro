@@ -1,0 +1,257 @@
+or(const [name,num] of Object.entries(MONTH_NAMES)){
+    const n=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const m=upper.match(new RegExp(`${n}\\s+(20\\d{2})`));
+    if(m)return {month:num,year:Number(m[1])};
+  }
+  const fm=String(fileName||'').match(/(?:^|\D)(0?[1-9]|1[0-2])[.\-_](20\d{2})(?:\D|$)/);
+  if(fm)return {month:Number(fm[1]),year:Number(fm[2])};
+  return null;
+}
+function joinPdfItems(items){
+  return items.sort((a,b)=>a.x-b.x).map(i=>i.text).join(' ').replace(/\s+/g,' ').trim();
+}
+async function extractBillingRowsWithPdfJs(file){
+  if(!window.pdfjsLib) throw new Error('Leitor de PDF não carregou. Verifique sua internet e tente novamente.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buffer=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+  let allText='';
+  const pages=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const viewport=page.getViewport({scale:1});
+    const tc=await page.getTextContent();
+    const items=tc.items.filter(i=>String(i.str||'').trim()).map(i=>({
+      text:String(i.str).trim(),x:i.transform[4],top:viewport.height-i.transform[5]
+    }));
+    allText+=' '+items.map(i=>i.text).join(' ');
+    pages.push({items,viewport,pageNo:p});
+  }
+  const comp=parseCompetenceFromPdfText(allText,file.name);
+  if(!comp)throw new Error('Não consegui identificar mês/ano da planilha. O título precisa conter algo como AGOSTO 2026.');
+  const extracted=[];
+  let seqAdm=0,seqCont=0;
+  pages.forEach(pg=>{
+    const headingItems=pg.items.filter(i=>/HONORÁRIOS|HONORARIOS|CONTABEIS|CONTÁBEIS/i.test(i.text));
+    const accountingTop=headingItems.length?Math.min(...headingItems.map(i=>i.top)):Infinity;
+    const byY=[];
+    pg.items.forEach(it=>{
+      let line=byY.find(l=>Math.abs(l.top-it.top)<=2.2);
+      if(!line){line={top:it.top,items:[]};byY.push(line)}
+      line.items.push(it);
+    });
+    byY.sort((a,b)=>a.top-b.top);
+    let previous=null;
+    byY.forEach(line=>{
+      const clientItems=line.items.filter(i=>i.x>=35 && i.x<225);
+      const totalItems=line.items.filter(i=>i.x>=505 && i.x<575);
+      const detailItems=line.items.filter(i=>i.x>=575 && i.x<760);
+      const vencItems=line.items.filter(i=>i.x>=760);
+      const client=joinPdfItems(clientItems);
+      const totalText=joinPdfItems(totalItems);
+      const details=joinPdfItems(detailItems);
+      const vencText=joinPdfItems(vencItems).replace(/\D/g,'');
+      const value=parseMoneyBR(totalText);
+      const looksHeader=/CLIENTE|TOTAL|VENC|DETALHES/i.test(client+' '+totalText+' '+details+' '+joinPdfItems(vencItems));
+      if(client && value>0 && !looksHeader){
+        const section=(pg.pageNo===1 || line.top<accountingTop)?'ADM':'CONTABIL';
+        const day=/^\d{1,2}$/.test(vencText)?Number(vencText):null;
+        if(day && (day<1||day>31))return;
+        const seq=section==='ADM'?++seqAdm:++seqCont;
+        extracted.push({section,client,value,details,day,seq});
+        previous=extracted[extracted.length-1];
+      }else if(details && previous && !client && !totalText){
+        previous.details=(previous.details+' '+details).trim();
+      }
+    });
+  });
+  // Deduplica linhas por seção/cliente/valor/dia/detalhes, caso o PDF.js quebre a mesma linha em duplicidade.
+  const seen=new Set();
+  const unique=[];
+  extracted.forEach(r=>{
+    const k=[r.section,looseName(r.client),r.value,r.day||'',looseName(r.details)].join('|');
+    if(seen.has(k))return; seen.add(k); unique.push(r);
+  });
+  return {rows:unique,competence:comp};
+}
+async function importMonthlyBillingPDF(input){
+  const files=[...(input.files||[])];
+  if(!files.length)return;
+
+  try{
+    const existing=new Set(
+      boletos.map(b=>b.sourceKey).filter(Boolean)
+    );
+
+    let totalAdded=0;
+    let totalDup=0;
+    let totalNoDue=0;
+    const importedMonths=[];
+
+    for(const file of files){
+
+      const {rows,competence}=await extractBillingRowsWithPdfJs(file);
+
+      if(!rows.length){
+        throw new Error(
+          `Não encontrei linhas de faturamento em ${file.name}.`
+        );
+      }
+
+      const ym=
+        `${competence.year}-${String(competence.month).padStart(2,'0')}`;
+
+      const monthCode=
+        `${String(competence.month).padStart(2,'0')}${competence.year}`;
+
+      // Janeiro a Julho/2026 já foram emitidos diretamente no banco.
+      const historicoEmitidoNoBanco =
+        ym>='2026-01' &&
+        ym<='2026-07';
+
+      let adm=0;
+      let cont=0;
+
+      rows.forEach(r=>{
+
+        const sectionSeq=
+          r.section==='ADM'
+            ?++adm
+            :++cont;
+
+        const dueMonth=
+          nextBillingMonth(
+            competence.year,
+            competence.month
+          );
+
+        const due=r.day
+          ?`${dueMonth.year}-${String(dueMonth.month).padStart(2,'0')}-${String(r.day).padStart(2,'0')}`
+          :'';
+
+        if(!due)totalNoDue++;
+
+        const sourceKey=
+          `pdf-${ym}-${r.section}-${looseName(r.client)}-${Number(r.value).toFixed(2)}-${r.day||'SEM'}-${looseName(r.details)}`;
+
+        if(existing.has(sourceKey)){
+          totalDup++;
+          return;
+        }
+
+        const c=findClientByLooseName(r.client);
+
+        boletos.push({
+          id:Date.now()
+            +totalAdded
+            +Math.floor(Math.random()*1000),
+
+          clientId:c?.id||0,
+          client:r.client,
+
+          docNumber:
+            `FAT-${monthCode}-${r.section==='ADM'?'ADM':'CONT'}-${String(sectionSeq).padStart(3,'0')}`,
+
+          due,
+          value:Number(r.value),
+
+          description:
+            r.section==='ADM'
+              ?`Faturamento ADM - ${String(competence.month).padStart(2,'0')}/${competence.year}`
+              :`Honorários contábeis - Associações - ${String(competence.month).padStart(2,'0')}/${competence.year}`,
+
+          details:r.details||'',
+
+          bank:
+            historicoEmitidoNoBanco
+              ?'Emitido diretamente no banco'
+              :'Integração pendente',
+
+          status:
+            !due
+              ?'pendente_vencimento'
+              :historicoEmitidoNoBanco
+                ?'emitido_externo'
+                :'aguardando_integracao',
+
+          externalIssued:
+            historicoEmitidoNoBanco && !!due,
+
+          receiptDate:'',
+          flowId:null,
+          sourceKey,
+          competence:ym,
+          section:r.section
+        });
+
+        existing.add(sourceKey);
+        totalAdded++;
+      });
+
+      importedMonths.push(
+        `${String(competence.month).padStart(2,'0')}/${competence.year}`
+      );
+    }
+
+    saveData('boletos',boletos);
+    renderAll();
+
+    alert(
+      `IMPORTAÇÃO CONCLUÍDA ✅\n\n`+
+      `Relatórios: ${importedMonths.join(', ')}\n`+
+      `Boletos criados: ${totalAdded}\n`+
+      `Duplicados ignorados: ${totalDup}\n`+
+      `Sem vencimento: ${totalNoDue}\n\n`+
+      `Os faturamentos de JAN/2026 a JUL/2026 foram marcados automaticamente como "Emitido no banco".`
+    );
+
+  }catch(e){
+
+    alert(
+      `Não consegui importar os PDFs:\n${e.message||e}`
+    );
+
+  }finally{
+
+    input.value='';
+
+  }
+}
+
+function clientDatalist(){
+  return `<datalist id="boletoClients">${clients.map(x=>`<option value="${esc(x.name)}"></option>`).join('')}</datalist>`;
+}
+function openBoleto(id=null){
+  const x=id?boletos.find(b=>b.id===id):{
+    client:'',due:today(),value:'',docNumber:`BOL-${String(boletos.length+1).padStart(4,'0')}`,
+    bank:'Integração pendente',description:'Cobrança BRCONDOS',details:'',status:'aguardando_integracao',
+    receiptDate:'',flowId:null,sourceKey:'',competence:''
+  };
+  if(!x)return;
+  openModal(id?'Editar boleto':'Emitir boleto',`
+    ${clientDatalist()}
+    <div class="modal-grid">
+      ${field('Cliente',`<input id="b_client_name" list="boletoClients" value="${esc(x.client||'')}" placeholder="Digite ou escolha o cliente">`)}
+      ${field('Vencimento',`<input id="b_due" type="date" value="${x.due||''}">`)}
+      ${field('Valor',`<input id="b_value" type="text" inputmode="decimal" value="${moneyInputBR(x.value)}" placeholder="0,00">`)}
+      ${field('Seu número / referência',`<input id="b_number" value="${esc(x.docNumber||'')}">`)}
+      ${field('Banco',`<select id="b_bank"><option ${x.bank==='Integração pendente'?'selected':''}>Integração pendente</option><option ${x.bank==='Sicredi'?'selected':''}>Sicredi</option><option ${x.bank==='Sicoob'?'selected':''}>Sicoob</option><option ${x.bank==='Outro banco'?'selected':''}>Outro banco</option></select>`)}
+      ${field('Descrição',`<input id="b_desc" value="${esc(x.description||'')}">`)}
+      <div class="field" style="grid-column:1/-1"><label>Detalhes</label><textarea id="b_details" rows="4" placeholder="RPA, número de lançamento, observações...">${esc(x.details||'')}</textarea></div>
+    </div>
+    <div class="notice" style="margin-top:16px">O campo <b>Detalhes</b> fica salvo no boleto, aparece na listagem, no relatório e na impressão.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveBoleto(${id||'null'})">${id?'Salvar alterações':'Emitir boleto'}</button></div>`);
+}
+function saveBoleto(id){
+  const old=id?boletos.find(x=>x.id===id):null;
+  const clientName=val('b_client_name');
+  const c=findClientByLooseName(clientName);
+  const due=val('b_due');
+  const obj={
+    id:id||Date.now(),clientId:c?.id||old?.clientId||0,client:clientName,docNumber:val('b_number'),due,
+    value:parseMoneyBR(val('b_value')),description:val('b_desc'),details:val('b_details'),bank:val('b_bank'),
+    status:old?.status==='recebido'?'recebido':(due?'aguardando_integracao':'pendente_vencimento'),
+    receiptDate:old?.receiptDate||'',flowId:old?.flowId||null,sourceKey:old?.sourceKey||'',competence:old?.competence||'',
+    sicrediRegistered:old?.sicrediRegistered||false,
+    sicrediNossoNumero:old?.sicrediNossoNumero||'',
+    sicrediLi
