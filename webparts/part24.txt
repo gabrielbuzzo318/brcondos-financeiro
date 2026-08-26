@@ -1,0 +1,229 @@
+utton class="btn primary" onclick="openParty('supplier')">+ Novo fornecedor</button>
+      </div>
+    </div>
+
+    <div id="supplierCnpjSyncNotice" class="notice" style="display:none"></div>
+
+    <div class="notice">
+      <b>Cadastro automático:</b> informe o CNPJ e clique em <b>Consultar CNPJ</b>.
+      O sistema tenta preencher razão social, fantasia, situação, endereço, CEP, contato e CNAE.
+    </div>
+
+    <div class="filter-bar">
+      <div class="field search">
+        <label>Pesquisar fornecedor</label>
+        <input
+          id="supplier_search"
+          type="text"
+          placeholder="Nome, fantasia, CNPJ..."
+          oninput="filterSuppliersTable()"
+        >
+      </div>
+
+      <button class="btn" onclick="clearSuppliersFilter()">Limpar</button>
+      <div id="supplier_filter_result" class="filter-result"></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fornecedor</th>
+            <th>CNPJ / CPF</th>
+            <th>Endereço</th>
+            <th>Contato</th>
+            <th>Situação</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${suppliers.length?suppliers.map(x=>`
+            <tr data-search="${esc([x.name,x.tradeName,x.doc,x.city,x.status].filter(Boolean).join(' '))}">
+              <td>
+                <b>${esc(x.name)}</b>
+                ${x.tradeName?`<div class="subtle">${esc(x.tradeName)}</div>`:''}
+                ${x.dataUpdated?`<div class="subtle">Atualizado: ${esc(x.dataUpdated)}</div>`:''}
+              </td>
+
+              <td>
+                ${esc(x.doc||'-')}
+                ${x.cnae?`<div class="subtle">CNAE: ${esc(x.cnae)}</div>`:''}
+              </td>
+
+              <td>
+                ${x.street
+                  ?`${esc(x.street)}${x.number?' , '+esc(x.number):''}${x.complement?' - '+esc(x.complement):''}
+                    <div class="subtle">${[x.district,x.city,x.state,x.zip].filter(Boolean).map(esc).join(' • ')}</div>`
+                  :(x.city?`${esc(x.city)}${x.state?' / '+esc(x.state):''}`:'<span class="subtle">Ainda não consultado</span>')
+                }
+              </td>
+
+              <td>
+                ${esc(x.email||'-')}
+                ${x.phone?`<div class="subtle">${esc(x.phone)}</div>`:''}
+              </td>
+
+              <td>
+                ${x.status
+                  ?`<span class="badge ${x.status.toLowerCase().includes('ativa')?'green':'gray'}">${esc(x.status)}</span>`
+                  :'-'
+                }
+              </td>
+
+              <td>
+                <div class="actions">
+                  ${x.doc?`<button class="btn small" onclick="syncSingleSupplierCnpj(${x.id})">Consultar</button>`:''}
+                  <button class="btn small" onclick="openParty('supplier',${x.id})">Editar</button>
+                  <button class="btn small danger" onclick="delParty('supplier',${x.id})">Excluir</button>
+                </div>
+              </td>
+            </tr>
+          `).join(''):`<tr><td colspan="6" class="empty">Nenhum fornecedor cadastrado.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  filterSuppliersTable();
+}
+
+function filterSuppliersTable(){
+  const q=normalizeSearchText(
+    document.getElementById('supplier_search')?.value||''
+  );
+
+  const rows=[
+    ...document.querySelectorAll('#view-fornecedores tbody tr[data-search]')
+  ];
+
+  let visible=0;
+
+  rows.forEach(tr=>{
+    const hay=normalizeSearchText(tr.dataset.search||'');
+    const show=!q||hay.includes(q);
+
+    tr.style.display=show?'':'none';
+    if(show)visible++;
+  });
+
+  const result=document.getElementById('supplier_filter_result');
+  if(result)result.textContent=`${visible} de ${rows.length} fornecedor(es)`;
+}
+
+function clearSuppliersFilter(){
+  const input=document.getElementById('supplier_search');
+  if(input)input.value='';
+  filterSuppliersTable();
+}
+
+function openParty(type,id=null){
+  const list=type==='client'?clients:suppliers;
+  const x=id?list.find(t=>t.id===id):normalizeParty({id:Date.now()});
+  openModal(type==='client'?'Cliente':'Fornecedor',`
+    <div class="modal-grid">
+      <div class="field">
+        <label>CNPJ / CPF</label>
+        <div style="display:flex;gap:7px">
+          <input id="p_doc" value="${esc(x.doc||'')}" style="flex:1" placeholder="Digite o CNPJ">
+          <button class="btn" type="button" onclick="lookupPartyForm()">Consultar CNPJ</button>
+        </div>
+      </div>
+      ${field('Razão Social / Nome',`<input id="p_name" value="${esc(x.name)}">`)}
+      ${field('Nome Fantasia',`<input id="p_trade" value="${esc(x.tradeName||'')}">`)}
+      ${field('Situação cadastral',`<input id="p_status" value="${esc(x.status||'')}">`)}
+      ${field('E-mail',`<input id="p_email" type="email" value="${esc(x.email||'')}">`)}
+      ${field('Telefone',`<input id="p_phone" value="${esc(x.phone||'')}">`)}
+      ${field('CEP',`<input id="p_zip" value="${esc(x.zip||'')}">`)}
+      ${field('Logradouro',`<input id="p_street" value="${esc(x.street||'')}">`)}
+      ${field('Número',`<input id="p_number" value="${esc(x.number||'')}">`)}
+      ${field('Complemento',`<input id="p_complement" value="${esc(x.complement||'')}">`)}
+      ${field('Bairro',`<input id="p_district" value="${esc(x.district||'')}">`)}
+      ${field('Cidade',`<input id="p_city" value="${esc(x.city||'')}">`)}
+      ${field('Código IBGE cidade',`<input id="p_city_ibge" maxlength="7" inputmode="numeric" value="${esc(x.cityIbge||((looseName(x.city)==='SAOJOSEDORIOPRETO')?'3549805':''))}" placeholder="3549805">`)}
+      ${field('UF',`<input id="p_state" maxlength="2" value="${esc(x.state||'')}">`)}
+      ${field('CNAE principal',`<input id="p_cnae" value="${esc(x.cnae||'')}">`)}
+${type==='client'?field('Documento de faturamento',`<select id="p_billing_document"><option value="nfse" ${x.billingDocument!=='receipt'?'selected':''}>NFS-e</option><option value="receipt" ${x.billingDocument==='receipt'?'selected':''}>Recibo</option></select>`):''}
+${type==='client'?field('Início do contrato',`<input id="p_contract_start" type="date" value="${esc(x.contractStart||'')}">`):''}
+${type==='client'?field('Quantidade de unidades',`<input id="p_units" type="number" min="0" step="1" value="${Number(x.units||0)}">`):''}
+${type==='client'?field('Contrato',`<input id="p_contract_file" type="file" accept=".pdf,.doc,.docx,image/*">${x.contractAttachmentName?`<div class="subtle">Contrato atual: ${esc(x.contractAttachmentName)}</div>`:''}`):''}
+    </div>
+    <div id="partyLookupNotice" class="subtle" style="margin-top:10px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveParty('${type}',${id||'null'})">Salvar</button>
+    </div>`);
+}
+async function lookupPartyForm(){
+  const doc=val('p_doc');
+  const notice=document.getElementById('partyLookupNotice');
+  if(cleanCnpj(doc).length!==14){notice.textContent='Digite um CNPJ válido com 14 números.';return}
+  notice.textContent='Consultando CNPJ...';
+  try{
+    const data=await fetchCnpjPublic(doc);
+    document.getElementById('p_name').value=data.razao_social||'';
+    document.getElementById('p_trade').value=data.nome_fantasia||'';
+    document.getElementById('p_status').value=data.descricao_situacao_cadastral||data.situacao_cadastral||'';
+    document.getElementById('p_email').value=data.email||'';
+    document.getElementById('p_phone').value=formatPhone(data.ddd_telefone_1||'');
+    document.getElementById('p_zip').value=formatCep(data.cep||'');
+    document.getElementById('p_street').value=[data.descricao_tipo_de_logradouro,data.logradouro].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+    document.getElementById('p_number').value=data.numero||'';
+    document.getElementById('p_complement').value=data.complemento||'';
+    document.getElementById('p_district').value=data.bairro||'';
+    document.getElementById('p_city').value=data.municipio||'';
+    document.getElementById('p_state').value=data.uf||'';
+    if(looseName(data.municipio)==='SAOJOSEDORIOPRETO')document.getElementById('p_city_ibge').value='3549805';
+    document.getElementById('p_cnae').value=data.cnae_fiscal?`${data.cnae_fiscal} - ${data.cnae_fiscal_descricao||''}`.trim():'';
+    notice.textContent='Dados carregados. Confira e clique em Salvar.';
+  }catch(e){
+    notice.textContent=`Não foi possível consultar este CNPJ. ${e.message||''}`;
+  }
+}
+
+async function saveParty(type,id){
+  const existing=(type==='client'?clients:suppliers).find(x=>x.id===id);
+
+  let contractAttachmentName=existing?.contractAttachmentName||'';
+  let contractAttachmentData=existing?.contractAttachmentData||'';
+
+  if(type==='client'){
+    try{
+      const file=document.getElementById('p_contract_file')?.files?.[0];
+      if(file){
+        const payload=await fileToData(file);
+        if(payload){
+          contractAttachmentName=payload.name;
+          contractAttachmentData=payload.data;
+        }
+      }
+    }catch(e){
+      return alert(e.message);
+    }
+  }
+
+  const obj=normalizeParty({
+    id:id||Date.now(),
+    name:val('p_name'),
+    tradeName:val('p_trade'),
+    doc:val('p_doc'),
+    status:val('p_status'),
+    email:val('p_email'),
+    phone:val('p_phone'),
+    zip:val('p_zip'),
+    street:val('p_street'),
+    number:val('p_number'),
+    complement:val('p_complement'),
+    district:val('p_district'),
+    city:val('p_city'),
+    state:val('p_state').toUpperCase(),
+    cityIbge:val('p_city_ibge'),
+    cnae:val('p_cnae'),
+    dataUpdated:existing?.dataUpdated||'',
+
+    contractStart:type==='client'?val('p_contract_start'):'',
+    contractEnd:type==='client'?(existing?.contractEnd||''):'',
+    units:type==='client'?Number(val('p_units')||0):0,
+    contractAttachmentName:type==='client'?contractAttachmentName:'',
+    contractAttachmentData:type==='client'?contractAttachmentData:'',
+    billingDocument:type==='client'?(val('p_billing_document')||'n
