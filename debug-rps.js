@@ -7,7 +7,8 @@ if (numero) {
   const endpoints = [
     original,
     'https://v2-ws-homologacao.giss.com.br/service-ws/nf/nfse-ws',
-    'https://ws-homologacao.giss.com.br/service-ws/nf/nfse-ws'
+    'https://ws-homologacao.giss.com.br/service-ws/nf/nfse-ws',
+    'https://ws-sjrp.giss.com.br/service-ws/nf/nfse-ws'
   ].filter((v,i,a)=>v && a.indexOf(v)===i);
 
   for (const endpoint of endpoints) {
