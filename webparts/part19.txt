@@ -1,0 +1,141 @@
+n>Controle da rotina de pagamentos da BRCONDOS • ${payables.filter(x=>x.sourceKey&&x.sourceKey.startsWith('resultxls-')).length} contas importadas</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="openReportModal('payables')">▤ Relatório</button>
+        <button class="btn primary" onclick="openPayable()">+ Nova conta a pagar</button>
+      </div>
+    </div>
+    <div class="cards grid">
+      <div class="card accent-orange"><div class="kpi-label">A PAGAR</div><div class="kpi-value">${money(aberto)}</div><div class="kpi-foot">${rows.filter(x=>x.status==='aberto').length} conta(s)</div></div>
+      <div class="card" style="border-top:3px solid var(--danger)"><div class="kpi-label">VENCIDO</div><div class="kpi-value">${money(vencido)}</div><div class="kpi-foot">${rows.filter(x=>x.status==='vencido').length} conta(s)</div></div>
+      <div class="card accent-blue"><div class="kpi-label">AGENDADO</div><div class="kpi-value">${money(agendado)}</div><div class="kpi-foot">${rows.filter(x=>x.status==='agendado').length} conta(s)</div></div>
+      <div class="card accent-green"><div class="kpi-label">PAGO</div><div class="kpi-value">${money(pago)}</div><div class="kpi-foot">${rows.filter(x=>x.status==='pago').length} conta(s)</div></div>
+    </div>
+    <div class="notice"><b>Fluxo integrado:</b> ao dar baixa, a conta entra automaticamente no Fluxo de Caixa. O botão <b>Agendar</b> controla o agendamento dentro do sistema; o envio do pagamento ao banco será possível quando conectarmos a API bancária.</div>
+    <div class="filter-bar">
+      <div class="field search">
+        <label>Pesquisar</label>
+        <input id="fin_search" type="text" placeholder="Nome, fornecedor, valor, categoria, PIX, código de barras..." oninput="filterFinanceiroTable()">
+      </div>
+      <div class="field">
+        <label>De</label>
+        <input id="fin_from" type="date" onchange="filterFinanceiroTable()">
+      </div>
+      <div class="field">
+        <label>Até</label>
+        <input id="fin_to" type="date" onchange="filterFinanceiroTable()">
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="fin_status" onchange="filterFinanceiroTable()">
+          <option value="">Todos</option>
+          <option value="aberto">A pagar</option>
+          <option value="vencido">Vencido</option>
+          <option value="agendado">Agendado</option>
+          <option value="pago">Pago</option>
+        </select>
+      </div>
+      <button class="btn" onclick="clearFinanceiroFilters()">Limpar filtros</button>
+      <div id="fin_filter_result" class="filter-result"></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr>
+      <th>Vencimento</th><th>Fornecedor</th><th>Descrição</th><th>Recorrência</th><th>Pagamento</th><th>Status</th><th>Valor</th><th>Anexo</th><th></th>
+    </tr></thead><tbody>
+    ${rows.length?rows.map(x=>`<tr data-date="${x.due||''}" data-status="${x.status}" data-search="${esc([
+        x.due, formatDate(x.due), x.supplier, x.description, x.category, x.paymentMethod, x.status,
+        x.value, money(x.value), x.pixCode, x.barcode, x.notes, x.scheduledDate, formatDate(x.scheduledDate||''), x.paymentDate, formatDate(x.paymentDate||'')
+      ].filter(Boolean).join(' ').toLowerCase())}">
+      <td>${formatDate(x.due)}</td>
+      <td><b>${x.supplier||'-'}</b></td>
+      <td>${x.description}<div class="subtle">${x.category||'-'}</div></td>
+      <td>${recurrenceBadge(x)}</td>
+      <td>${x.paymentMethod||'-'}${x.scheduledDate?`<div class="subtle">Ag.: ${formatDate(x.scheduledDate)}</div>`:''}</td>
+      <td>${statusBadge(x.status)}${x.paymentDate?`<div class="subtle">Baixa: ${formatDate(x.paymentDate)}</div>`:''}</td>
+      <td class="amount neg">${money(x.value)}</td>
+      <td>${attachmentCell(x)}</td>
+      <td><div class="actions">
+        ${x.status!=='pago'
+          ? `<button class="btn small" onclick="openSchedule(${x.id})">Agendar</button><button class="btn small green" onclick="markPayablePaid(${x.id})">Dar baixa</button>`
+          : `<button class="btn small danger" onclick="reversePayablePayment(${x.id})">Estornar baixa</button>`}
+        <button class="btn small" onclick="openPayable(${x.id})">Editar</button>
+        <button class="btn small danger" onclick="delPayable(${x.id})">Excluir</button>
+      </div></td>
+    </tr>`).join(''):`<tr><td colspan="9" class="empty">Nenhuma conta a pagar cadastrada.</td></tr>`}
+    </tbody></table></div>`;
+}
+
+function openPayable(id=null){
+  const x=id?payables.find(t=>t.id===id):{due:today(),supplier:'',description:'',category:'',value:'',paymentMethod:'PIX',status:'aberto',notes:'',flowId:null,recurring:false,frequency:'monthly',repeatCount:12,pixCode:'',barcode:'',scheduledDate:'',paymentDate:'',attachmentName:'',attachmentData:''};
+  openModal('Conta a pagar',`
+    <div class="modal-grid">
+      ${field('Vencimento',`<input id="ap_due" type="date" value="${x.due}">`)}
+      ${field('Fornecedor',`<select id="ap_supplier"><option value="">Selecione</option>${suppliers.map(s=>`<option value="${esc(s.name)}" ${x.supplier===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}</select>`)}
+      ${field('Descrição',`<input id="ap_desc" value="${esc(x.description||'')}">`)}
+      ${field('Plano de contas',`<div style="display:flex;gap:7px"><select id="ap_cat" style="flex:1">${accountOptions('saida',x.category||'')}</select><button class="btn" type="button" onclick="quickCreateAccount('saida','ap_cat')">+</button></div>`)}
+      ${field('Valor',`<input id="ap_value" type="text" inputmode="decimal" value="${moneyInputBR(x.value)}" placeholder="0,00">`)}
+      ${field('Forma de pagamento',`<select id="ap_method">
+        <option ${x.paymentMethod==='PIX'?'selected':''}>PIX</option>
+        <option ${x.paymentMethod==='Boleto'?'selected':''}>Boleto</option>
+        <option ${x.paymentMethod==='Transferência'?'selected':''}>Transferência</option>
+        <option ${x.paymentMethod==='Débito automático'?'selected':''}>Débito automático</option>
+        <option ${x.paymentMethod==='Outro'?'selected':''}>Outro</option>
+      </select>`)}
+      ${field('Status',`<select id="ap_status">
+        <option value="aberto" ${x.status==='aberto'||x.status==='vencido'?'selected':''}>A pagar</option>
+        <option value="agendado" ${x.status==='agendado'?'selected':''}>Agendado</option>
+        <option value="pago" ${x.status==='pago'?'selected':''}>Pago</option>
+      </select>`)}
+      ${field('Data do agendamento',`<input id="ap_scheduled" type="date" value="${x.scheduledDate||''}">`)}
+      ${field('Código PIX / Copia e Cola',`<textarea id="ap_pix" rows="3">${esc(x.pixCode||'')}</textarea>`)}
+      ${field('Código de barras / Linha digitável',`<textarea id="ap_barcode" rows="3">${esc(x.barcode||'')}</textarea>`)}
+      ${field('Observação',`<input id="ap_notes" value="${esc(x.notes||'')}">`)}
+      ${field('Anexo (PDF ou imagem)',`<input id="ap_attachment" type="file" accept=".pdf,image/*"><div class="subtle">${x.attachmentName?`Atual: ${esc(x.attachmentName)}`:'Nenhum anexo'}</div>`)}
+    </div>
+    <div class="card" style="margin-top:14px;box-shadow:none">
+      <div style="display:flex;align-items:center;gap:10px">
+        <input id="ap_recurring" type="checkbox" ${x.recurring?'checked':''} onchange="toggleRecurrenceFields()">
+        <label for="ap_recurring" style="font-size:13px;font-weight:800">Esta conta é recorrente</label>
+      </div>
+      <div id="recurrenceFields" class="modal-grid" style="margin-top:12px;${x.recurring?'':'display:none'}">
+        ${field('Frequência',`<select id="ap_frequency">
+          <option value="monthly" ${x.frequency==='monthly'?'selected':''}>Mensal</option>
+          <option value="weekly" ${x.frequency==='weekly'?'selected':''}>Semanal</option>
+          <option value="yearly" ${x.frequency==='yearly'?'selected':''}>Anual</option>
+        </select>`)}
+        ${field('Quantidade de lançamentos',`<input id="ap_repeat" type="number" min="2" max="60" value="${x.repeatCount||12}">`)}
+      </div>
+      <div class="subtle" style="margin-top:8px">Ao salvar uma nova conta recorrente, o sistema cria automaticamente os próximos vencimentos.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="savePayable(${id||'null'})">Salvar</button>
+    </div>`);
+}
+function toggleRecurrenceFields(){
+  const box=document.getElementById('recurrenceFields');
+  box.style.display=document.getElementById('ap_recurring').checked?'grid':'none';
+}
+function addPeriod(dateStr,frequency,n){
+  const [y,m,d]=dateStr.split('-').map(Number);
+  if(frequency==='weekly'){
+    const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()+7*n);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+  if(frequency==='yearly'){
+    const yy=y+n, mm=m, last=new Date(yy,mm,0).getDate(), dd=Math.min(d,last);
+    return `${yy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+  }
+  const total=(m-1)+n, yy=y+Math.floor(total/12), mm=(total%12)+1, last=new Date(yy,mm,0).getDate(), dd=Math.min(d,last);
+  return `${yy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+}
+function fileToData(file){
+  return new Promise((resolve,reject)=>{
+    if(!file) return resolve(null);
+    if(file.size>1800000) return reject(new Error('O anexo deve ter no máximo 1,8 MB nesta versão local.'));
+    const r=new FileReader(); r.onload=()=>resolve({name:file.name,data:r.result}); r.onerror=reject; r.readAsDataURL(file);
+  });
+}
+async function savePayable(id){
+  const old=id?payables.find(x=>x.id===id):null;
+  const recurring=document.getElementById('ap_recurring').checked;
+  const repeatCount=recurring?Math.max(2,Math.min(60,Number(val('ap_repeat')||12))):1;
+  let attachmentName=old?.attachmentName||'', 
