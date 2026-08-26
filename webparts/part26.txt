@@ -1,0 +1,189 @@
+eData('nfse', nfse);
+  localStorage.setItem(chave, 'ok');
+})();
+
+function receiptDefaultIssueDate(competence,boletoDue=''){
+  if(boletoDue)return boletoDue;
+  const m=String(competence||'').match(/^(\d{4})-(\d{2})$/);
+  if(!m)return today();
+  let year=Number(m[1]), month=Number(m[2])+1;
+  if(month===13){month=1;year++;}
+  return `${year}-${String(month).padStart(2,'0')}-10`;
+}
+function receiptYear(row){
+  return String(row?.competence||row?.issueDate||today()).slice(0,4) || String(new Date().getFullYear());
+}
+function nextReceiptNumber(year){
+  year=String(year||new Date().getFullYear());
+  const saved=Number(localStorage.getItem(`brcondos_receipt_last_${year}`)||0);
+  const used=receipts.map(r=>{
+    const m=String(r.receiptNumber||'').match(/^(\d+)\/(\d{4})$/);
+    return m&&m[2]===year?Number(m[1]):0;
+  });
+  const next=Math.max(saved,...used,0)+1;
+  localStorage.setItem(`brcondos_receipt_last_${year}`,String(next));
+  return `${String(next).padStart(4,'0')}/${year}`;
+}
+function syncBillingFromBoletos(){
+  const source=boletos.filter(b=>b.competence && b.section!=='CONTABIL' && !/CONTABIL/i.test(String(b.description||'')));
+  let addedNfse=0,addedReceipts=0,ignored=0,missingClient=0,converted=0,locked=0;
+
+  source.forEach((b,i)=>{
+    const c=clients.find(x=>x.id===b.clientId)||findClientByLooseName(b.client);
+    if(!c){missingClient++;return;}
+
+    const nfExisting=nfse.find(x=>String(x.sourceBoletoId)===String(b.id));
+    const recExisting=receipts.find(x=>String(x.sourceBoletoId)===String(b.id));
+
+    if(c.billingDocument==='receipt'){
+      if(recExisting){ignored++;return;}
+      if(nfExisting){
+        if(['emitida_nfse','cancelada_nfse'].includes(nfExisting.status)){locked++;return;}
+        nfse=nfse.filter(x=>x.id!==nfExisting.id);
+        converted++;
+      }
+
+      const issueDate=receiptDefaultIssueDate(b.competence,b.due||'');
+      const year=String(b.competence||issueDate).slice(0,4);
+      receipts.push(normalizeReceipt({
+        id:Date.now()+i+Math.floor(Math.random()*100),
+        sourceBoletoId:b.id,
+        clientId:c.id,
+        client:c.name||b.client,
+        competence:b.competence,
+        issueDate,
+        value:Number(b.value||0),
+        description:'Honorários administrativos',
+        receiptNumber:nextReceiptNumber(year),
+        status:'pendente'
+      }));
+      addedReceipts++;
+      return;
+    }
+
+    if(nfExisting){ignored++;return;}
+    if(recExisting){
+      if(recExisting.status==='gerado'){locked++;return;}
+      receipts=receipts.filter(x=>x.id!==recExisting.id);
+      converted++;
+    }
+
+    nfse.push({
+      id:Date.now()+i+Math.floor(Math.random()*100),sourceBoletoId:b.id,clientId:c.id||b.clientId||0,client:b.client,
+      competence:b.competence,value:Number(b.value||0),description:'Administração de Condomínios.',
+      rpsNumber:nextRpsNumber(),issueDate:today(),serviceDate:'',aliquotaPct:null,status:'rascunho',
+      nfseNumber:'',verificationCode:'',gissProtocol:'',lastError:'',gissResponse:null
+    });
+    addedNfse++;
+  });
+
+  saveData('nfse',nfse);
+  saveData('receipts',receipts);
+  renderAll();
+  alert(
+    `Sincronização concluída.\n\n`+
+    `NFS-e criadas: ${addedNfse}\n`+
+    `Recibos criados: ${addedReceipts}\n`+
+    `Convertidos após mudança no cadastro: ${converted}\n`+
+    `Já sincronizados: ${ignored}\n`+
+    `Cliente não encontrado: ${missingClient}\n`+
+    `Documentos já emitidos/gerados e preservados: ${locked}\n\n`+
+    `O sistema separou automaticamente conforme o campo Documento de faturamento do cadastro de Clientes.`
+  );
+}
+
+function syncNfseFromBoletos(){
+  syncBillingFromBoletos();
+}
+
+function openNfseMonthSettings(comp=''){
+  const fallback=comp||nfse.map(x=>x.competence).filter(Boolean).sort().reverse()[0]||boletos.map(x=>x.competence).filter(Boolean).sort().reverse()[0]||new Date().toISOString().slice(0,7);
+  const cfg=nfseSetting(fallback);
+  openModal('Configurar competência da NFS-e',`
+    <div class="notice"><b>Configure uma vez por mês.</b> Todas as NFS-e dessa competência usarão a mesma alíquota, salvo ajuste individual.</div>
+    <div class="modal-grid">
+      ${field('Competência',`<input id="nf_cfg_comp" type="month" value="${esc(fallback)}" onchange="loadNfseMonthConfig()">`)}
+      ${field('Alíquota ISS (%)',`<input id="nf_cfg_aliq" type="text" inputmode="decimal" value="${cfg.aliquotaPct!==undefined?String(cfg.aliquotaPct).replace('.',','):''}" placeholder="4,41">`)}
+      ${field('Data da prestação',`<input id="nf_cfg_service_date" type="date" value="${cfg.serviceDate||nfseLastDay(fallback)}">`)}
+    </div>
+    <div class="notice">Ex.: 4,41% é convertida pelo backend para <b>0.0441</b> no XML da Giss. ISS retido fica como <b>Não</b> por padrão.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveNfseMonthConfig()">Salvar configuração</button></div>`);
+}
+function loadNfseMonthConfig(){
+  const comp=val('nf_cfg_comp');const cfg=nfseSetting(comp);
+  document.getElementById('nf_cfg_aliq').value=cfg.aliquotaPct!==undefined?String(cfg.aliquotaPct).replace('.',','):'';
+  document.getElementById('nf_cfg_service_date').value=cfg.serviceDate||nfseLastDay(comp);
+}
+function saveNfseMonthConfig(){
+  const comp=val('nf_cfg_comp'), aliq=parseMoneyBR(val('nf_cfg_aliq')), serviceDate=val('nf_cfg_service_date');
+  if(!comp||!aliq||!serviceDate)return alert('Preencha competência, alíquota e data da prestação.');
+  nfseSettings[comp]={aliquotaPct:aliq,serviceDate};
+  saveData('nfseSettings',nfseSettings);closeModal();renderAll();
+}
+function openNfseEdit(id){
+  const x=nfse.find(n=>n.id===id);if(!x)return;
+  const locked=['emitida_nfse','cancelada_nfse'].includes(x.status);
+  const lockAttr=locked?'disabled':'';
+  openModal(locked?'Visualizar NFS-e':'Editar NFS-e',`
+    ${locked
+      ? `<div class="notice"><b>NFS-e já ${x.status==='cancelada_nfse'?'cancelada':'emitida'}.</b> Os dados ficam somente para consulta e não podem ser alterados localmente.</div>`
+      : `<div class="notice"><b>Descrição da NFS-e:</b> altere a discriminação abaixo antes de emitir. O botão <b>Emitir todas</b> usará exatamente o texto salvo aqui.</div>`
+    }
+    <div class="modal-grid">
+      ${field('Cliente',`<input value="${esc(x.client)}" disabled>`)}
+      ${field('RPS',`<input id="nf_rps" inputmode="numeric" value="${esc(x.rpsNumber)}" ${lockAttr}>`)}
+      ${field('Competência',`<input id="nf_comp" type="month" value="${esc(x.competence||'')}" ${lockAttr}>`)}
+      ${field('Data emissão/RPS',`<input id="nf_issue" type="date" value="${x.issueDate||today()}" ${lockAttr}>`)}
+      ${field('Data da prestação',`<input id="nf_service" type="date" value="${nfseServiceDate(x.competence,x)}" ${lockAttr}>`)}
+      ${field('Alíquota ISS (%)',`<input id="nf_aliq" type="text" inputmode="decimal" value="${nfseAliquota(x.competence,x)?String(nfseAliquota(x.competence,x)).replace('.',','):''}" ${lockAttr}>`)}
+      ${field('Valor',`<input id="nf_value" type="text" inputmode="decimal" value="${moneyInputBR(x.value)}" ${lockAttr}>`)}
+      <div class="field" style="grid-column:1/-1">
+        <label>Descrição / Discriminação do serviço</label>
+        <textarea id="nf_desc" rows="4" ${lockAttr}>${esc(x.description||'Administração de Condomínios.')}</textarea>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="closeModal()">${locked?'Fechar':'Cancelar'}</button>
+      ${!locked?`<button class="btn primary" onclick="saveNfseEdit(${id})">Salvar alterações</button>`:''}
+    </div>`);
+}
+function saveNfseEdit(id){
+  const current=nfse.find(x=>x.id===id);
+  if(!current)return;
+  if(['emitida_nfse','cancelada_nfse'].includes(current.status)){
+    return alert('Essa NFS-e já foi emitida/cancelada e não pode ser alterada localmente.');
+  }
+  const description=val('nf_desc');
+  if(!description)return alert('Informe a descrição/discriminação do serviço.');
+  nfse=nfse.map(x=>x.id===id?{
+    ...x,
+    rpsNumber:val('nf_rps').replace(/\D/g,''),
+    competence:val('nf_comp'),
+    issueDate:val('nf_issue'),
+    serviceDate:val('nf_service'),
+    aliquotaPct:parseMoneyBR(val('nf_aliq')),
+    value:parseMoneyBR(val('nf_value')),
+    description
+  }:x);
+  saveData('nfse',nfse);closeModal();renderAll();
+}
+async function testGissConnection(){
+  try{
+    const h=await fetch('/api/nfse/health');const health=await h.json();
+    if(!health.configured)throw new Error(`Falta configurar: ${(health.missing||[]).join(', ')}`);
+    const r=await fetch('/api/nfse/wsdl-test');const data=await r.json();
+    if(!r.ok)throw new Error(data.error||'Falha no teste do WSDL.');
+    alert(`GISS CONECTADA ✅\n\nAmbiente: ${String(data.ambiente||'').toUpperCase()}\nCertificado: OK\nWSDL: OK\n\nMétodos encontrados: ${(data.metodos||[]).filter(x=>/RecepcionarLoteRps|ConsultarNfse|CancelarNfse/i.test(x)).slice(0,8).join(', ')||'WSDL carregado'}`);
+  }catch(e){alert(`Teste Giss não passou:\n${e.message}`);}
+}
+async function previewNfseXml(id){
+  const row=nfse.find(x=>x.id===id);if(!row)return;
+  try{
+    const payload=nfsePayload(row);
+    const r=await fetch('/api/nfse/preview?assinar=1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await r.json();if(!r.ok)throw new Error([data.error,Array.isArray(data.details)?data.details.join(', '):data.details].filter(Boolean).join(' - '));
+    openModal(`Prévia XML • RPS ${esc(row.rpsNumber)}`,`
+      <div class="notice"><b>Nada foi transmitido.</b> Esta tela apenas gerou e assinou o XML localmente usando o A1.</div>
+      <div class="field"><label>XML assinado</label><textarea rows="18" style="font-family:monospace;font-size:11px" readonly>${esc(data.dataXml||'')}</textarea></div>
+      <div style="display:flex;justify-content:flex-end"><button class="btn primary" onclick="closeModal()">Fechar</button></div>`);
+  }catch(e){alert(`Não co
