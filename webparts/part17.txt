@@ -1,0 +1,61 @@
+ly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-238","due":"2027-06-10","supplier":"BRCONDOS-PLAZA CORPORATE","description":"Taxa de condominio","category":"Taxa de condominio","value":350.0,"paymentMethod":"","status":"aberto","notes":"","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-239","due":"2027-06-10","supplier":"BANCO COOPERATIVO SICREDI S.A.","description":"Integralização de Capital","category":"Despesas Bancárias","value":20.0,"paymentMethod":"","status":"aberto","notes":"Integralização de Capital","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-240","due":"2027-06-20","supplier":"PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA","description":"Compra da Sala do Plaza Corporate.","category":"Imóvel","value":12292.71,"paymentMethod":"","status":"aberto","notes":"Compra da Sala do Plaza Corporate.","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-241","due":"2027-07-10","supplier":"BANCO COOPERATIVO SICREDI S.A.","description":"Integralização de Capital","category":"Despesas Bancárias","value":20.0,"paymentMethod":"","status":"aberto","notes":"Integralização de Capital","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-242","due":"2027-07-20","supplier":"PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA","description":"Compra da Sala do Plaza Corporate.","category":"Imóvel","value":12292.71,"paymentMethod":"","status":"aberto","notes":"Compra da Sala do Plaza Corporate.","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-243","due":"2027-08-10","supplier":"BANCO COOPERATIVO SICREDI S.A.","description":"Integralização de Capital","category":"Despesas Bancárias","value":20.0,"paymentMethod":"","status":"aberto","notes":"Integralização de Capital","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-244","due":"2027-08-20","supplier":"PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA","description":"Compra da Sala do Plaza Corporate.","category":"Imóvel","value":12292.71,"paymentMethod":"","status":"aberto","notes":"Compra da Sala do Plaza Corporate.","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-245","due":"2027-09-10","supplier":"BANCO COOPERATIVO SICREDI S.A.","description":"Integralização de Capital","category":"Despesas Bancárias","value":20.0,"paymentMethod":"","status":"aberto","notes":"Integralização de Capital","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-246","due":"2027-09-20","supplier":"PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA","description":"Compra da Sala do Plaza Corporate.","category":"Imóvel","value":12292.71,"paymentMethod":"","status":"aberto","notes":"Compra da Sala do Plaza Corporate.","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-247","due":"2027-10-10","supplier":"BANCO COOPERATIVO SICREDI S.A.","description":"Integralização de Capital","category":"Despesas Bancárias","value":20.0,"paymentMethod":"","status":"aberto","notes":"Integralização de Capital","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-248","due":"2027-10-20","supplier":"PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA","description":"Compra da Sala do Plaza Corporate.","category":"Imóvel","value":12292.71,"paymentMethod":"","status":"aberto","notes":"Compra da Sala do Plaza Corporate.","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-249","due":"2027-11-10","supplier":"BANCO COOPERATIVO SICREDI S.A.","description":"Integralização de Capital","category":"Despesas Bancárias","value":20.0,"paymentMethod":"","status":"aberto","notes":"Integralização de Capital","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-250","due":"2027-11-20","supplier":"PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA","description":"Compra da Sala do Plaza Corporate.","category":"Imóvel","value":12292.71,"paymentMethod":"","status":"aberto","notes":"Compra da Sala do Plaza Corporate.","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-251","due":"2027-12-10","supplier":"BANCO COOPERATIVO SICREDI S.A.","description":"Integralização de Capital","category":"Despesas Bancárias","value":20.0,"paymentMethod":"","status":"aberto","notes":"Integralização de Capital","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""},{"sourceKey":"resultxls-252","due":"2027-12-20","supplier":"PLAZA CORPORATE - PAS CORPORATE INC IMB SPE LTDA","description":"Compra da Sala do Plaza Corporate.","category":"Imóvel","value":12292.71,"paymentMethod":"","status":"aberto","notes":"Compra da Sala do Plaza Corporate.","flowId":null,"recurring":false,"frequency":"monthly","repeatCount":1,"recurrenceGroup":null,"pixCode":"","barcode":"","scheduledDate":"","paymentDate":"","attachmentName":"","attachmentData":""}];
+
+(function mergeImportedPayables(){
+  // Remove apenas os dois registros demonstrativos das versões iniciais.
+  payables=payables.filter(p=>!(
+    (p.id===1 && p.supplier==='Alpha Serviços') ||
+    (p.id===2 && p.supplier==='Tech Predial')
+  ));
+
+  const existingKeys=new Set(payables.map(p=>p.sourceKey).filter(Boolean));
+  let nextId=2000000;
+
+  BRCONDOS_PAYABLE_IMPORT.forEach(item=>{
+    if(!existingKeys.has(item.sourceKey)){
+      payables.push(normalizePayable({...item,id:nextId++}));
+      existingKeys.add(item.sourceKey);
+    }
+  });
+
+  saveData('payables',payables);
+})();
+
+(function mergeImportedSuppliers(){
+  // Remove somente os fornecedores demonstrativos antigos, se ainda existirem.
+  suppliers=suppliers.filter(s=>![
+    'Alpha Serviços',
+    'Tech Predial'
+  ].includes(s.name));
+
+  const existingNames=new Set(suppliers.map(s=>String(s.name||'').trim().toLowerCase()));
+  const importedNames=[...new Set(BRCONDOS_PAYABLE_IMPORT.map(p=>p.supplier).filter(Boolean))];
+
+  importedNames.forEach((name,i)=>{
+    const key=String(name).trim().toLowerCase();
+    if(!existingNames.has(key)){
+      suppliers.push(normalizeParty({
+        id:3000000+i,
+        name:name,
+        tradeName:'',
+        doc:'',
+        email:'',
+        phone:'',
+        zip:'',
+        street:'',
+        number:'',
+        complement:'',
+        district:'',
+        city:'',
+        state:'',
+        status:'',
+        cnae:'',
+        dataUpdated:''
+      }));
+      existingNames.add(key);
+    }
+  });
+
+  saveData('suppliers',suppliers);
+})();
+
+const BRCONDOS_CLIENT_SEED = [{"doc": "27.964.630/0001-32", "name": "AKADIA"}, {"doc": "19.888.907/0001-67", "name": "ALTOS DE IBORUNA"}, {"doc": "25.529.263/0001-13", "name": "ASSOCIACAO DOS MORADORES DO CONDOMINIO RESIDENCIAL BOM JARDIM II"}, {"doc": "46.806.088/0001-34", "name": "ASSOCIACAO DOS MORADORES EPLENUM AMO EPLENUM"}, {"doc": "03.197.870/0001-90", "name": "ASSOCIACAO DOS PROP. DO RECANTO DOS CURIMBATAS"}, {"doc": "08.986.504/0001-34", "name": "ASSOCIACAO ECO VILLAGE"}, {"doc": "08.218.781/0001-05", "name": "ASSOCIACAO ECO VILLAGE I"}, {"doc": "26.717.974/0001-84", "name": "ASSOCIACAO LOTEAMENTO EUROPARK I"}, {"doc": "50.569.834/0001-90", "name": "ASSOCIACAO LOTEAMENTO EUROPARK II"}, {"doc": "23.818.526/0001-89", "name": "ASSOCIACAO QUINTA DO GOLFE HORIZONTES"}, {"doc": "23.729.329/0001-93", "name": "ASSOCIACAO QUINTA DO GOLFE JARDINS"}, {"doc": "23.622.496/0001-30", "name": "ASSOCIACAO RESIDENCIAL LAS VEGAS II"}, {"doc": "59.846.089/0001-54", "name": "ASSOCIACAO RESIDENCIAL MONTE CARLO"}, {"doc": "10.323.407/0001-03", "name": "CONDOMINIO BOSQUE VIVENDAS"}, {"doc": "53.213.203/0001-22", "name": "CONDOMINIO EDIFICIO GINES GOMES"}, {"doc": "03.503.569/0001-68", "name": "CONDOMINIO EDIFICIO JOAO PEDRO DE LUCA"}, {"doc": "56.357.445/0001-88", "name": "CONDOMINIO EDIFICIO MARIA LUCIA"}, {"doc": "71.745.285/0001-38", "name": "CONDOMINIO EDIFICIO MONT BLANC"}, {"doc": "05.895.468/0001-05", "name": 
