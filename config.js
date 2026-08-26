@@ -7,7 +7,7 @@ const text = (name, fallback = '') => String(process.env[name] ?? fallback).trim
 const digits = (name, fallback = '') => text(name, fallback).replace(/\D/g, '');
 
 let certPfxPath = text('GISS_CERT_PFX_PATH');
-const certPfxBase64Parts = [1,2,3,4]
+const certPfxBase64Parts = Array.from({ length: 8 }, (_, i) => i + 1)
   .map(i => text(`GISS_CERT_PFX_BASE64_${i}`))
   .filter(Boolean)
   .join('');
