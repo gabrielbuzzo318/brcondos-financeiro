@@ -19,7 +19,6 @@ const PORT = Number(process.env.PORT || 3000);
 app.disable('x-powered-by');
 app.use(express.json({ limit: '4mb' }));
 
-// Proteção real no servidor. A tela interna do HTML é mantida sem alteração.
 const APP_USER = String(process.env.APP_USER || '').trim();
 const APP_PASSWORD = String(process.env.APP_PASSWORD || '').trim();
 function safeEqual(a, b) {
@@ -48,10 +47,7 @@ const route = fn => async (req, res) => {
     if (!res.headersSent) res.json(data);
   } catch (err) {
     const status = Number(err?.status || 500);
-    res.status(status).json({
-      error: err?.message || 'Erro interno.',
-      details: err?.details ?? null
-    });
+    res.status(status).json({ error: err?.message || 'Erro interno.', details: err?.details ?? null });
   }
 };
 
@@ -64,8 +60,6 @@ app.get('/api/nfse/consultar-lote', route(req => consultarLoteRpsGiss(req.query.
 app.get('/api/nfse/consultar-numero', route(req => consultarNfsePorNumeroGiss({ numero: req.query.numero, pagina: req.query.pagina })));
 app.get('/api/nfse/consultar-rps', route(req => consultarNfsePorRpsGiss({ numero: req.query.numero, serie: req.query.serie, tipo: req.query.tipo })));
 
-// O front já possui os botões Sicredi. Sem credenciais configuradas no servidor,
-// devolvemos um erro explícito em vez de expor qualquer segredo no navegador.
 app.post('/api/boletos', (_req, res) => res.status(503).json({ error: 'Integração Sicredi ainda não configurada neste servidor.' }));
 app.get('/api/boletos/:nossoNumero', (_req, res) => res.status(503).json({ error: 'Integração Sicredi ainda não configurada neste servidor.' }));
 
@@ -79,7 +73,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     const status = getGissConfigStatus();
     console.log(`GISS config: ${status.configured ? 'OK' : 'INCOMPLETA'}`);
 
-    const splitB64 = [1,2,3,4]
+    const splitB64 = Array.from({ length: 8 }, (_, i) => i + 1)
       .map(i => String(process.env[`GISS_CERT_PFX_BASE64_${i}`] || '').trim())
       .filter(Boolean)
       .join('');
