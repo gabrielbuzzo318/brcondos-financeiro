@@ -7,10 +7,10 @@ const text = (name, fallback = '') => String(process.env[name] ?? fallback).trim
 const digits = (name, fallback = '') => text(name, fallback).replace(/\D/g, '');
 
 let certPfxPath = text('GISS_CERT_PFX_PATH');
-const certPfxBase64Parts = [
-  text('GISS_CERT_PFX_BASE64_1'),
-  text('GISS_CERT_PFX_BASE64_2')
-].filter(Boolean).join('');
+const certPfxBase64Parts = [1,2,3,4]
+  .map(i => text(`GISS_CERT_PFX_BASE64_${i}`))
+  .filter(Boolean)
+  .join('');
 const certPfxBase64 = certPfxBase64Parts || text('GISS_CERT_PFX_BASE64');
 
 if (!certPfxPath && certPfxBase64) {
