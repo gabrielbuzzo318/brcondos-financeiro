@@ -13,7 +13,16 @@ if (missing.length) {
 }
 
 fs.mkdirSync(publicDir, { recursive: true });
-const html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8')).join('');
+let html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8')).join('');
+
+const patchPath = path.join(root, 'webpatch.js');
+if (fs.existsSync(patchPath)) {
+  const patch = fs.readFileSync(patchPath, 'utf8').trim();
+  const marker = html.lastIndexOf('</script>');
+  if (marker < 0) throw new Error('Não encontrei </script> para aplicar o patch do frontend.');
+  html = `${html.slice(0, marker)}\n${patch}\n${html.slice(marker)}`;
+}
+
 fs.writeFileSync(output, html, 'utf8');
 
 if (!html.includes('<!DOCTYPE html>') || !html.includes('</html>')) {
