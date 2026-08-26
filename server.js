@@ -72,4 +72,20 @@ app.get('/api/boletos/:nossoNumero', (_req, res) => res.status(503).json({ error
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
 app.get(/.*/, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(PORT, '0.0.0.0', () => console.log(`BRCONDOS online na porta ${PORT}`));
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`BRCONDOS online na porta ${PORT}`);
+
+  if (String(process.env.GISS_STARTUP_TEST || '') === '1') {
+    const status = getGissConfigStatus();
+    console.log(`GISS config: ${status.configured ? 'OK' : 'INCOMPLETA'}`);
+
+    if (status.configured) {
+      try {
+        const result = await testGissWsdl();
+        console.log(`GISS WSDL: OK (${(result.metodos || []).length} método(s) detectado(s))`);
+      } catch (err) {
+        console.error(`GISS WSDL: FALHOU - ${err?.message || 'erro desconhecido'}`);
+      }
+    }
+  }
+});
