@@ -1,0 +1,176 @@
+orAll('#view-recibos tbody tr[data-id]')].filter(tr=>tr.style.display!=='none').map(tr=>Number(tr.dataset.id)));
+  return receipts.filter(x=>ids.has(Number(x.id)));
+}
+function generateAllReceipts(){
+  const rows=visibleReceiptRows().filter(x=>x.status!=='gerado');
+  if(!rows.length)return alert('Não há recibos pendentes nos resultados atuais.');
+  const total=rows.reduce((s,x)=>s+Number(x.value||0),0);
+  if(!confirm(`Gerar ${rows.length} recibo(s)?\n\nValor total: ${money(total)}\n\nEles serão abertos juntos para Imprimir / Salvar PDF.`))return;
+  if(!openReceiptPrintWindow(rows,'Recibos de Prestação de Serviço'))return;
+  rows.forEach(x=>x.status='gerado');saveData('receipts',receipts);renderAll();
+}
+function filterReceiptsTable(){
+  const q=normalizeSearchText(document.getElementById('receipt_search')?.value||'');
+  const comp=document.getElementById('receipt_comp_filter')?.value||'';
+  const status=document.getElementById('receipt_status_filter')?.value||'';
+  const rows=[...document.querySelectorAll('#view-recibos tbody tr[data-search]')];let visible=0;
+  rows.forEach(tr=>{
+    const ok=(!q||normalizeSearchText(tr.dataset.search||'').includes(q))&&(!comp||tr.dataset.comp===comp)&&(!status||tr.dataset.status===status);
+    tr.style.display=ok?'':'none';if(ok)visible++;
+  });
+  const el=document.getElementById('receipt_filter_result');if(el)el.textContent=`${visible} resultado(s)`;
+}
+function clearReceiptFilters(){
+  ['receipt_search','receipt_comp_filter','receipt_status_filter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  filterReceiptsTable();
+}
+
+
+function renderReceipts(){
+  const view=document.getElementById('view-recibos');if(!view)return;
+  const generated=receipts.filter(x=>x.status==='gerado').length;
+  const pending=receipts.filter(x=>x.status!=='gerado').length;
+  const total=receipts.reduce((s,x)=>s+Number(x.value||0),0);
+  const comps=[...new Set(receipts.map(x=>x.competence).filter(Boolean))].sort().reverse();
+  view.innerHTML=`
+    <div class="section-title">
+      <div><h2>Recibos</h2><span>Recibos de prestação de serviço para clientes configurados como Recibo</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" onclick="openNewReceipt()">+ Recibo</button>
+        <button class="btn" onclick="syncBillingFromBoletos()">↻ Sincronizar faturamento</button>
+        <button class="btn" onclick="openReportModal('receipts')">▤ Relatório</button>
+        <button class="btn green" onclick="generateAllReceipts()">⚡ Gerar todos</button>
+      </div>
+    </div>
+    <div class="notice"><b>Automático:</b> em Clientes, defina <b>Documento de faturamento = Recibo</b>. Ao sincronizar o faturamento, esses clientes vêm para esta aba; os demais continuam em Notas Fiscais.</div>
+    <div class="cards grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card accent-slate"><div class="kpi-label">TOTAL</div><div class="kpi-value">${receipts.length}</div></div>
+      <div class="card accent-orange"><div class="kpi-label">PENDENTES</div><div class="kpi-value">${pending}</div></div>
+      <div class="card accent-green"><div class="kpi-label">GERADOS</div><div class="kpi-value">${generated}</div></div>
+      <div class="card accent-blue"><div class="kpi-label">VALOR TOTAL</div><div class="kpi-value" style="font-size:20px">${money(total)}</div></div>
+    </div>
+    <div class="filter-bar">
+      <div class="field search"><label>Pesquisar</label><input id="receipt_search" placeholder="Cliente, nº, competência, valor..." oninput="filterReceiptsTable()"></div>
+      <div class="field"><label>Competência</label><select id="receipt_comp_filter" onchange="filterReceiptsTable()"><option value="">Todas</option>${comps.map(c=>`<option value="${c}">${receiptCompetenceLabel(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select id="receipt_status_filter" onchange="filterReceiptsTable()"><option value="">Todos</option><option value="pendente">Pendente</option><option value="gerado">Gerado</option></select></div>
+      <button class="btn" onclick="clearReceiptFilters()">Limpar filtros</button><div id="receipt_filter_result" class="filter-result"></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Recibo</th><th>Cliente</th><th>Competência</th><th>Data</th><th>Status</th><th>Valor</th><th></th></tr></thead><tbody>
+      ${receipts.length?receipts.slice().sort((a,b)=>(b.competence||'').localeCompare(a.competence||'')||String(a.client||'').localeCompare(String(b.client||''),'pt-BR')).map(x=>`
+        <tr data-id="${x.id}" data-comp="${esc(x.competence||'')}" data-status="${esc(x.status||'pendente')}" data-search="${esc([x.receiptNumber,x.client,x.competence,receiptCompetenceLabel(x.competence),x.issueDate,formatDate(x.issueDate),x.value,money(x.value),x.status].filter(Boolean).join(' '))}">
+          <td><b>${esc(x.receiptNumber||'-')}</b></td>
+          <td>${esc(x.client||'-')}</td>
+          <td>${esc(receiptCompetenceLabel(x.competence))}</td>
+          <td>${formatDate(x.issueDate)}</td>
+          <td>${statusBadge(x.status==='gerado'?'gerado_recibo':'pendente_recibo')}</td>
+          <td class="amount pos">${money(x.value)}</td>
+          <td><div class="actions">
+            <button class="btn small" onclick="openReceiptEdit(${x.id})">Editar</button>
+            <button class="btn small" onclick="previewReceipt(${x.id})">Visualizar</button>
+            <button class="btn small primary" onclick="generateReceiptPdf(${x.id})">${x.status==='gerado'?'Reimprimir PDF':'Gerar / Imprimir PDF'}</button>
+            <button class="btn small danger" onclick="deleteReceipt(${x.id})">Excluir</button>
+          </div></td>
+        </tr>`).join(''):`<tr><td colspan="7" class="empty">Nenhum recibo criado. Configure o cliente como <b>Recibo</b> e clique em <b>Sincronizar faturamento</b>.</td></tr>`}
+    </tbody></table></div>`;
+  setTimeout(filterReceiptsTable,0);
+}
+
+
+function normalizeSearchText(v){
+  return String(v||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().trim();
+}
+function valueSearchVariants(v){
+  const s=String(v||'').trim();
+  return [s, s.replace(/\./g,'').replace(',','.'), s.replace(/[^\d,.-]/g,'')].filter(Boolean);
+}
+
+function filterBoletosTable(){
+  const q=normalizeSearchText(document.getElementById('boleto_search')?.value||'');
+  const from=document.getElementById('boleto_from')?.value||'';
+  const to=document.getElementById('boleto_to')?.value||'';
+  const status=document.getElementById('boleto_status')?.value||'';
+
+  const rows=[...document.querySelectorAll('#view-boletos tbody tr[data-search]')];
+  let visible=0;
+
+  rows.forEach(tr=>{
+    const hay=normalizeSearchText(tr.dataset.search||'');
+    const date=tr.dataset.date||'';
+    const st=tr.dataset.status||'';
+
+    const matchesText=!q || hay.includes(q) || valueSearchVariants(q).some(v=>hay.includes(normalizeSearchText(v)));
+    const matchesFrom=!from || (!!date && date>=from);
+    const matchesTo=!to || (!!date && date<=to);
+    const matchesStatus=!status || st===status;
+
+    const show=matchesText && matchesFrom && matchesTo && matchesStatus;
+    tr.style.display=show?'':'none';
+    if(show) visible++;
+  });
+
+  const box=document.getElementById('boleto_filter_result');
+  if(box) box.textContent=`${visible} de ${rows.length} boleto(s)`;
+}
+
+function clearBoletosFilters(){
+  ['boleto_search','boleto_from','boleto_to','boleto_status'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value='';
+  });
+  filterBoletosTable();
+}
+
+function filterFinanceiroTable(){
+  const q=normalizeSearchText(document.getElementById('fin_search')?.value||'');
+  const from=document.getElementById('fin_from')?.value||'';
+  const to=document.getElementById('fin_to')?.value||'';
+  const status=document.getElementById('fin_status')?.value||'';
+  const rows=[...document.querySelectorAll('#view-financeiro tbody tr[data-search]')];
+  let visible=0;
+  rows.forEach(tr=>{
+    const hay=normalizeSearchText(tr.dataset.search||'');
+    const date=tr.dataset.date||'';
+    const st=tr.dataset.status||'';
+    const matchesText=!q || hay.includes(q) || valueSearchVariants(q).some(v=>hay.includes(normalizeSearchText(v)));
+    const matchesFrom=!from || date>=from;
+    const matchesTo=!to || date<=to;
+    const matchesStatus=!status || st===status;
+    const show=matchesText&&matchesFrom&&matchesTo&&matchesStatus;
+    tr.style.display=show?'':'none';
+    if(show)visible++;
+  });
+  const box=document.getElementById('fin_filter_result');
+  if(box) box.textContent=`${visible} de ${rows.length} conta(s)`;
+}
+function clearFinanceiroFilters(){
+  ['fin_search','fin_from','fin_to','fin_status'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  filterFinanceiroTable();
+}
+function filterFluxoTable(){
+  const q=normalizeSearchText(document.getElementById('flux_search')?.value||'');
+  const from=document.getElementById('flux_from')?.value||'';
+  const to=document.getElementById('flux_to')?.value||'';
+  const type=document.getElementById('flux_type')?.value||'';
+  const status=document.getElementById('flux_status')?.value||'';
+  const rows=[...document.querySelectorAll('#view-fluxo tbody tr[data-search]')];
+  let visible=0;
+  rows.forEach(tr=>{
+    const hay=normalizeSearchText(tr.dataset.search||'');
+    const date=tr.dataset.date||'';
+    const tp=tr.dataset.type||'';
+    const st=tr.dataset.status||'';
+    const matchesText=!q || hay.includes(q) || valueSearchVariants(q).some(v=>hay.includes(normalizeSearchText(v)));
+    const matchesFrom=!from || date>=from;
+    const matchesTo=!to || date<=to;
+    const matchesType=!type || tp===type;
+    const matchesStatus=!status || st===status;
+    const show=matchesText&&matchesFrom&&matchesTo&&matchesType&&matchesStatus;
+    tr.style.display=show?'':'none';
+    if(show)visible++;
+  });
+  const box=document.getElementById('flux_filter_result');
+  if(box
