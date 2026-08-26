@@ -1,0 +1,103 @@
+kpi-value">${success}</div></div>
+      <div class="card" style="border-top:3px solid var(--danger)"><div class="kpi-label">FALHAS</div><div class="kpi-value">${failures.length}</div></div>
+      <div class="card accent-slate"><div class="kpi-label">IGNORADOS</div><div class="kpi-value">${skipped.length}</div></div>
+    </div>
+    <div class="notice"><b>PDFs não foram baixados.</b> Você continua podendo abrir o PDF oficial individualmente quando quiser.</div>
+    ${failHtml}
+    ${skipHtml}
+    <div style="display:flex;justify-content:flex-end;margin-top:18px"><button class="btn primary" onclick="closeModal()">Fechar</button></div>
+  `);
+}
+
+async function consultSicrediBoleto(id){
+  const b=boletos.find(x=>x.id===id);
+  if(!b?.sicrediNossoNumero)return alert('Nosso Número não disponível.');
+  try{
+    const response=await fetch(`/api/boletos/${encodeURIComponent(b.sicrediNossoNumero)}`);
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.error||'Falha na consulta.');
+    b.sicrediResponse=data;
+    saveData('boletos',boletos);
+    alert(`Consulta Sicredi concluída.\n\nNosso Número: ${b.sicrediNossoNumero}\nStatus retornado: ${data.situacao || data.status || data.situacaoBoleto || 'consulte o JSON salvo no registro'}`);
+  }catch(e){
+    alert(`Erro na consulta Sicredi:\n${e.message}`);
+  }
+}
+
+function payBoleto(id){
+  const b=boletos.find(x=>x.id===id);
+  if(!b)return;
+  openModal('Baixa do boleto',`
+    <div class="modal-grid">
+      ${field('Cliente',`<input value="${esc(b.client)}" disabled>`)}
+      ${field('Boleto',`<input value="${esc(b.docNumber)}" disabled>`)}
+      ${field('Valor recebido',`<input value="${money(b.value)}" disabled>`)}
+      ${field('Data da baixa / recebimento',`<input id="boleto_receipt_date" type="date" value="${b.receiptDate||today()}">`)}
+    </div>
+    <div class="notice" style="margin-top:14px">A data escolhida será a data da entrada no Fluxo de Caixa.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="confirmBoletoReceived(${id})">Confirmar recebimento</button>
+    </div>`);
+}
+function confirmBoletoReceived(id){
+  const d=val('boleto_receipt_date');
+  if(!d)return alert('Informe a data da baixa.');
+  boletos=boletos.map(x=>x.id===id?{...x,status:'recebido',receiptDate:d}:x);
+  saveData('boletos',boletos);
+  syncBoletoToFlow(id);
+  closeModal();
+  renderAll();
+}
+function syncBoletoToFlow(id){
+  const b=boletos.find(x=>x.id===id);
+  if(!b || b.flowId) return;
+  const flowId=Date.now()+13;
+  transactions.push({
+    id:flowId,
+    date:b.receiptDate||today(),
+    type:'entrada',
+    description:`Boleto recebido - ${b.description}`,
+    category:'Recebimento de boletos',
+    party:b.client||'',
+    value:Number(b.value),
+    status:'pago'
+  });
+  boletos=boletos.map(x=>x.id===id?{...x,flowId}:x);
+  saveData('transactions',transactions);
+  saveData('boletos',boletos);
+}
+function delBoleto(id){if(confirm('Excluir este boleto?')){boletos=boletos.filter(x=>x.id!==id);saveData('boletos',boletos);renderAll()}}
+function printBoleto(id){
+  const b=boletos.find(x=>x.id===id);
+  if(!b)return;
+
+  if(b.sicrediRegistered && b.sicrediLinhaDigitavel){
+    window.open(`/api/boletos/pdf?linhaDigitavel=${encodeURIComponent(b.sicrediLinhaDigitavel)}`,'_blank');
+    return;
+  }
+
+  const w=window.open('','_blank','width=800,height=700');
+  w.document.write(`<html><head><meta charset="UTF-8"><title>${esc(b.docNumber)}</title><style>body{font-family:Arial;padding:40px;color:#26343c}.box{border:1px solid #ddd;padding:25px}.warn{background:#fff4df;padding:12px;margin:15px 0}.big{font-size:28px;font-weight:bold}.details{background:#f6f8fa;padding:12px;border-radius:6px;white-space:pre-wrap}</style></head><body><div class="box"><h2>BRCONDOS - Financeiro Sjrp</h2><p><b>Referência:</b> ${esc(b.docNumber)}</p><p><b>Cliente:</b> ${esc(b.client)}</p><p><b>Vencimento:</b> ${b.due?formatDate(b.due):'SEM VENCIMENTO DEFINIDO'}</p><p class="big">${money(b.value)}</p><p><b>Descrição:</b> ${esc(b.description||'-')}</p><p><b>Detalhes:</b></p><div class="details">${esc(b.details||'-')}</div><div class="warn">PRÉVIA LOCAL: este boleto ainda não foi registrado no Sicredi.</div></div></body></html>`);
+  w.document.close();
+  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} },300);
+}
+
+function openModal(title,body){
+  const m=document.getElementById('modal');m.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>${title}</h3><button class="close" onclick="closeModal()">✕</button></div>${body}</div>`;m.classList.remove('hidden');
+}
+function closeModal(){document.getElementById('modal').classList.add('hidden')}
+function field(label,html){return `<div class="field"><label>${label}</label>${html}</div>`}
+function val(id){return document.getElementById(id).value.trim()}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function formatDate(d){if(!d)return '-';const [y,m,day]=d.split('-');return `${day}/${m}/${y}`}
+
+if(localStorage.getItem('brcondos_session')){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userEmailMini').textContent=localStorage.getItem('brcondos_session');
+  renderAll();
+}
+</script>
+</body>
+</html>
