@@ -1,0 +1,208 @@
+alizados</span></div><div class="field"><select><option>Agosto/2026</option></select></div></div>
+    <div class="grid two-cols">
+      <div class="card">
+        <div class="panel-title">Demonstrativo</div>
+        <div class="dre-row"><span>(+) Receita operacional</span><b>${money(receita)}</b></div>
+        <div class="dre-row"><span>(-) Deduções / estornos</span><b>${money(0)}</b></div>
+        <div class="dre-row"><span>(=) Receita líquida</span><b>${money(receita)}</b></div>
+        ${Object.entries(cats).map(([k,v])=>`<div class="dre-row"><span>(-) ${k}</span><b>${money(v)}</b></div>`).join('')}
+        <div class="dre-row total"><span>Total de despesas</span><span>${money(despesas)}</span></div>
+        <div class="dre-row result"><span>RESULTADO DO PERÍODO</span><span>${money(resultado)}</span></div>
+      </div>
+      <div class="card">
+        <div class="panel-title">Indicadores</div>
+        <div class="dre-row"><span>Margem operacional</span><b>${receita?((resultado/receita)*100).toFixed(1):'0.0'}%</b></div>
+        <div class="dre-row"><span>Despesas / Receita</span><b>${receita?((despesas/receita)*100).toFixed(1):'0.0'}%</b></div>
+        <div class="dre-row"><span>Resultado</span><b style="color:${resultado>=0?'#278c3a':'#c94848'}">${money(resultado)}</b></div>
+        <div class="notice" style="margin-top:20px">DRE gerencial. O plano de contas pode ser ajustado depois para ficar exatamente igual ao formato usado pela BRCONDOS.</div>
+      </div>
+    </div>`;
+}
+
+
+function accountOptions(type,current=''){
+  const list=chartAccounts
+    .filter(x=>!type || x.type===type)
+    .sort((a,b)=>(a.code||'').localeCompare(b.code||''));
+  let html='<option value="">Selecione</option>';
+  html+=list.map(x=>`<option value="${esc(x.name)}" ${current===x.name?'selected':''}>${esc(x.code)} - ${esc(x.name)}</option>`).join('');
+  return html;
+}
+function renderChartAccounts(){
+  const entries=chartAccounts.filter(x=>x.type==='entrada').sort((a,b)=>(a.code||'').localeCompare(b.code||''));
+  const exits=chartAccounts.filter(x=>x.type==='saida').sort((a,b)=>(a.code||'').localeCompare(b.code||''));
+  document.getElementById('view-plano').innerHTML=`
+    <div class="section-title">
+      <div><h2>Plano de Contas</h2><span>Estrutura simples para organizar receitas e despesas</span></div>
+      <button class="btn primary" onclick="openChartAccount()">+ Nova conta</button>
+    </div>
+    <div class="notice"><b>Simples de manter:</b> você pode criar quantas contas quiser. Elas passam a aparecer automaticamente nos cadastros financeiros.</div>
+    <div class="grid two-cols">
+      <div class="card">
+        <div class="panel-title">Entradas / Receitas</div>
+        <div class="table-wrap"><table style="min-width:0"><thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th></th></tr></thead><tbody>
+        ${entries.length?entries.map(x=>`<tr><td><b>${esc(x.code||'-')}</b></td><td>${esc(x.name)}</td><td>${esc(x.group||'-')}</td><td><div class="actions"><button class="btn small" onclick="openChartAccount(${x.id})">Editar</button><button class="btn small danger" onclick="deleteChartAccount(${x.id})">Excluir</button></div></td></tr>`).join(''):`<tr><td colspan="4" class="empty">Nenhuma conta de entrada.</td></tr>`}
+        </tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="panel-title">Saídas / Despesas</div>
+        <div class="table-wrap"><table style="min-width:0"><thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th></th></tr></thead><tbody>
+        ${exits.length?exits.map(x=>`<tr><td><b>${esc(x.code||'-')}</b></td><td>${esc(x.name)}</td><td>${esc(x.group||'-')}</td><td><div class="actions"><button class="btn small" onclick="openChartAccount(${x.id})">Editar</button><button class="btn small danger" onclick="deleteChartAccount(${x.id})">Excluir</button></div></td></tr>`).join(''):`<tr><td colspan="4" class="empty">Nenhuma conta de saída.</td></tr>`}
+        </tbody></table></div>
+      </div>
+    </div>`;
+}
+
+function quickCreateAccount(type,targetSelectId){
+  const name=prompt('Nome da nova conta:');
+  if(!name)return;
+  const group=prompt('Grupo (opcional):')||'';
+  const code=prompt('Código (opcional, ex.: 2.11):')||'';
+  const exists=chartAccounts.find(x=>x.name.trim().toLowerCase()===name.trim().toLowerCase());
+  if(exists){
+    alert('Essa conta já existe.');
+    const sel=document.getElementById(targetSelectId);
+    if(sel)sel.value=exists.name;
+    return;
+  }
+  const obj={id:Date.now(),code,name:name.trim(),type,group:group.trim()};
+  chartAccounts.push(obj);
+  saveData('chartAccounts',chartAccounts);
+  const sel=document.getElementById(targetSelectId);
+  if(sel){
+    sel.innerHTML=accountOptions(type,obj.name);
+    sel.value=obj.name;
+  }
+}
+function refreshTransactionAccountOptions(){
+  const sel=document.getElementById('m_cat');
+  const typeSel=document.getElementById('m_type');
+  if(!sel||!typeSel)return;
+  const current=sel.value;
+  sel.innerHTML=accountOptions(typeSel.value,current);
+}
+
+function openChartAccount(id=null){
+  const x=id?chartAccounts.find(a=>a.id===id):{code:'',name:'',type:'saida',group:''};
+  openModal(id?'Editar conta':'Nova conta do plano',`
+    <div class="modal-grid">
+      ${field('Código',`<input id="pc_code" value="${esc(x.code||'')}" placeholder="Ex.: 2.11">`)}
+      ${field('Tipo',`<select id="pc_type"><option value="entrada" ${x.type==='entrada'?'selected':''}>Entrada / Receita</option><option value="saida" ${x.type==='saida'?'selected':''}>Saída / Despesa</option></select>`)}
+      ${field('Nome da conta',`<input id="pc_name" value="${esc(x.name||'')}" placeholder="Ex.: Honorários jurídicos">`)}
+      ${field('Grupo',`<input id="pc_group" value="${esc(x.group||'')}" placeholder="Ex.: Despesas Administrativas">`)}
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveChartAccount(${id||'null'})">Salvar</button>
+    </div>`);
+}
+function saveChartAccount(id){
+  const obj={
+    id:id||Date.now(),
+    code:val('pc_code'),
+    name:val('pc_name'),
+    type:val('pc_type'),
+    group:val('pc_group')
+  };
+  if(!obj.name)return alert('Informe o nome da conta.');
+  const duplicate=chartAccounts.some(x=>x.id!==id && x.name.trim().toLowerCase()===obj.name.trim().toLowerCase());
+  if(duplicate)return alert('Já existe uma conta com esse nome.');
+  if(id)chartAccounts=chartAccounts.map(x=>x.id===id?obj:x);else chartAccounts.push(obj);
+  saveData('chartAccounts',chartAccounts);
+  closeModal();renderAll();
+}
+function deleteChartAccount(id){
+  const x=chartAccounts.find(a=>a.id===id);
+  if(!x)return;
+  if(!confirm(`Excluir a conta "${x.name}" do plano de contas? Os lançamentos existentes não serão apagados.`))return;
+  chartAccounts=chartAccounts.filter(a=>a.id!==id);
+  saveData('chartAccounts',chartAccounts);
+  renderAll();
+}
+
+function renderClients(){
+  const enriched=clients.filter(x=>x.city||x.street||x.status||x.cnae).length;
+
+  document.getElementById('view-clientes').innerHTML=`
+    <div class="section-title">
+      <div>
+        <h2>Clientes</h2>
+        <span>${clients.length} cliente(s) cadastrado(s) • ${enriched} com dados cadastrais consultados</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="openReportModal('clients')">▤ Relatório</button>
+        <button class="btn" onclick="syncAllCnpjs()">↻ Atualizar dados dos CNPJs</button>
+        <button class="btn primary" onclick="openParty('client')">+ Novo cliente</button>
+      </div>
+    </div>
+
+    <div id="cnpjSyncNotice" class="notice" style="display:none"></div>
+
+    <div class="notice">
+      <b>Consulta cadastral:</b> o botão acima busca os dados públicos pelo CNPJ e preenche razão social,
+      nome fantasia, situação cadastral, endereço, telefone, e-mail e CNAE quando disponíveis.
+    </div>
+
+    <div class="filter-bar">
+      <div class="field search">
+        <label>Pesquisar cliente</label>
+        <input
+          id="client_search"
+          type="text"
+          placeholder="Nome, fantasia, CNPJ..."
+          oninput="filterClientsTable()"
+        >
+      </div>
+
+      <button class="btn" onclick="clearClientsFilter()">Limpar</button>
+      <div id="client_filter_result" class="filter-result"></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>CNPJ / CPF</th>
+            <th>Faturamento</th>
+            <th>Unidades</th>
+            <th>Início contrato</th>
+            <th>Contrato</th>
+            <th>Endereço</th>
+            <th>Contato</th>
+            <th>Situação</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${clients.length?clients.map(x=>`
+            <tr data-search="${esc([x.name,x.tradeName,x.doc,x.city,x.status,x.billingDocument==='receipt'?'recibo':'nfse'].filter(Boolean).join(' '))}">
+              <td>
+                <b>${esc(x.name)}</b>
+                ${x.tradeName?`<div class="subtle">${esc(x.tradeName)}</div>`:''}
+                ${x.dataUpdated?`<div class="subtle">Atualizado: ${esc(x.dataUpdated)}</div>`:''}
+              </td>
+
+              <td>
+                ${esc(x.doc||'-')}
+                ${x.cnae?`<div class="subtle">CNAE: ${esc(x.cnae)}</div>`:''}
+              </td>
+
+              <td>
+                ${x.billingDocument==='receipt'
+                  ?'<span class="badge yellow">Recibo</span>'
+                  :'<span class="badge blue">NFS-e</span>'}
+              </td>
+
+              <td>
+                ${Number(x.units||0)>0?`<b>${Number(x.units)}</b>`:'-'}
+              </td>
+
+              <td>
+                ${x.contractStart?formatDate(x.contractStart):'-'}
+              </td>
+
+              <td>
+                ${x.contractAttachmentData
+                  ?`<button class="btn small" onclick="openClientContract(${
