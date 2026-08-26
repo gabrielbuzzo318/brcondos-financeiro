@@ -1,0 +1,291 @@
+x.id})">Ver contrato</button>
+                    <div class="subtle">${esc(x.contractAttachmentName||'Contrato anexado')}</div>`
+                  :'<span class="subtle">Sem contrato</span>'
+                }
+              </td>
+
+              <td>
+                ${x.street
+                  ?`${esc(x.street)}${x.number?' , '+esc(x.number):''}${x.complement?' - '+esc(x.complement):''}
+                    <div class="subtle">${[x.district,x.city,x.state,x.zip].filter(Boolean).map(esc).join(' • ')}</div>`
+                  :(x.city?`${esc(x.city)}${x.state?' / '+esc(x.state):''}`:'<span class="subtle">Ainda não consultado</span>')
+                }
+              </td>
+
+              <td>
+                ${esc(x.email||'-')}
+                ${x.phone?`<div class="subtle">${esc(x.phone)}</div>`:''}
+              </td>
+
+              <td>
+                ${x.status
+                  ?`<span class="badge ${x.status.toLowerCase().includes('ativa')?'green':'gray'}">${esc(x.status)}</span>`
+                  :'-'
+                }
+              </td>
+
+              <td>
+                <div class="actions">
+                  ${x.doc?`<button class="btn small" onclick="syncSingleCnpj(${x.id})">Consultar</button>`:''}
+                  <button class="btn small" onclick="openParty('client',${x.id})">Editar</button>
+
+${!x.contractEnd
+  ?`<button class="btn small danger" onclick="openRescindClient(${x.id})">Rescindir contrato</button>`
+  :`<button class="btn small" onclick="openRescindClient(${x.id})">Rescisão: ${formatDate(x.contractEnd)}</button>`
+}
+
+                  <button class="btn small danger" onclick="delParty('client',${x.id})">Excluir</button>
+                </div>
+              </td>
+            </tr>
+          `).join(''):`<tr><td colspan="10" class="empty">Nenhum cliente cadastrado.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  filterClientsTable();
+}
+
+function openRescindClient(id){
+  const c=clients.find(x=>x.id===id);
+  if(!c)return;
+
+  openModal(
+    c.contractEnd?'Alterar rescisão do contrato':'Rescindir contrato',
+    `
+      <div class="notice">
+        <b>${esc(c.name)}</b><br>
+        Informe a data em que o contrato foi encerrado.
+      </div>
+
+      <div class="modal-grid">
+        ${field(
+          'Data da rescisão',
+          `<input id="client_contract_end" type="date" value="${esc(c.contractEnd||today())}">`
+        )}
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+        ${c.contractEnd
+          ?`<button class="btn" onclick="cancelClientRescission(${id})">Reativar contrato</button>`
+          :''
+        }
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn danger" onclick="saveClientRescission(${id})">
+          ${c.contractEnd?'Salvar alteração':'Confirmar rescisão'}
+        </button>
+      </div>
+    `
+  );
+}
+
+function saveClientRescission(id){
+  const c=clients.find(x=>x.id===id);
+  if(!c)return;
+
+  const date=val('client_contract_end');
+
+  if(!date)return alert('Informe a data da rescisão.');
+
+  if(c.contractStart && date<c.contractStart){
+    return alert('A data da rescisão não pode ser anterior ao início do contrato.');
+  }
+
+  if(!confirm(
+    `Confirmar rescisão do contrato?\n\nCliente: ${c.name}\nData: ${formatDate(date)}`
+  ))return;
+
+  c.contractEnd=date;
+  saveData('clients',clients);
+  closeModal();
+  renderAll();
+}
+
+function cancelClientRescission(id){
+  const c=clients.find(x=>x.id===id);
+  if(!c)return;
+
+  if(!confirm(`Reativar o contrato de ${c.name}?\n\nA data de rescisão será removida.`))return;
+
+  c.contractEnd='';
+  saveData('clients',clients);
+  closeModal();
+  renderAll();
+}
+
+function filterClientsTable(){
+  const q=normalizeSearchText(
+    document.getElementById('client_search')?.value||''
+  );
+
+  const rows=[
+    ...document.querySelectorAll('#view-clientes tbody tr[data-search]')
+  ];
+
+  let visible=0;
+
+  rows.forEach(tr=>{
+    const hay=normalizeSearchText(tr.dataset.search||'');
+    const show=!q||hay.includes(q);
+
+    tr.style.display=show?'':'none';
+    if(show)visible++;
+  });
+
+  const result=document.getElementById('client_filter_result');
+  if(result)result.textContent=`${visible} de ${rows.length} cliente(s)`;
+}
+
+function clearClientsFilter(){
+  const input=document.getElementById('client_search');
+  if(input)input.value='';
+  filterClientsTable();
+}
+
+function openClientContract(id){
+  const c=clients.find(x=>x.id===id);
+
+  if(!c?.contractAttachmentData){
+    return alert('Este cliente não possui contrato anexado.');
+  }
+
+  const a=document.createElement('a');
+  a.href=c.contractAttachmentData;
+  a.target='_blank';
+  a.rel='noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function cleanCnpj(v){return String(v||'').replace(/\D/g,'')}
+function formatCep(v){
+  const d=String(v||'').replace(/\D/g,'');
+  return d.length===8?`${d.slice(0,5)}-${d.slice(5)}`:v||'';
+}
+function formatPhone(v){
+  const d=String(v||'').replace(/\D/g,'');
+  if(d.length===11)return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if(d.length===10)return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return v||'';
+}
+async function fetchCnpjPublic(doc){
+  const cnpj=cleanCnpj(doc);
+  if(cnpj.length!==14) throw new Error('CNPJ inválido');
+  const urls=[
+    `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`,
+    `https://brasilapi.com.br/cnpj/v1/${cnpj}`
+  ];
+  let lastErr=null;
+  for(const url of urls){
+    try{
+      const r=await fetch(url,{headers:{'Accept':'application/json'}});
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    }catch(e){lastErr=e}
+  }
+  throw lastErr||new Error('Falha na consulta');
+}
+function applyCnpjData(client,data){
+  return normalizeParty({
+    ...client,
+    name:data.razao_social||client.name,
+    tradeName:data.nome_fantasia||client.tradeName,
+    doc:client.doc,
+    email:data.email||client.email,
+    phone:formatPhone(data.ddd_telefone_1||client.phone),
+    zip:formatCep(data.cep||client.zip),
+    street:[data.descricao_tipo_de_logradouro,data.logradouro].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||client.street,
+    number:data.numero||client.number,
+    complement:data.complemento||client.complement,
+    district:data.bairro||client.district,
+    city:data.municipio||client.city,
+    state:data.uf||client.state,
+    status:data.descricao_situacao_cadastral||data.situacao_cadastral||client.status,
+    cnae:data.cnae_fiscal?`${data.cnae_fiscal} - ${data.cnae_fiscal_descricao||''}`.trim():client.cnae,
+    dataUpdated:new Date().toLocaleDateString('pt-BR')
+  });
+}
+async function syncSingleCnpj(id,quiet=false){
+  const idx=clients.findIndex(x=>x.id===id);
+  if(idx<0)return;
+  try{
+    const data=await fetchCnpjPublic(clients[idx].doc);
+    clients[idx]=applyCnpjData(clients[idx],data);
+    saveData('clients',clients);
+    if(!quiet){renderAll();alert('Dados cadastrais atualizados.')}
+    return true;
+  }catch(e){
+    if(!quiet)alert(`Não foi possível consultar ${clients[idx].doc}. ${e.message||''}`);
+    return false;
+  }
+}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+async function syncAllCnpjs(){
+  const btns=[...document.querySelectorAll('#view-clientes button')];
+  btns.forEach(b=>b.disabled=true);
+  const notice=document.getElementById('cnpjSyncNotice');
+  notice.style.display='block';
+  let ok=0,fail=0;
+  for(let i=0;i<clients.length;i++){
+    const c=clients[i];
+    if(cleanCnpj(c.doc).length!==14)continue;
+    notice.innerHTML=`Consultando <b>${i+1} de ${clients.length}</b>: ${esc(c.name)}…<br><span class="subtle">Já atualizados: ${ok} • Falhas: ${fail}</span>`;
+    const done=await syncSingleCnpj(c.id,true);
+    done?ok++:fail++;
+    await wait(180);
+  }
+  saveData('clients',clients);
+  renderAll();
+  const n=document.getElementById('cnpjSyncNotice');
+  if(n){n.style.display='block';n.innerHTML=`Consulta concluída: <b>${ok}</b> CNPJ(s) atualizados e <b>${fail}</b> falha(s). Você pode usar o botão “Consultar” individualmente nos que falharem.`}
+}
+
+async function syncSingleSupplierCnpj(id,quiet=false){
+  const idx=suppliers.findIndex(x=>x.id===id);
+  if(idx<0)return;
+  try{
+    const data=await fetchCnpjPublic(suppliers[idx].doc);
+    suppliers[idx]=applyCnpjData(suppliers[idx],data);
+    saveData('suppliers',suppliers);
+    if(!quiet){renderAll();alert('Dados cadastrais do fornecedor atualizados.')}
+    return true;
+  }catch(e){
+    if(!quiet)alert(`Não foi possível consultar ${suppliers[idx].doc}. ${e.message||''}`);
+    return false;
+  }
+}
+async function syncAllSupplierCnpjs(){
+  const btns=[...document.querySelectorAll('#view-fornecedores button')];
+  btns.forEach(b=>b.disabled=true);
+  const notice=document.getElementById('supplierCnpjSyncNotice');
+  notice.style.display='block';
+  let ok=0,fail=0;
+  for(let i=0;i<suppliers.length;i++){
+    const s=suppliers[i];
+    if(cleanCnpj(s.doc).length!==14)continue;
+    notice.innerHTML=`Consultando <b>${i+1} de ${suppliers.length}</b>: ${esc(s.name||s.doc)}…<br><span class="subtle">Já atualizados: ${ok} • Falhas: ${fail}</span>`;
+    const done=await syncSingleSupplierCnpj(s.id,true);
+    done?ok++:fail++;
+    await wait(180);
+  }
+  saveData('suppliers',suppliers);
+  renderAll();
+  const n=document.getElementById('supplierCnpjSyncNotice');
+  if(n){n.style.display='block';n.innerHTML=`Consulta concluída: <b>${ok}</b> fornecedor(es) atualizados e <b>${fail}</b> falha(s).`}
+}
+
+function renderSuppliers(){
+  const enriched=suppliers.filter(x=>x.city||x.street||x.status||x.cnae).length;
+
+  document.getElementById('view-fornecedores').innerHTML=`
+    <div class="section-title">
+      <div>
+        <h2>Fornecedores</h2>
+        <span>${suppliers.length} fornecedor(es) cadastrado(s) • ${enriched} com dados cadastrais consultados</span>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="syncAllSupplierCnpjs()">↻ Atualizar dados dos CNPJs</button>
+        <b
