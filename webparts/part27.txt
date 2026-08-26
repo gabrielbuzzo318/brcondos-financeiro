@@ -1,0 +1,221 @@
+nsegui gerar a prévia:\n${e.message}`);}
+}
+function applyGissResultToRows(rows,data){
+  const listaNfse = Array.isArray(data.nfse) ? data.nfse : [];
+  const listaCancelamentos = Array.isArray(data.cancelamentos) ? data.cancelamentos : [];
+  const byRps = new Map(listaNfse.map(n => [String(n.rpsNumero || ''), n]));
+  const cancelByNumero = new Map(listaCancelamentos.filter(c=>c && c.numero).map(c=>[String(c.numero),c]));
+  const errs = data.erros || [];
+  const protocolo = data.protocolo || data.consulta?.protocolo || '';
+
+  rows.forEach(row => {
+    const rpsAtual = String(row.gissRpsNumber || row.rpsNumber || '');
+    let result = byRps.get(rpsAtual);
+    if(!result && rows.length === 1 && listaNfse.length === 1) result = listaNfse[0];
+
+    const cancelamentoDireto = cancelByNumero.get(String(row.nfseNumber || ''));
+    const er = errs.find(e => !e.rpsNumero || String(e.rpsNumero) === rpsAtual);
+
+    if(!result && cancelamentoDireto){
+      Object.assign(row,{
+        status:'cancelada_nfse',
+        cancelDate:cancelamentoDireto.dataCancelamento || row.cancelDate || '',
+        cancelCode:cancelamentoDireto.codigoCancelamento || row.cancelCode || '',
+        gissProtocol:protocolo || row.gissProtocol || '',
+        lastError:'',
+        gissResponse:data
+      });
+      return;
+    }
+
+    if(result){
+      const rpsReal = String(result.rpsNumero || rpsAtual || '');
+      const cancelInfo = result.cancelada ? result : cancelByNumero.get(String(result.numero || row.nfseNumber || ''));
+      const isCanceled = !!(result.cancelada || cancelInfo || row.status==='cancelada_nfse');
+      Object.assign(row,{
+        rpsNumber:rpsReal,
+        gissRpsNumber:rpsReal,
+        status:isCanceled ? 'cancelada_nfse' : 'emitida_nfse',
+        nfseNumber:result.numero || row.nfseNumber || '',
+        verificationCode:result.codigoVerificacao || row.verificationCode || '',
+        gissInternalId:result.idInterno || row.gissInternalId || '',
+        gissProtocol:protocolo || row.gissProtocol || '',
+        cancelDate:(cancelInfo?.dataCancelamento || result.dataCancelamento || row.cancelDate || ''),
+        cancelCode:(cancelInfo?.codigoCancelamento || result.codigoCancelamento || row.cancelCode || ''),
+        lastError:'',
+        gissResponse:data
+      });
+      const numeroRps = Number(rpsReal);
+      if(Number.isFinite(numeroRps) && numeroRps > 0) localStorage.setItem('brcondos_giss_last_rps',String(numeroRps));
+    }else if(er || String(data.situacao) === '1' || String(data.situacao) === '3'){
+      Object.assign(row,{
+        status:'erro_nfse',
+        gissProtocol:protocolo || row.gissProtocol || '',
+        lastError:[er?.codigo,er?.mensagem,er?.correcao].filter(Boolean).join(' - ') || 'A Giss não confirmou a emissão.',
+        gissResponse:data
+      });
+    }else{
+      Object.assign(row,{
+        status:'enviando_nfse',
+        gissProtocol:protocolo || row.gissProtocol || '',
+        lastError:'',
+        gissResponse:data
+      });
+    }
+  });
+  saveData('nfse',nfse);
+  renderAll();
+}
+function abrirPdfGiss(id){
+  const row = nfse.find(x => x.id === id);
+  if(!row) return;
+
+  const idInterno = String(row.gissInternalId || '').trim();
+
+  if(!idInterno){
+    return alert('O ID interno da NFS-e ainda não foi carregado. Clique em Atualizar Giss primeiro.');
+  }
+
+  const url =
+    `https://gissv2-3549805.giss.com.br/service-relatorio/api/relatorio/pdf/3549805/nota/${encodeURIComponent(idInterno)}`;
+
+  window.open(url, '_blank');
+}
+
+async function atualizarGissNfse(id){
+  const row = nfse.find(x => x.id === id);
+  if(!row) return;
+  const protocolo = String(row.gissProtocol || '').trim();
+  if(!protocolo) return alert('Essa NFS-e não possui protocolo da Giss salvo.');
+
+  try{
+    const r = await fetch(`/api/nfse/consultar-lote?protocolo=${encodeURIComponent(protocolo)}`);
+    const data = await r.json();
+    if(!r.ok)throw new Error(data.error || 'Falha ao consultar a Giss.');
+    applyGissResultToRows([row], data);
+
+    if(row.status==='cancelada_nfse'){
+      alert(
+        `NFS-e CANCELADA na Giss ⛔\n\n` +
+        `RPS: ${row.rpsNumber || ''}\n` +
+        `NFS-e: ${row.nfseNumber || ''}` +
+        `${row.cancelDate?`\nData do cancelamento: ${row.cancelDate}`:''}` +
+        `${row.cancelCode?`\nCódigo do cancelamento: ${row.cancelCode}`:''}`
+      );
+    }else if(row.status==='emitida_nfse'){
+      alert(
+        `NFS-e confirmada na Giss ✅\n\n` +
+        `RPS: ${row.rpsNumber || ''}\n` +
+        `NFS-e: ${row.nfseNumber || ''}\n` +
+        `Código de verificação: ${row.verificationCode || ''}`
+      );
+    }else if(String(data.situacao) === '3'){
+      alert('A Giss processou o lote com erro:\n\n' + (data.erros || []).map(e => [e.codigo,e.mensagem,e.correcao].filter(Boolean).join(' - ')).join('\n'));
+    }else{
+      alert(`Situação atual do lote na Giss: ${data.situacao || 'aguardando'}`);
+    }
+  }catch(e){
+    alert(`Erro ao consultar a Giss: ${e.message}`);
+  }
+}
+async function atualizarTodasGiss(){
+  const consultaveis=nfse.filter(x=>String(x.gissProtocol||'').trim());
+  if(!consultaveis.length) return alert('Não há NFS-e com protocolo da Giss para atualizar.');
+
+  const grupos=new Map();
+  consultaveis.forEach(row=>{
+    const protocolo=String(row.gissProtocol||'').trim();
+    if(!protocolo)return;
+    if(!grupos.has(protocolo))grupos.set(protocolo,[]);
+    grupos.get(protocolo).push(row);
+  });
+
+  if(!confirm(
+    `ATUALIZAR GISS\n\n` +
+    `NFS-e a consultar: ${consultaveis.length}\n` +
+    `Protocolos: ${grupos.size}\n\n` +
+    `Também serão verificadas as NFS-e já emitidas para identificar cancelamentos.\n\n` +
+    `Esta operação NÃO emite novas notas.\nContinuar?`
+  ))return;
+
+  openModal(
+    'Atualizando NFS-e na Giss',
+    `<div class="notice"><b>Não feche esta tela.</b> O sistema está consultando os protocolos na Giss, inclusive notas já emitidas.</div>
+     <div id="gissUpdateText">Preparando...</div>
+     <div class="bulk-progress-track"><div id="gissUpdateBar" class="bulk-progress-bar"></div></div>
+     <div id="gissUpdateStats" class="subtle">Confirmadas: 0 • Canceladas: 0 • Aguardando: 0 • Erros: 0</div>`
+  );
+
+  let processados=0,confirmadas=0,canceladas=0,aguardando=0,erros=0;
+  for(const [protocolo,rows] of grupos){
+    try{
+      const r=await fetch(`/api/nfse/consultar-lote?protocolo=${encodeURIComponent(protocolo)}`);
+      const data=await r.json();
+      if(!r.ok)throw new Error(data.error || 'Falha ao consultar a Giss.');
+      applyGissResultToRows(rows,data);
+      rows.forEach(row=>{
+        if(row.status==='cancelada_nfse')canceladas++;
+        else if(row.status==='emitida_nfse')confirmadas++;
+        else if(row.status==='erro_nfse')erros++;
+        else aguardando++;
+      });
+    }catch(e){
+      rows.forEach(row=>{row.lastError=e.message;});
+      erros+=rows.length;
+      saveData('nfse',nfse);
+    }
+
+    processados+=rows.length;
+    const bar=document.getElementById('gissUpdateBar');
+    const textEl=document.getElementById('gissUpdateText');
+    const stats=document.getElementById('gissUpdateStats');
+    if(bar)bar.style.width=`${Math.round((processados/consultaveis.length)*100)}%`;
+    if(textEl)textEl.textContent=`${processados} de ${consultaveis.length} atualizado(s)`;
+    if(stats)stats.textContent=`Confirmadas: ${confirmadas} • Canceladas: ${canceladas} • Aguardando: ${aguardando} • Erros: ${erros}`;
+    await sleepMs(300);
+  }
+
+  renderAll();
+  openModal(
+    'Atualização da Giss concluída',
+    `<div class="cards grid" style="grid-template-columns:repeat(4,1fr)">
+       <div class="card accent-green"><div class="kpi-label">CONFIRMADAS</div><div class="kpi-value">${confirmadas}</div></div>
+       <div class="card accent-slate"><div class="kpi-label">CANCELADAS</div><div class="kpi-value">${canceladas}</div></div>
+       <div class="card accent-blue"><div class="kpi-label">AGUARDANDO</div><div class="kpi-value">${aguardando}</div></div>
+       <div class="card" style="border-top:3px solid var(--danger)"><div class="kpi-label">ERROS</div><div class="kpi-value">${erros}</div></div>
+     </div>
+     <div style="display:flex;justify-content:flex-end;margin-top:18px"><button class="btn primary" onclick="closeModal()">Fechar</button></div>`
+  );
+}
+async function emitNfseOne(id){
+  const row=nfse.find(x=>x.id===id);if(!row)return;
+  const reason=nfseCanEmit(row);if(reason)return alert(reason);
+  let payload;try{payload=nfsePayload(row)}catch(e){return alert(e.message)}
+  const envMsg='A emissão será feita no ambiente configurado no .env. Comece em HOMOLOGAÇÃO.';
+  if(!confirm(`Emitir NFS-e no Giss?\n\nCliente: ${row.client}\nCompetência: ${nfseMonthLabel(row.competence)}\nValor: ${money(row.value)}\nAlíquota: ${nfseAliquota(row.competence,row).toFixed(2)}%\n\n${envMsg}`))return;
+  row.status='enviando_nfse';saveData('nfse',nfse);renderAll();
+  try{
+    const r=await fetch('/api/nfse/emitir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await r.json();
+    applyGissResultToRows([row],data);
+    if(r.ok&&data.sucesso)alert(`NFS-e emitida com sucesso${data.nfse?.[0]?.numero?` • Nº ${data.nfse[0].numero}`:''}.`);
+    else alert(`A Giss devolveu uma rejeição:\n${(data.erros||[]).map(e=>[e.codigo,e.mensagem,e.correcao].filter(Boolean).join(' - ')).join('\n')||data.error||'Confira o retorno.'}`);
+  }catch(e){row.status='erro_nfse';row.lastError=e.message;saveData('nfse',nfse);renderAll();alert(`Erro ao emitir NFS-e:\n${e.message}`);}
+}
+function visibleNfseRows(){
+  const ids=new Set([...document.querySelectorAll('#view-nfse tbody tr[data-id]')].filter(tr=>tr.style.display!=='none').map(tr=>Number(tr.dataset.id)));
+  return nfse.filter(x=>ids.has(Number(x.id)));
+}
+async function emitAllNfse(){
+  const visible=visibleNfseRows();
+  const eligible=[];
+  const skipped=[];
+
+  visible.forEach(x=>{
+    const reason=nfseCanEmit(x);
+    reason
+      ? skipped.push({row:x,reason})
+      : eligible.push(x);
+  });
+
+  if(!eligible.length
