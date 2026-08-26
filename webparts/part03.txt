@@ -1,0 +1,173 @@
+id:1,date:'2026-08-25',paidBy:'Financeiro SJRP',reimbursedBy:'Condomínio Exemplo',description:'Compra emergencial de material',category:'Administrativo',value:185.90,requestDate:'2026-08-25',expectedDate:'2026-08-30',receivedDate:'',receiptMethod:'PIX',status:'solicitado',notes:'',attachmentName:'',attachmentData:'',flowId:null}
+  ],
+  payables:[
+    {id:1,due:'2026-08-27',supplier:'Alpha Serviços',description:'Manutenção predial',category:'Manutenção',value:3250,paymentMethod:'PIX',status:'aberto',notes:'',flowId:null,recurring:false,frequency:'monthly',repeatCount:1,recurrenceGroup:null,pixCode:'',barcode:'',scheduledDate:'',attachmentName:'',attachmentData:'',paymentDate:''},
+    {id:2,due:'2026-08-28',supplier:'Tech Predial',description:'Prestador de serviços',category:'Prestadores',value:4600,paymentMethod:'Boleto',status:'agendado',notes:'Pagamento programado',flowId:null,recurring:true,frequency:'monthly',repeatCount:12,recurrenceGroup:'demo-rec',pixCode:'',barcode:'34191.79001 01043.510047 91020.150008 1 99990000460000',scheduledDate:'2026-08-28',attachmentName:'',attachmentData:''}
+  ],
+  boletos:[
+    {id:1,clientId:1,client:'Condomínio Jardim Europa',docNumber:'BOL-0001',due:'2026-08-30',value:14850,description:'Honorários / serviços',bank:'Integração pendente',status:'aguardando_integracao'}
+  ],
+  nfse:[],
+  receipts:[],
+  nfseSettings:{}
+};
+
+function loadData(key){ const x=localStorage.getItem('brcondos_'+key); return x?JSON.parse(x):JSON.parse(JSON.stringify(defaults[key])); }
+function normalizeParty(x){
+  return {
+    id:x.id||Date.now(),
+    name:x.name||x.legalName||'',
+    tradeName:x.tradeName||'',
+    doc:x.doc||'',
+    email:x.email||'',
+    phone:x.phone||'',
+    zip:x.zip||'',
+    street:x.street||'',
+    number:x.number||'',
+    complement:x.complement||'',
+    district:x.district||'',
+    city:x.city||'',
+    state:x.state||'',
+    cityIbge:x.cityIbge||'',
+    status:x.status||'',
+    cnae:x.cnae||'',
+    dataUpdated:x.dataUpdated||'',
+
+    contractStart:x.contractStart||'',
+    contractEnd:x.contractEnd||'',
+    units:Number(x.units||0),
+    contractAttachmentName:x.contractAttachmentName||'',
+    contractAttachmentData:x.contractAttachmentData||'',
+    billingDocument:['nfse','receipt'].includes(String(x.billingDocument||'').toLowerCase())
+      ? String(x.billingDocument).toLowerCase()
+      : 'nfse'
+  };
+}
+function normalizePayable(x){
+  return {
+    ...x,
+    recurring:!!x.recurring, frequency:x.frequency||'monthly', repeatCount:Number(x.repeatCount||1),
+    recurrenceGroup:x.recurrenceGroup||null, pixCode:x.pixCode||'', barcode:x.barcode||'',
+    scheduledDate:x.scheduledDate||'', paymentDate:x.paymentDate||'', attachmentName:x.attachmentName||'', attachmentData:x.attachmentData||''
+  };
+}
+function normalizeReceipt(x){
+  return {
+    ...x,
+    id:x.id||Date.now(),
+    sourceBoletoId:x.sourceBoletoId||'',
+    clientId:Number(x.clientId||0),
+    client:x.client||'',
+    competence:x.competence||'',
+    issueDate:x.issueDate||today(),
+    value:Number(x.value||0),
+    description:x.description||'Honorários administrativos',
+    receiptNumber:x.receiptNumber||'',
+    status:x.status==='gerado'?'gerado':'pendente'
+  };
+}
+function saveData(key,val){ localStorage.setItem('brcondos_'+key,JSON.stringify(val)); }
+let transactions=loadData('transactions'), clients=loadData('clients').map(normalizeParty), suppliers=loadData('suppliers').map(normalizeParty), chartAccounts=loadData('chartAccounts'), reimbursements=loadData('reimbursements'), payables=loadData('payables').map(normalizePayable), boletos=loadData('boletos'), nfse=loadData('nfse'), receipts=loadData('receipts'), nfseSettings=loadData('nfseSettings');
+nfse=Array.isArray(nfse)?nfse:[];
+receipts=Array.isArray(receipts)?receipts.map(normalizeReceipt):[];
+nfseSettings=(nfseSettings&&typeof nfseSettings==='object'&&!Array.isArray(nfseSettings))?nfseSettings:{};
+
+boletos=boletos.map(b=>({
+  ...b,
+  status:b.status==='pago_boleto'?'recebido':b.status,
+  receiptDate:b.receiptDate||'',
+  flowId:b.flowId||null,
+  details:b.details||'',
+  sourceKey:b.sourceKey||'',
+  competence:b.competence||'',
+  sicrediRegistered:!!b.sicrediRegistered,
+  sicrediNossoNumero:b.sicrediNossoNumero||'',
+  sicrediLinhaDigitavel:b.sicrediLinhaDigitavel||'',
+  sicrediQrCode:b.sicrediQrCode||b.qrCode||'',
+  sicrediTxId:b.sicrediTxId||'',
+  sicrediResponse:b.sicrediResponse||null
+}));
+saveData('boletos',boletos);
+
+(function migrateBoletoDueMonthsOnce(){
+  const migrationKey='brcondos_boleto_due_shift_20260825_v1';
+  if(localStorage.getItem(migrationKey)==='done') return;
+
+  boletos=boletos.map(b=>{
+    if(!b.due) return b;
+    const m=String(b.due).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m) return b;
+    let year=Number(m[1]), month=Number(m[2]), day=m[3];
+
+    if(month===7) month=8;
+    else if(month===8) month=9;
+    else return b;
+
+    return {...b,due:`${year}-${String(month).padStart(2,'0')}-${day}`};
+  });
+
+  saveData('boletos',boletos);
+  localStorage.setItem(migrationKey,'done');
+})();
+
+(function marcarBoletosSetembroComoEmitidosNoBanco(){
+  const chave='brcondos_boletos_setembro_2026_emitidos_banco_v1';
+
+  if(localStorage.getItem(chave)==='ok') return;
+
+  boletos=boletos.map(b=>{
+    if(
+      String(b.due||'')>='2026-09-01' &&
+      String(b.due||'')<='2026-09-30' &&
+      b.status!=='recebido'
+    ){
+      return {
+        ...b,
+        status:'emitido_externo',
+        externalIssued:true
+      };
+    }
+
+    return b;
+  });
+
+  saveData('boletos',boletos);
+  localStorage.setItem(chave,'ok');
+})();
+
+
+
+function looseName(v){
+  return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+function findClientByLooseName(name){
+  const n=looseName(name);
+  if(!n) return null;
+  let exact=clients.find(c=>looseName(c.name)===n || looseName(c.tradeName)===n);
+  if(exact) return exact;
+  const aliases={
+    'ASSOCIACAOEPLENUM':'ASSOCIACAODOSMORADORESEPLENUMAMOEPLENUM',
+    'ASSOCIACAOEPLENUM':'ASSOCIACAODOSMORADORESEPLENUMAMOEPLENUM',
+    'ASSOCIACAORECANTODOSCURIMBATAS':'ASSOCIACAODOSPROPDORECANTODOSCURIMBATAS',
+    'ASSOCRECANTODOSCURIMBATAS':'ASSOCIACAODOSPROPDORECANTODOSCURIMBATAS',
+    'ASSOCMONTECARLO':'ASSOCIACAORESIDENCIALMONTECARLO',
+    'GINEZGOMES':'CONDOMINIOEDIFICIOGINESGOMES',
+    'RIOMAGIORI':'CONDOMINIOEDIFICIORIOMAGGIORE',
+    'VILLESDESALPES':'VILLESDESALPESRESIDENCE',
+    'VILLE DES ALPES':'VILLESDESALPESRESIDENCE',
+    'NOVA RESIDENCE':'NOVARESIDENCEQUINTADASPAINEIRAS',
+    'PARKPRIME':'CONDOMINIOPARKPRIMERESIDENCE',
+    'HAUT':'EDIFICIOHAUTRESIDENCE',
+    'MYRA':'MYRAJK',
+    'HUBLOT':'HUBLOTHIGIENOPOLIS',
+    'HYPE':'HYPE'
+  };
+  const target=aliases[n];
+  if(target) return clients.find(c=>looseName(c.name)===looseName(target))||null;
+  return clients.find(c=>{
+    const cn=looseName(c.name);
+    return cn && (cn.includes(n) || n.includes(cn));
+  })||null;
+}
+
+const BRCONDOS_BILLING_082026 = [{"id":6100000,"clientId":0,"client":"ASSOCIAÇÃO ECO VILLAGE","docNumber":"FAT-082026-ADM-001","due":"2026-09-04","value":3658.0,"description":"Faturamento ADM - Agosto/2026","details":"","bank":"Integração pendente","status":"aguardando_integracao","receiptDate":"","flowId":null,"sourceKey":"pdf-2026-08-ADM-ASSOCIACAOECOVILLAGE-3658.00-4-","competence":"2026-08","section":"ADM"},{"id":6100001,"clientId":0,"client":"ASSOCIAÇÃO ECO VILLAGE - I","docNumber":"FAT-082026-ADM-002","due":"2026-09-16","value":3758.0,"description":"Faturamento ADM - Agosto/2026","details":"","bank":"Integração pendente","status":"aguardando_integracao","receiptDate":"","flowId":null,"sourceKey":"pdf-2026-08-ADM-ASSOCIACAOECOVILLAGEI-3758.00-16-","competence":"2026-08","section":"ADM"},{"id":6100002,"clientId":0,"client":"ASSOCIAÇÃO E PLENUM","docNumber":"FAT-082026-ADM-003","due":"2026-09-10","value":8563.8,"description":"Faturamento ADM - Agosto/2026","details":"","bank":"Integração pendente","status":"aguardando_integracao","receiptDate":"","flowId":null,"sourceKey":"pdf-2026-08-ADM-ASSOCIACAOEPLENUM-8563.80-10-","competence":"2026-08","section":"ADM"},{"id":6100003,"clientId":0,"client":"ASSOCIAÇÃO EUROPARK I","docNumber":"FAT-082026-ADM-004","due":"2026-09-01","value":4052.0,"description":"Faturamento ADM - Agosto/2026","details":"RPA #15903747","bank":"Integração pendente","status":"aguardando_integracao","receiptDate":"","flowId":null,"sourceKey":"pdf-2026-08-ADM-ASSOCIACAOEUROPARKI-4052.00-1-RPA15903747","competence":"2026-08","section":"ADM"},{"id":6100004,"clientId":0,"client":"ASSOCIAÇÃO EUROPARK II","docNumber":"FAT-082026-ADM-005","due":"2026-09-10","value":2352.0,"description":"Faturamento ADM - Agosto/2026","details":"RPA #15903604","bank":"Integração pendente","status":"aguardando_integracao","receiptDate":"","flowId":null,"sourceKey":"pdf-2026-08-ADM-ASSOCIACAOEUROPARKII-2352.00-10-RPA15903604","competence":"2026-08","section":"ADM"},{"id":6100005,"clientId":0,"client":"ASSOCIAÇÃO BOM JARDIM II","docNumber":"FAT-082026-ADM-006","due":"2026-09-15","value":1818.0,"description":"Faturamento ADM - Agosto/2026","details":"","bank":"Integração pendente","status":"aguardando_integracao","receiptDate":"","flowId":null,"sourceKey":"pdf-2026-08-ADM-ASSOCIACAOBOMJARDIMII-1818.00-15-","competence":"2026-08","section":"ADM"},{"id":6100006,"clientId":0,"client":"ASSOCIAÇÃO RESIDENCIAL MONTE CARLO","docNumber":"FAT-082026-ADM-007","due":"2026-09-10","value":4042.0,"description":"Faturamento ADM - Agosto/2026","details":"RPA #15903569","bank":"Integração pendente","status":"aguardando_integracao","receiptDate":"","flowId":null,"sourceKey":"pdf-2026-08-ADM-ASSOCIACAORESIDENCIALMONTECARLO-4042.00-10-RPA15903569","competence":"2026-08","section":"ADM"},{"id":6100007,"clientId":0,"client":"ASSOCIAÇÃO QUINTA DO GOLFE HORIZONTES","docNumber":"FAT-082026-ADM-008","due":"2026-09-10","value":1659.6,"description":"Faturamento ADM - Agosto/2026","details":"RPA ##-15917569 #15920696 #15963358","bank":"Integração pendente","status":"aguarda
