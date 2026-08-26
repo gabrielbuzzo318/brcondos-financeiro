@@ -1,0 +1,270 @@
+nhaDigitavel:old?.sicrediLinhaDigitavel||'',
+    sicrediQrCode:old?.sicrediQrCode||'',
+    sicrediTxId:old?.sicrediTxId||'',
+    sicrediResponse:old?.sicrediResponse||null
+  };
+  if(!obj.client||!obj.value)return alert('Preencha cliente e valor.');
+  if(id)boletos=boletos.map(x=>x.id===id?obj:x);else boletos.push(obj);
+  saveData('boletos',boletos);closeModal();renderAll();
+  if(!id)alert('Boleto criado e salvo na lista.');
+}
+
+
+function buildSicrediPagador(client){
+  if(!client) throw new Error('Cliente não encontrado no cadastro.');
+  const documento=String(client.doc||'').replace(/\D/g,'');
+  const endereco=[client.street,client.number,client.complement,client.district].filter(Boolean).join(', ');
+  const missing=[];
+  if(![11,14].includes(documento.length)) missing.push('CNPJ/CPF');
+  if(!client.name) missing.push('Razão Social');
+  if(!endereco) missing.push('Endereço');
+  if(!client.city) missing.push('Cidade');
+  if(!client.state) missing.push('UF');
+  if(!client.zip) missing.push('CEP');
+  if(missing.length) throw new Error(`Complete no cadastro do cliente: ${missing.join(', ')}.`);
+  return {
+    documento,
+    nome:client.name,
+    endereco,
+    cidade:client.city,
+    uf:client.state,
+    cep:client.zip
+  };
+}
+function extractSicrediField(data,names){
+  for(const name of names){
+    if(data && data[name]!==undefined && data[name]!==null) return data[name];
+  }
+  return '';
+}
+async function registerSicrediBoleto(id,{confirmOne=true,silent=false,render=true}={}){
+  const b=boletos.find(x=>x.id===id);
+  if(!b){
+    const error='Boleto não encontrado.';
+    if(!silent)alert(error);
+    return {ok:false,error};
+  }
+  if(b.sicrediRegistered){
+    const error='Este boleto já foi registrado no Sicredi.';
+    if(!silent)alert(error);
+    return {ok:false,skipped:true,error};
+  }
+  if(b.status==='recebido'){
+    const error='Este boleto já está marcado como recebido.';
+    if(!silent)alert(error);
+    return {ok:false,skipped:true,error};
+  }
+  if(!b.due){
+    const error='Defina o vencimento antes de emitir.';
+    if(!silent)alert(error);
+    return {ok:false,skipped:true,error};
+  }
+
+  const client=findClientByLooseName(b.client) || clients.find(c=>c.id===b.clientId);
+  let pagador;
+  try{
+    pagador=buildSicrediPagador(client);
+  }catch(e){
+    if(!silent)alert(e.message);
+    return {ok:false,skipped:true,error:e.message};
+  }
+
+  if(confirmOne && !confirm(`Emitir boleto HÍBRIDO no Sicredi?\n\nCliente: ${b.client}\nVencimento: ${formatDate(b.due)}\nValor: ${money(b.value)}`)){
+    return {ok:false,cancelled:true,error:'Cancelado pelo usuário.'};
+  }
+
+  try{
+    const response=await fetch('/api/boletos',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        dataVencimento:b.due,
+        valor:Number(b.value),
+        seuNumero:String(b.id).replace(/\D/g,'').slice(-10),
+        idTituloEmpresa:String(b.docNumber||'').slice(0,25),
+        descricao:b.description||'Cobrança BRCONDOS',
+        detalhes:b.details||'',
+        pagador
+      })
+    });
+
+    let data={};
+    try{ data=await response.json(); }
+    catch(_){ data={}; }
+
+    if(!response.ok){
+      const details=data.details
+        ? (typeof data.details==='string'?data.details:JSON.stringify(data.details))
+        : '';
+      throw new Error([data.error,details].filter(Boolean).join(' - ') || `Erro HTTP ${response.status}`);
+    }
+
+    const nossoNumero=String(extractSicrediField(data,['nossoNumero','nossoNumeroGerado','nosso_numero'])||'');
+    const linhaDigitavel=String(extractSicrediField(data,['linhaDigitavel','linha_digitavel'])||'');
+    const qrCode=String(extractSicrediField(data,['qrCode','qrcode','qrCodePix','pixCopiaECola','codigoQrCode'])||'');
+    const txid=String(extractSicrediField(data,['txid','txId','idTransacao'])||'');
+
+    boletos=boletos.map(x=>x.id===id?{
+      ...x,
+      bank:'Sicredi',
+      status:'emitido',
+      sicrediRegistered:true,
+      sicrediNossoNumero:nossoNumero,
+      sicrediLinhaDigitavel:linhaDigitavel,
+      sicrediQrCode:qrCode,
+      sicrediTxId:txid,
+      sicrediResponse:data
+    }:x);
+
+    saveData('boletos',boletos);
+    if(render)renderAll();
+    if(!silent)alert('Boleto híbrido registrado no Sicredi com sucesso.');
+
+    return {ok:true,id,client:b.client,value:Number(b.value),data};
+  }catch(e){
+    if(!silent)alert(`Erro ao emitir no Sicredi:\n${e.message}`);
+    return {ok:false,id,client:b.client,value:Number(b.value),error:e.message};
+  }
+}
+
+async function emitSicrediBoleto(id){
+  return await registerSicrediBoleto(id,{confirmOne:true,silent:false,render:true});
+}
+
+function bulkVisibleBoletoIds(){
+  const rows=[...document.querySelectorAll('#view-boletos tbody tr[data-id]')];
+  return new Set(
+    rows
+      .filter(tr=>tr.style.display!=='none')
+      .map(tr=>Number(tr.dataset.id))
+      .filter(Number.isFinite)
+  );
+}
+
+function prevalidateBulkBoleto(b){
+  if(!b)return 'Boleto não encontrado.';
+  if(b.sicrediRegistered)return 'Já emitido no Sicredi.';
+
+  if(b.externalIssued || b.status==='emitido_externo'){
+    return 'Já emitido diretamente no banco.';
+  }
+
+  if(b.status==='recebido')return 'Já recebido.';
+  if(!b.due)return 'Sem vencimento.';
+
+  const client=findClientByLooseName(b.client) || clients.find(c=>c.id===b.clientId);
+
+  try{
+    buildSicrediPagador(client);
+    return '';
+  }catch(e){
+    return e.message;
+  }
+}
+
+function updateBulkProgress(current,total,label,success,failed){
+  const bar=document.getElementById('bulkProgressBar');
+  const text=document.getElementById('bulkProgressText');
+  const stats=document.getElementById('bulkProgressStats');
+  const log=document.getElementById('bulkProgressLog');
+
+  if(bar)bar.style.width=`${total?Math.round((current/total)*100):0}%`;
+  if(text)text.textContent=`${current} de ${total} processado(s)${label?' • '+label:''}`;
+  if(stats)stats.textContent=`Emitidos: ${success} • Falhas: ${failed}`;
+  if(log && label){
+    const line=document.createElement('div');
+    line.textContent=label;
+    log.prepend(line);
+  }
+}
+
+function sleepMs(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+
+async function emitAllSicrediBoletos(){
+  const visibleIds=bulkVisibleBoletoIds();
+  const visible=boletos.filter(b=>visibleIds.has(Number(b.id)));
+
+  const eligible=[];
+  const skipped=[];
+
+  visible.forEach(b=>{
+    const reason=prevalidateBulkBoleto(b);
+    if(reason)skipped.push({boleto:b,reason});
+    else eligible.push(b);
+  });
+
+  if(!eligible.length){
+    const extra=skipped.length
+      ? `\n\n${skipped.length} boleto(s) foram ignorados por já estarem emitidos/recebidos, estarem sem vencimento ou com cadastro incompleto.`
+      : '';
+    return alert(`Não há boletos aptos para emissão nos resultados atuais.${extra}`);
+  }
+
+  const totalValue=eligible.reduce((sum,b)=>sum+Number(b.value||0),0);
+  const currentFilters=[
+    document.getElementById('boleto_search')?.value,
+    document.getElementById('boleto_from')?.value,
+    document.getElementById('boleto_to')?.value,
+    document.getElementById('boleto_status')?.value
+  ].some(Boolean);
+
+  const filterNote=currentFilters
+    ? '\n\nATENÇÃO: serão emitidos somente os boletos que estão VISÍVEIS com os filtros atuais.'
+    : '\n\nComo não há filtros ativos, serão considerados todos os boletos aptos da lista.';
+
+  if(!confirm(
+    `EMISSÃO EM LOTE - SICREDI\n\n`+
+    `Boletos a registrar: ${eligible.length}\n`+
+    `Valor total: ${money(totalValue)}\n`+
+    `Ignorados: ${skipped.length}\n`+
+    filterNote+
+    `\n\nOs PDFs NÃO serão baixados automaticamente.\n\nConfirmar a emissão real no Sicredi?`
+  ))return;
+
+  openModal('Emissão em lote - Sicredi',`
+    <div class="notice"><b>Não feche esta tela enquanto a emissão estiver em andamento.</b> Os boletos são enviados um por um para evitar duplicidade e facilitar a identificação de qualquer erro.</div>
+    <div id="bulkProgressText" style="font-weight:800">Preparando...</div>
+    <div class="bulk-progress-track"><div id="bulkProgressBar" class="bulk-progress-bar"></div></div>
+    <div id="bulkProgressStats" class="subtle">Emitidos: 0 • Falhas: 0</div>
+    <div id="bulkProgressLog" class="bulk-log">Iniciando emissão...</div>
+  `);
+
+  let success=0;
+  const failures=[];
+
+  for(let i=0;i<eligible.length;i++){
+    const b=eligible[i];
+    updateBulkProgress(i,eligible.length,`Emitindo ${b.client}...`,success,failures.length);
+
+    const result=await registerSicrediBoleto(b.id,{
+      confirmOne:false,
+      silent:true,
+      render:false
+    });
+
+    if(result.ok){
+      success++;
+      updateBulkProgress(i+1,eligible.length,`✓ ${b.client} — ${money(b.value)}`,success,failures.length);
+    }else{
+      failures.push({boleto:b,error:result.error||'Erro desconhecido'});
+      updateBulkProgress(i+1,eligible.length,`✗ ${b.client} — ${result.error||'Erro'}`,success,failures.length);
+    }
+
+    // Pequena pausa entre requisições para não disparar tudo simultaneamente.
+    if(i<eligible.length-1)await sleepMs(250);
+  }
+
+  saveData('boletos',boletos);
+  renderAll();
+
+  const failHtml=failures.length
+    ? `<div class="card" style="box-shadow:none;margin-top:12px"><div class="panel-title">Falhas</div>${failures.slice(0,12).map(f=>`<div class="subtle" style="margin:6px 0"><b>${esc(f.boleto.client)}</b>: ${esc(f.error)}</div>`).join('')}${failures.length>12?`<div class="subtle">+ ${failures.length-12} falha(s)</div>`:''}</div>`
+    : '';
+
+  const skipHtml=skipped.length
+    ? `<div class="card" style="box-shadow:none;margin-top:12px"><div class="panel-title">Ignorados</div>${skipped.slice(0,12).map(s=>`<div class="subtle" style="margin:6px 0"><b>${esc(s.boleto.client)}</b>: ${esc(s.reason)}</div>`).join('')}${skipped.length>12?`<div class="subtle">+ ${skipped.length-12} ignorado(s)</div>`:''}</div>`
+    : '';
+
+  openModal('Emissão em lote concluída',`
+    <div class="cards grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card accent-green"><div class="kpi-label">EMITIDOS</div><div class="
