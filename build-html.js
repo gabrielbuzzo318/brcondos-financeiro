@@ -17,7 +17,8 @@ let html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8
 
 const patchPath = path.join(root, 'webpatch.js');
 if (fs.existsSync(patchPath)) {
-  const patch = fs.readFileSync(patchPath, 'utf8').trim();
+  let patch = fs.readFileSync(patchPath, 'utf8').trim();
+  patch = patch.replace('/api/nfse/consultar-rps?numero=', '/api/nfse/consultar-rps-historico?numero=');
   const marker = html.lastIndexOf('</script>');
   if (marker < 0) throw new Error('Não encontrei </script> para aplicar o patch do frontend.');
   html = `${html.slice(0, marker)}\n${patch}\n${html.slice(marker)}`;
