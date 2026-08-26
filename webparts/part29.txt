@@ -1,0 +1,222 @@
+ro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze',16:'dezesseis',17:'dezessete',18:'dezoito',19:'dezenove'};
+const D={2:'vinte',3:'trinta',4:'quarenta',5:'cinquenta',6:'sessenta',7:'setenta',8:'oitenta',9:'noventa'};
+const C={1:'cento',2:'duzentos',3:'trezentos',4:'quatrocentos',5:'quinhentos',6:'seiscentos',7:'setecentos',8:'oitocentos',9:'novecentos'};
+function w(n){n=Math.floor(n);if(n<20)return U[n];if(n<100)return D[Math.floor(n/10)]+(n%10?' e '+U[n%10]:'');if(n===100)return 'cem';if(n<1000)return C[Math.floor(n/100)]+(n%100?' e '+w(n%100):'');if(n<1000000){const q=Math.floor(n/1000),r=n%1000;return (q===1?'mil':w(q)+' mil')+(r?(r<100?' e ':', ')+w(r):'');}if(n<1000000000){const q=Math.floor(n/1000000),r=n%1000000;return (q===1?'um milhão':w(q)+' milhões')+(r?(r<100?' e ':', ')+w(r):'');}return String(n);}
+const total=Math.round(Number(v||0)*100),reais=Math.floor(total/100),cent=total%100;let s='';if(reais)s=w(reais)+' '+(reais===1?'real':'reais');if(cent)s+=(s?' e ':'')+w(cent)+' '+(cent===1?'centavo':'centavos');return (s||'zero reais').toUpperCase();
+}
+
+
+function receiptClient(row){return clients.find(c=>c.id===row.clientId)||findClientByLooseName(row.client);}
+function receiptAddress(c){
+  if(!c)return '-';
+  const street=[c.street,c.number?`Nº ${c.number}`:''].filter(Boolean).join(', ');
+  return [street,c.district?`BAIRRO ${c.district}`:'',c.city].filter(Boolean).join(' - ').toUpperCase();
+}
+function receiptPageHtml(row){
+  const c=receiptClient(row);
+  const clientName=String(c?.name||row.client||'-').toUpperCase();
+  const address=receiptAddress(c);
+  return `<section class="receipt-page">
+    <div class="receipt-number">RECIBO Nº ${esc(row.receiptNumber||'-')}</div>
+    <div class="receipt-logo-slot"></div>
+    <h1>RECIBO DE PRESTAÇÃO DE SERVIÇO</h1>
+    <div class="receipt-text">
+      RECEBEMOS DE <b><u>${esc(clientName)}</u></b>, SITO A ${esc(address)}, A IMPORTÂNCIA DE
+      <b>${money(row.value)}</b> (${esc(receiptAmountWords(row.value))}) REFERENTE AOS HONORÁRIOS
+      ADMINISTRATIVOS AO MÊS DE ${esc(receiptCompetenceLabel(row.competence))}.
+    </div>
+    <div class="receipt-date">São José do Rio Preto/SP, ${esc(receiptDateLong(row.issueDate))}</div>
+    <div class="receipt-sign">
+  <div style="
+    font-family:'Brush Script MT','Segoe Script','Lucida Handwriting',cursive;
+    font-size:26px;
+    font-style:italic;
+    margin-bottom:6px;
+  ">
+    Marco Antonio Dosualdo
+  </div>
+
+  <div class="receipt-line"></div>
+
+  <div style="font-weight:700">
+    COMARC ADMINISTRAÇÃO DE CONDOMÍNIOS LTDA
+  </div>
+
+  <div style="font-weight:700">
+    UNIDADE SÃO JOSÉ DO RIO PRETO
+  </div>
+
+  <div style="font-weight:700">
+    CNPJ 29.941.735/0001-00
+  </div>
+</div>
+  </section>`;
+}
+function openReceiptPrintWindow(rows,title='Recibo de Prestação de Serviço'){
+  rows=(rows||[]).filter(Boolean);if(!rows.length)return false;
+  const logo=document.querySelector('.brand img')?.src||document.querySelector('.login-logo')?.src||'';
+  const w=window.open('','_blank','width=1050,height=900');
+  if(!w){alert('O navegador bloqueou a abertura do recibo. Libere pop-ups para este sistema.');return false;}
+  const pages=rows.map(receiptPageHtml).join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#dfe3e6;font-family:Arial,sans-serif;color:#111}
+    .receipt-page{position:relative;width:210mm;min-height:297mm;margin:10mm auto;background:#fff;padding:28mm 30mm 24mm;page-break-after:always}
+    .receipt-page:last-child{page-break-after:auto}.receipt-number{position:absolute;right:30mm;top:18mm;font-size:10pt;color:#666;font-weight:700}
+    .receipt-logo{display:block;width:34mm;margin:0 auto 26mm}.receipt-logo-slot{height:20mm;margin-bottom:20mm}
+    h1{text-align:center;font-size:17pt;text-decoration:underline;margin:0 0 38mm;font-weight:700}
+    .receipt-text{font-size:14pt;line-height:1.55;text-align:justify;text-transform:uppercase}
+    .receipt-date{text-align:center;font-size:13pt;margin-top:42mm}
+    .receipt-sign{text-align:center;font-size:13pt;margin-top:25mm;line-height:1.5}.receipt-line{border-top:1px solid #9eb8d9;width:75%;margin:0 auto 5mm}
+    .print-btn{position:fixed;right:22px;bottom:22px;border:0;border-radius:7px;background:#f36c2f;color:#fff;padding:12px 16px;font-weight:bold;cursor:pointer}
+    @page{size:A4;margin:0}@media print{body{background:#fff}.receipt-page{margin:0}.print-btn{display:none}}
+  </style></head><body>${pages}<button class="print-btn" onclick="window.print()">Imprimir / Salvar PDF</button>
+  <script>
+    const logo=${JSON.stringify(logo)};
+    if(logo)document.querySelectorAll('.receipt-logo-slot').forEach(el=>el.innerHTML='<img class="receipt-logo" src="'+logo+'">');
+  <\/script></body></html>`);
+  w.document.close();return true;
+}
+
+
+function previewReceipt(id){
+  const row=receipts.find(x=>x.id===id);if(!row)return;
+  openReceiptPrintWindow([row],`Recibo ${row.receiptNumber||''}`);
+}
+function generateReceiptPdf(id){
+  const row=receipts.find(x=>x.id===id);if(!row)return;
+  if(!openReceiptPrintWindow([row],`Recibo ${row.receiptNumber||''}`))return;
+  row.status='gerado';saveData('receipts',receipts);renderAll();
+}
+
+function openNewReceipt(){
+  const receiptClients=clients
+    .slice()
+    .sort((a,b)=>{
+      const ar=a.billingDocument==='receipt'?0:1;
+      const br=b.billingDocument==='receipt'?0:1;
+      return ar-br || String(a.name||'').localeCompare(String(b.name||''),'pt-BR');
+    });
+
+  const defaultComp=new Date().toISOString().slice(0,7);
+
+  openModal('Novo recibo',`
+    <div class="modal-grid">
+
+      ${field('Cliente',`
+        <select id="rec_new_client">
+          <option value="">Selecione o cliente</option>
+          ${receiptClients.map(c=>`
+            <option value="${c.id}">
+              ${esc(c.name)}${c.billingDocument==='receipt'?' • RECIBO':''}
+            </option>
+          `).join('')}
+        </select>
+      `)}
+
+      ${field('Competência',`
+        <input id="rec_new_comp" type="month" value="${defaultComp}">
+      `)}
+
+      ${field('Data do recibo',`
+        <input id="rec_new_date" type="date" value="${today()}">
+      `)}
+
+      ${field('Valor',`
+        <input id="rec_new_value"
+               type="text"
+               inputmode="decimal"
+               placeholder="0,00">
+      `)}
+
+    </div>
+
+    <div class="notice">
+      O número do recibo será gerado automaticamente seguindo a sequência do ano.
+      Este recibo será criado manualmente e não precisa ter boleto de origem.
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveNewReceipt()">Criar recibo</button>
+    </div>
+  `);
+}
+
+function saveNewReceipt(){
+  const clientId=Number(val('rec_new_client'));
+  const competence=val('rec_new_comp');
+  const issueDate=val('rec_new_date');
+  const value=parseMoneyBR(val('rec_new_value'));
+
+  const c=clients.find(x=>Number(x.id)===clientId);
+
+  if(!c)return alert('Selecione o cliente.');
+  if(!competence)return alert('Informe a competência.');
+  if(!issueDate)return alert('Informe a data do recibo.');
+  if(!(value>0))return alert('Informe um valor válido.');
+
+  const year=String(competence).slice(0,4);
+
+  const row=normalizeReceipt({
+    id:Date.now(),
+    sourceBoletoId:'',
+    clientId:c.id,
+    client:c.name,
+    competence,
+    issueDate,
+    value,
+    description:'Honorários administrativos',
+    receiptNumber:nextReceiptNumber(year),
+    status:'pendente'
+  });
+
+  receipts.push(row);
+
+  saveData('receipts',receipts);
+
+  closeModal();
+  renderAll();
+
+  alert(
+    `Recibo criado ✅\n\n`+
+    `Nº: ${row.receiptNumber}\n`+
+    `Cliente: ${row.client}\n`+
+    `Valor: ${money(row.value)}`
+  );
+}
+
+function openReceiptEdit(id){
+  const x=receipts.find(r=>r.id===id);if(!x)return;
+  openModal('Editar recibo',`
+    <div class="modal-grid">
+      ${field('Cliente',`<input value="${esc(x.client||'')}" disabled>`)}
+      ${field('Nº do recibo',`<input id="rec_number" value="${esc(x.receiptNumber||'')}">`)}
+      ${field('Competência',`<input id="rec_comp" type="month" value="${esc(x.competence||'')}">`)}
+      ${field('Data do recibo',`<input id="rec_date" type="date" value="${esc(x.issueDate||today())}">`)}
+      ${field('Valor',`<input id="rec_value" inputmode="decimal" value="${esc(moneyInputBR(x.value))}">`)}
+    </div>
+    <div class="notice">A data vem sugerida pelo vencimento do faturamento, mas pode ser alterada antes de gerar o recibo.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveReceiptEdit(${id})">Salvar</button>
+    </div>`);
+}
+function saveReceiptEdit(id){
+  const x=receipts.find(r=>r.id===id);if(!x)return;
+  const number=val('rec_number').trim(),comp=val('rec_comp'),date=val('rec_date'),value=parseMoneyBR(val('rec_value'));
+  if(!number)return alert('Informe o número do recibo.');
+  if(!comp)return alert('Informe a competência.');
+  if(!date)return alert('Informe a data do recibo.');
+  if(!(value>0))return alert('Informe um valor válido.');
+  if(receipts.some(r=>r.id!==id&&String(r.receiptNumber).toUpperCase()===number.toUpperCase()))return alert('Já existe um recibo com esse número.');
+  x.receiptNumber=number;x.competence=comp;x.issueDate=date;x.value=value;x.status='pendente';
+  saveData('receipts',receipts);closeModal();renderAll();
+}
+function deleteReceipt(id){
+  const x=receipts.find(r=>r.id===id);if(!x)return;
+  if(!confirm(`Excluir o recibo ${x.receiptNumber||''} de ${x.client}?\n\nIsso não exclui o boleto de origem.`))return;
+  receipts=receipts.filter(r=>r.id!==id);saveData('receipts',receipts);renderAll();
+}
+function visibleReceiptRows(){
+  const ids=new Set([...document.querySelect
