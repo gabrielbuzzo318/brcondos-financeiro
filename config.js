@@ -2,11 +2,36 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import forge from 'node-forge';
 
 const text = (name, fallback = '') => String(process.env[name] ?? fallback).trim();
 const digits = (name, fallback = '') => text(name, fallback).replace(/\D/g, '');
 
 let certPfxPath = text('GISS_CERT_PFX_PATH');
+const certPassword = text('GISS_CERT_PASSWORD');
+
+const certPemBase64 = text('GISS_CERT_PEM_BASE64');
+const keyPemBase64 = text('GISS_KEY_PEM_BASE64');
+
+if (!certPfxPath && certPemBase64 && keyPemBase64) {
+  certPfxPath = path.join(os.tmpdir(), 'brcondos-giss-cert.pfx');
+  try {
+    const certPem = Buffer.from(certPemBase64, 'base64').toString('utf8');
+    const keyPem = Buffer.from(keyPemBase64, 'base64').toString('utf8');
+    const cert = forge.pki.certificateFromPem(certPem);
+    const key = forge.pki.privateKeyFromPem(keyPem);
+    const p12Asn1 = forge.pkcs12.toPkcs12Asn1(key, [cert], certPassword, {
+      algorithm: '3des',
+      friendlyName: 'BRCONDOS GISS A1'
+    });
+    const der = forge.asn1.toDer(p12Asn1).getBytes();
+    fs.writeFileSync(certPfxPath, Buffer.from(der, 'binary'), { mode: 0o600 });
+  } catch (err) {
+    console.error('Falha ao reconstruir certificado GISS:', err.message);
+    certPfxPath = '';
+  }
+}
+
 const certPfxBase64Parts = Array.from({ length: 8 }, (_, i) => i + 1)
   .map(i => text(`GISS_CERT_PFX_BASE64_${i}`))
   .filter(Boolean)
@@ -31,7 +56,7 @@ export const config = {
     cnpj: digits('GISS_CNPJ'),
     inscricaoMunicipal: text('GISS_INSCRICAO_MUNICIPAL'),
     certPfxPath,
-    certPassword: text('GISS_CERT_PASSWORD'),
+    certPassword,
     serieRps: text('GISS_SERIE_RPS', 'RPS'),
     itemListaServico: text('GISS_ITEM_LISTA_SERVICO'),
     codigoTributacaoMunicipio: text('GISS_CODIGO_TRIBUTACAO_MUNICIPIO'),
