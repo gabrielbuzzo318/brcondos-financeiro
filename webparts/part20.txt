@@ -1,0 +1,202 @@
+attachmentData=old?.attachmentData||'';
+  try{
+    const f=document.getElementById('ap_attachment').files[0];
+    const payload=await fileToData(f);
+    if(payload){attachmentName=payload.name;attachmentData=payload.data}
+  }catch(e){return alert(e.message)}
+  const obj={
+    id:id||Date.now(),
+    due:val('ap_due'),
+    supplier:val('ap_supplier'),
+    description:val('ap_desc'),
+    category:val('ap_cat'),
+    value:parseMoneyBR(val('ap_value')),
+    paymentMethod:val('ap_method'),
+    status:val('ap_status'),
+    notes:val('ap_notes'),
+    flowId:old?.flowId||null,
+    recurring,
+    frequency:recurring?val('ap_frequency'):'monthly',
+    repeatCount,
+    recurrenceGroup:old?.recurrenceGroup||null,
+    pixCode:val('ap_pix'),
+    barcode:val('ap_barcode'),
+    scheduledDate:val('ap_scheduled'),
+    paymentDate:old?.paymentDate||'',
+    attachmentName,
+    attachmentData
+  };
+  if(!obj.due||!obj.description||!obj.value)return alert('Preencha vencimento, descrição e valor.');
+
+  if(id){
+    payables=payables.map(x=>x.id===id?obj:x);
+  }else if(recurring){
+    const group='rec-'+Date.now();
+    const items=[];
+    for(let i=0;i<repeatCount;i++){
+      items.push({...obj,id:Date.now()+i,due:addPeriod(obj.due,obj.frequency,i),recurrenceGroup:group,flowId:null,paymentDate:''});
+    }
+    payables.push(...items);
+  }else{
+    payables.push(obj);
+  }
+  saveData('payables',payables);
+  if(obj.status==='pago' && id) syncPayableToFlow(obj.id);
+  closeModal();renderAll();
+}
+function openSchedule(id){
+  const p=payables.find(x=>x.id===id); if(!p)return;
+  openModal('Agendar pagamento',`
+    <div class="modal-grid">
+      ${field('Conta',`<input value="${esc(p.description)}" disabled>`)}
+      ${field('Valor',`<input value="${money(p.value)}" disabled>`)}
+      ${field('Data do agendamento',`<input id="sch_date" type="date" value="${p.scheduledDate||p.due||today()}">`)}
+      ${field('Forma de pagamento',`<select id="sch_method">
+        <option ${p.paymentMethod==='PIX'?'selected':''}>PIX</option>
+        <option ${p.paymentMethod==='Boleto'?'selected':''}>Boleto</option>
+        <option ${p.paymentMethod==='Transferência'?'selected':''}>Transferência</option>
+        <option ${p.paymentMethod==='Débito automático'?'selected':''}>Débito automático</option>
+        <option ${p.paymentMethod==='Outro'?'selected':''}>Outro</option>
+      </select>`)}
+    </div>
+    <div class="notice" style="margin-top:14px">Este agendamento é interno. Para enviar o pagamento automaticamente ao banco, precisaremos conectar a API bancária.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveSchedule(${id})">Agendar</button></div>`);
+}
+function saveSchedule(id){
+  const d=val('sch_date'); if(!d)return alert('Informe a data do agendamento.');
+  payables=payables.map(x=>x.id===id?{...x,status:'agendado',scheduledDate:d,paymentMethod:val('sch_method')}:x);
+  saveData('payables',payables);closeModal();renderAll();
+}
+function openAttachment(id){
+  const p=payables.find(x=>x.id===id);
+  if(!p?.attachmentData)return alert('Esta conta não possui anexo.');
+  const a=document.createElement('a');a.href=p.attachmentData;a.download=p.attachmentName||'anexo';document.body.appendChild(a);a.click();a.remove();
+}
+function markPayablePaid(id){
+  const p=payables.find(x=>x.id===id);
+  if(!p)return;
+  openModal('Dar baixa na conta',`
+    <div class="modal-grid">
+      ${field('Conta',`<input value="${esc(p.description)}" disabled>`)}
+      ${field('Fornecedor',`<input value="${esc(p.supplier||'-')}" disabled>`)}
+      ${field('Valor',`<input value="${money(p.value)}" disabled>`)}
+      ${field('Data da baixa / pagamento',`<input id="payable_payment_date" type="date" value="${p.paymentDate||today()}">`)}
+    </div>
+    <div class="notice" style="margin-top:14px">A data escolhida será a data da saída no Fluxo de Caixa.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="confirmPayablePaid(${id})">Confirmar baixa</button>
+    </div>`);
+}
+function confirmPayablePaid(id){
+  const d=val('payable_payment_date');
+  if(!d)return alert('Informe a data da baixa.');
+  payables=payables.map(x=>x.id===id?{...x,status:'pago',paymentDate:d}:x);
+  saveData('payables',payables);
+  syncPayableToFlow(id);
+  closeModal();
+  renderAll();
+}
+
+function reversePayablePayment(id){
+  const p=payables.find(x=>x.id===id);
+  if(!p)return;
+
+  if(!confirm('Estornar a baixa desta conta? Ela voltará para A pagar e a saída correspondente será removida do Fluxo de Caixa.')) return;
+
+  if(p.flowId){
+    transactions=transactions.filter(t=>t.id!==p.flowId);
+    saveData('transactions',transactions);
+  }
+
+  payables=payables.map(x=>x.id===id?{
+    ...x,
+    status:'aberto',
+    paymentDate:'',
+    flowId:null
+  }:x);
+
+  saveData('payables',payables);
+  renderAll();
+}
+
+function syncPayableToFlow(id){
+  const p=payables.find(x=>x.id===id);
+  if(!p || p.flowId) return;
+  const flowId=Date.now()+1;
+  transactions.push({
+    id:flowId,date:p.paymentDate||today(),type:'saida',description:p.description,category:p.category||'Contas a pagar',
+    party:p.supplier||'',value:Number(p.value),status:'pago'
+  });
+  payables=payables.map(x=>x.id===id?{...x,flowId}:x);
+  saveData('transactions',transactions);saveData('payables',payables);
+}
+function delPayable(id){
+  if(!confirm('Excluir esta conta a pagar?')) return;
+  payables=payables.filter(x=>x.id!==id);
+  saveData('payables',payables);renderAll();
+}
+
+
+
+function reimbursementStatusBadge(s){
+  const map={
+    a_solicitar:['A solicitar','gray'],
+    solicitado:['Solicitado','blue'],
+    vencido:['Vencido','red'],
+    recebido:['Recebido','green'],
+    cancelado:['Cancelado','red']
+  };
+  const x=map[s]||[s,'gray'];
+  return `<span class="badge ${x[1]}">${x[0]}</span>`;
+}
+function reimbursementEffectiveStatus(r){
+  if(r.status==='recebido'||r.status==='cancelado'||r.status==='a_solicitar') return r.status;
+  if(r.expectedDate && r.expectedDate < today()) return 'vencido';
+  return r.status||'solicitado';
+}
+function renderReimbursements(){
+  const normalized=reimbursements.map(x=>({...x,status:reimbursementEffectiveStatus(x)}));
+  const toRequest=normalized.filter(x=>x.status==='a_solicitar').reduce((a,b)=>a+Number(b.value||0),0);
+  const requested=normalized.filter(x=>x.status==='solicitado').reduce((a,b)=>a+Number(b.value||0),0);
+  const overdue=normalized.filter(x=>x.status==='vencido').reduce((a,b)=>a+Number(b.value||0),0);
+  const received=normalized.filter(x=>x.status==='recebido').reduce((a,b)=>a+Number(b.value||0),0);
+  const rows=[...normalized].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  document.getElementById('view-reembolsos').innerHTML=`
+    <div class="section-title">
+      <div><h2>Reembolsos a Receber</h2><span>Controle do que foi pago e precisa ser reembolsado • ${reimbursements.filter(x=>x.sourceKey&&x.sourceKey.startsWith('reembolso-print-')).length} registros importados</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="openReportModal('reimbursements')">▤ Relatório</button>
+        <button class="btn primary" onclick="openReimbursement()">+ Novo reembolso</button>
+      </div>
+    </div>
+
+    <div class="cards grid">
+      <div class="card accent-slate"><div class="kpi-label">A SOLICITAR</div><div class="kpi-value">${money(toRequest)}</div><div class="kpi-foot">${normalized.filter(x=>x.status==='a_solicitar').length} item(ns)</div></div>
+      <div class="card accent-blue"><div class="kpi-label">SOLICITADO / A RECEBER</div><div class="kpi-value">${money(requested)}</div><div class="kpi-foot">${normalized.filter(x=>x.status==='solicitado').length} item(ns)</div></div>
+      <div class="card" style="border-top:3px solid var(--danger)"><div class="kpi-label">VENCIDO</div><div class="kpi-value">${money(overdue)}</div><div class="kpi-foot">${normalized.filter(x=>x.status==='vencido').length} item(ns)</div></div>
+      <div class="card accent-green"><div class="kpi-label">RECEBIDO</div><div class="kpi-value">${money(received)}</div><div class="kpi-foot">Já lançado como entrada no fluxo</div></div>
+    </div>
+
+    <div class="notice"><b>Agora está no fluxo certo:</b> o reembolso é um valor que <b>você já pagou e precisa receber de volta</b>. Quando marcar como <b>Recebido</b>, ele entra automaticamente no Fluxo de Caixa como <b>entrada</b>.</div>
+
+    <div class="table-wrap"><table><thead><tr>
+      <th>Data paga</th><th>Pago para / Favorecido</th><th>Reembolsado por</th><th>Descrição</th><th>Previsto</th><th>Status</th><th>Valor</th><th>Anexo</th><th></th>
+    </tr></thead><tbody>
+    ${rows.length?rows.map(x=>`<tr>
+      <td>${formatDate(x.date)}</td>
+      <td><b>${x.paidBy||'-'}</b></td>
+      <td>${x.reimbursedBy||'-'}</td>
+      <td>${x.description||'-'}${x.category?`<div class="subtle">${x.category}</div>`:''}</td>
+      <td>${x.expectedDate?formatDate(x.expectedDate):'-'}</td>
+      <td>${reimbursementStatusBadge(x.status)}</td>
+      <td class="amount pos">${money(x.value)}</td>
+      <td>${x.attachmentName?`<button class="btn small" onclick="openReimbursementAttachment(${x.id})">📎 ${esc(x.attachmentName.length>16?x.attachmentName.slice(0,16)+'…':x.attachmentName)}</button>`:'<span class="subtle">Sem anexo</span>'}</td>
+      <td><div class="actions">
+        ${x.status==='a_solicitar'?`<button class="btn small" onclick="requestReimbursement(${x.id})">Marcar solicitado</button>`:''}
+        ${x.status!=='recebido'&&x.status!=='cancelado'?`<button class="btn small green" onclick="receiveReimbursement(${x.id})">Recebi</button>`:''}
+        <button class="btn small" onclick="openReimbursement(${x.id})">Editar</button>
+        <button class="btn small danger" onclick="deleteReimbursement(${x.id})">Excluir</button>
+      </div></td>
+    </t
