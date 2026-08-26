@@ -1,0 +1,219 @@
+fse'):'nfse'
+  });
+
+  if(!obj.name)return alert('Informe o nome.');
+
+  if(type==='client'){
+    clients=id?clients.map(x=>x.id===id?obj:x):[...clients,obj];
+    saveData('clients',clients);
+  }else{
+    suppliers=id?suppliers.map(x=>x.id===id?obj:x):[...suppliers,obj];
+    saveData('suppliers',suppliers);
+  }
+
+  closeModal();
+  renderAll();
+}
+function delParty(type,id){
+  if(!confirm('Excluir este cadastro?'))return;
+  if(type==='client'){clients=clients.filter(x=>x.id!==id);saveData('clients',clients)}
+  else{suppliers=suppliers.filter(x=>x.id!==id);saveData('suppliers',suppliers)}
+  renderAll();
+}
+
+function renderBoletos(){
+  const open=boletos.filter(x=>x.status!=='recebido').reduce((a,b)=>a+Number(b.value),0);
+  const received=boletos.filter(x=>x.status==='recebido').reduce((a,b)=>a+Number(b.value),0);
+  const noDue=boletos.filter(x=>!x.due).length;
+  document.getElementById('view-boletos').innerHTML=`
+    <div class="section-title"><div><h2>Boletos</h2><span>Boletos a emitir e recebimentos</span></div><div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="document.getElementById('monthlyBillingPdf').click()">⇧ Importar PDF mensal</button>
+      <input id="monthlyBillingPdf" type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="importMonthlyBillingPDF(this)">
+      <button class="btn green" onclick="emitAllSicrediBoletos()">⚡ Emitir todos</button>
+      <button class="btn" onclick="openReportModal('boletos')">▤ Relatório</button>
+      <button class="btn primary" onclick="openBoleto()">+ Emitir boleto</button>
+    </div></div>
+    <div class="notice"><b>Regra do faturamento:</b> o mês escrito no relatório é a <b>competência</b> e o boleto vence no <b>mês seguinte</b>. Ex.: relatório AGOSTO/2026 → vencimento SETEMBRO/2026. Para registrar vários de uma vez, use <b>Emitir todos</b>; se houver filtros ativos, o lote respeita somente os boletos visíveis. Nenhum PDF é baixado automaticamente.</div>
+    <div class="cards grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card accent-blue"><div class="kpi-label">EM ABERTO</div><div class="kpi-value">${money(open)}</div></div>
+      <div class="card accent-green"><div class="kpi-label">RECEBIDOS</div><div class="kpi-value">${money(received)}</div></div>
+      <div class="card" style="border-top:3px solid var(--danger)"><div class="kpi-label">SEM VENCIMENTO</div><div class="kpi-value">${noDue}</div></div>
+      <div class="card accent-slate"><div class="kpi-label">TOTAL DE BOLETOS</div><div class="kpi-value">${boletos.length}</div></div>
+    </div>
+    <div class="filter-bar">
+      <div class="field search">
+        <label>Pesquisar</label>
+        <input id="boleto_search" type="text" placeholder="Cliente, boleto, valor, detalhes, nosso número..." oninput="filterBoletosTable()">
+      </div>
+      <div class="field">
+        <label>De</label>
+        <input id="boleto_from" type="date" onchange="filterBoletosTable()">
+      </div>
+      <div class="field">
+        <label>Até</label>
+        <input id="boleto_to" type="date" onchange="filterBoletosTable()">
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="boleto_status" onchange="filterBoletosTable()">
+          <option value="">Todos</option>
+          <option value="aguardando_integracao">Aguardando emissão</option>
+          <option value="emitido">Emitido</option>
+          <option value="emitido_externo">Emitido no banco</option>
+          <option value="recebido">Recebido</option>
+          <option value="pendente_vencimento">Sem vencimento</option>
+        </select>
+      </div>
+      <button class="btn" onclick="clearBoletosFilters()">Limpar filtros</button>
+      <div id="boleto_filter_result" class="filter-result"></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Número</th><th>Cliente</th><th>Vencimento</th><th>Descrição</th><th>Detalhes</th><th>Status</th><th>Recebimento</th><th>Valor</th><th></th></tr></thead><tbody>
+    ${boletos.length?boletos.sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).map(x=>`<tr
+      data-id="${x.id}"
+      data-date="${x.due||''}"
+      data-status="${x.status||''}"
+      data-search="${esc([
+        x.docNumber,x.client,x.due,formatDate(x.due||''),x.description,x.details,x.bank,x.status,
+        x.value,money(x.value),x.receiptDate,formatDate(x.receiptDate||''),x.competence,
+        x.sicrediNossoNumero,x.sicrediLinhaDigitavel,x.sicrediTxId
+      ].filter(Boolean).join(' ').toLowerCase())}">
+      <td><b>${esc(x.docNumber)}</b>${x.competence?`<div class="subtle">Comp.: ${esc(x.competence)}</div>`:''}${x.sicrediNossoNumero?`<div class="subtle">Nosso Nº: ${esc(x.sicrediNossoNumero)}</div>`:''}</td>
+      <td>${esc(x.client)}</td>
+      <td>${x.due?formatDate(x.due):'<span class="badge red">Definir</span>'}</td>
+      <td>${esc(x.description||'-')}</td>
+      <td>${x.details?esc(x.details):'<span class="subtle">-</span>'}</td>
+      <td>${statusBadge(x.status)}</td>
+      <td>${x.receiptDate?formatDate(x.receiptDate):'-'}</td>
+      <td class="amount pos">${money(x.value)}</td>
+      <td><div class="actions">
+        <button class="btn small" onclick="openBoleto(${x.id})">Editar</button>
+       ${x.sicrediRegistered
+  ? `<button class="btn small" onclick="printBoleto(${x.id})">PDF</button><button class="btn small" onclick="consultSicrediBoleto(${x.id})">Consultar</button>`
+  : (
+      x.externalIssued || x.status==='emitido_externo'
+        ? ''
+        : (x.due?`<button class="btn small primary" onclick="emitSicrediBoleto(${x.id})">Emitir</button>`:'')
+    )
+}
+        ${x.status!=='recebido'&&x.due?`<button class="btn small green" onclick="payBoleto(${x.id})">Receber</button>`:''}
+        <button class="btn small danger" onclick="delBoleto(${x.id})">Excluir</button>
+      </div></td>
+    </tr>`).join(''):`<tr><td colspan="9" class="empty">Nenhum boleto cadastrado.</td></tr>`}
+    </tbody></table></div>`;
+}
+
+
+function nfseMonthLabel(comp){
+  const m=String(comp||'').match(/^(\d{4})-(\d{2})$/);
+  return m?`${m[2]}/${m[1]}`:(comp||'-');
+}
+function nfseLastDay(comp){
+  const m=String(comp||'').match(/^(\d{4})-(\d{2})$/);
+  if(!m)return today();
+  const d=new Date(Number(m[1]),Number(m[2]),0);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function nfseSetting(comp){return nfseSettings[comp]||{};}
+function nfseAliquota(comp,row){return Number(row?.aliquotaPct||nfseSetting(comp).aliquotaPct||0);}
+function nfseServiceDate(comp,row){return row?.serviceDate||nfseSetting(comp).serviceDate||nfseLastDay(comp);}
+function nfseClientIbge(c){
+  if(c?.cityIbge&&/^\d{7}$/.test(String(c.cityIbge)))return String(c.cityIbge);
+  if(looseName(c?.city)==='SAOJOSEDORIOPRETO')return '3549805';
+  return '';
+}
+function nfseClientCheck(c){
+  if(!c)return 'Cliente não encontrado no cadastro.';
+  const d=String(c.doc||'').replace(/\D/g,'');
+  const missing=[];
+  if(![11,14].includes(d.length))missing.push('CNPJ/CPF');
+  if(!c.name)missing.push('Razão Social');
+  if(!c.street)missing.push('endereço');
+  if(!c.number)missing.push('número');
+  if(!c.district)missing.push('bairro');
+  if(!c.zip||String(c.zip).replace(/\D/g,'').length!==8)missing.push('CEP');
+  if(!c.city)missing.push('cidade');
+  if(!c.state)missing.push('UF');
+  if(!nfseClientIbge(c))missing.push('código IBGE da cidade');
+  return missing.length?`Complete no cliente: ${missing.join(', ')}.`:'';
+}
+function nfseTomadorFromClient(c){
+  const err=nfseClientCheck(c); if(err)throw new Error(err);
+  return {
+    documento:String(c.doc||'').replace(/\D/g,''),nome:c.name,
+    endereco:c.street,numero:c.number,complemento:c.complement||'',bairro:c.district,
+    codigoMunicipio:nfseClientIbge(c),cidade:c.city,uf:c.state,cep:String(c.zip||'').replace(/\D/g,''),email:c.email||''
+  };
+}
+function nfsePayload(row){
+  const c=clients.find(x=>x.id===row.clientId)||findClientByLooseName(row.client);
+  const aliquota=nfseAliquota(row.competence,row);
+  if(!row.competence)throw new Error('Defina a competência.');
+  if(!aliquota)throw new Error(`Configure a alíquota da competência ${nfseMonthLabel(row.competence)}.`);
+  return {
+    numeroRps:String(row.rpsNumber),
+    numeroLote:Date.now(),
+    competencia:nfseServiceDate(row.competence,row),
+    dataEmissao:row.issueDate||today(),
+    valor:Number(row.value||0),
+    aliquotaPct:aliquota,
+    discriminacao:row.description||'Administração de Condomínios.',
+    tomador:nfseTomadorFromClient(c)
+  };
+}
+function nfseCanEmit(row){
+  if(row.status==='emitida_nfse')return 'Já emitida.';
+  if(row.status==='cancelada_nfse')return 'NFS-e cancelada.';
+  if(!row.competence)return 'Sem competência.';
+  if(!nfseAliquota(row.competence,row))return 'Alíquota do mês não configurada.';
+  const c=clients.find(x=>x.id===row.clientId)||findClientByLooseName(row.client);
+  return nfseClientCheck(c);
+}
+function nextRpsNumber(){
+  const lastSaved = Number(
+    localStorage.getItem('brcondos_giss_last_rps') || 0
+  );
+
+  const used = nfse
+    .map(x => Number(x.rpsNumber))
+    .filter(n =>
+      Number.isFinite(n) &&
+      n > 0 &&
+      n < 1000000
+    );
+
+  const maior = Math.max(
+    lastSaved,
+    ...(used.length ? used : [0])
+  );
+
+  return String(maior + 1);
+}
+
+(function corrigirRpsPendentesUmaVez(){
+  const chave = 'brcondos_corrige_rps_apos_218_v1';
+
+  if(localStorage.getItem(chave) === 'ok') return;
+
+  const emitidosValidos = nfse
+    .filter(x => x.status === 'emitida_nfse')
+    .map(x => Number(x.rpsNumber))
+    .filter(n => Number.isFinite(n) && n > 0 && n < 1000000);
+
+  const ultimoEmitido = Math.max(
+    218,
+    Number(localStorage.getItem('brcondos_giss_last_rps') || 0),
+    ...(emitidosValidos.length ? emitidosValidos : [0])
+  );
+
+  let proximo = ultimoEmitido + 1;
+
+  nfse = nfse.map(x => {
+    if(x.status === 'emitida_nfse') return x;
+
+    return {
+      ...x,
+      rpsNumber: String(proximo++)
+    };
+  });
+
+  sav
