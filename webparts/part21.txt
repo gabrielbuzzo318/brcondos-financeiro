@@ -1,0 +1,208 @@
+r>`).join(''):`<tr><td colspan="9" class="empty">Nenhum reembolso cadastrado.</td></tr>`}
+    </tbody></table></div>`;
+}
+
+function openReimbursement(id=null){
+  const x=id?reimbursements.find(r=>r.id===id):{
+    date:today(),paidBy:'',reimbursedBy:'',description:'',category:'',value:'',
+    requestDate:'',expectedDate:'',receivedDate:'',receiptMethod:'PIX',status:'a_solicitar',
+    notes:'',attachmentName:'',attachmentData:'',flowId:null
+  };
+
+  openModal('Reembolso a receber',`
+    <div class="modal-grid">
+      ${field('Data em que você pagou',`<input id="rb_date" type="date" value="${x.date||today()}">`)}
+      ${field('Pago para / Favorecido',`<input id="rb_paidby" value="${esc(x.paidBy||'')}" placeholder="Nome / Razão Social">`)}
+      ${field('Quem deve reembolsar',`<input id="rb_reimbursedby" value="${esc(x.reimbursedBy||'')}" placeholder="Condomínio / cliente / empresa">`)}
+      ${field('Descrição da despesa',`<input id="rb_desc" value="${esc(x.description||'')}" placeholder="Ex.: material comprado para o condomínio">`)}
+      ${field('Categoria',`<input id="rb_cat" value="${esc(x.category||'')}" placeholder="Ex.: Administrativo">`)}
+      ${field('Valor a receber',`<input id="rb_value" type="number" step="0.01" value="${x.value||''}">`)}
+      ${field('Data da solicitação',`<input id="rb_request" type="date" value="${x.requestDate||''}">`)}
+      ${field('Previsão de reembolso',`<input id="rb_expected" type="date" value="${x.expectedDate||''}">`)}
+      ${field('Forma de recebimento',`<select id="rb_method">
+        <option ${x.receiptMethod==='PIX'?'selected':''}>PIX</option>
+        <option ${x.receiptMethod==='Transferência'?'selected':''}>Transferência</option>
+        <option ${x.receiptMethod==='Dinheiro'?'selected':''}>Dinheiro</option>
+        <option ${x.receiptMethod==='Outro'?'selected':''}>Outro</option>
+      </select>`)}
+      ${field('Status',`<select id="rb_status">
+        <option value="a_solicitar" ${x.status==='a_solicitar'?'selected':''}>A solicitar</option>
+        <option value="solicitado" ${x.status==='solicitado'||x.status==='vencido'?'selected':''}>Solicitado / A receber</option>
+        <option value="recebido" ${x.status==='recebido'?'selected':''}>Recebido</option>
+        <option value="cancelado" ${x.status==='cancelado'?'selected':''}>Cancelado</option>
+      </select>`)}
+      ${field('Observação',`<input id="rb_notes" value="${esc(x.notes||'')}">`)}
+      ${field('Anexo / comprovante da despesa',`<input id="rb_attachment" type="file" accept=".pdf,image/*"><div class="subtle">${x.attachmentName?`Atual: ${esc(x.attachmentName)}`:'Nenhum anexo'}</div>`)}
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveReimbursement(${id||'null'})">Salvar</button>
+    </div>`);
+}
+
+async function saveReimbursement(id){
+  const old=id?reimbursements.find(x=>x.id===id):null;
+  let attachmentName=old?.attachmentName||'', attachmentData=old?.attachmentData||'';
+
+  try{
+    const f=document.getElementById('rb_attachment').files[0];
+    const payload=await fileToData(f);
+    if(payload){attachmentName=payload.name;attachmentData=payload.data}
+  }catch(e){
+    return alert(e.message);
+  }
+
+  const obj={
+    id:id||Date.now(),
+    date:val('rb_date'),
+    paidBy:val('rb_paidby'),
+    reimbursedBy:val('rb_reimbursedby'),
+    description:val('rb_desc'),
+    category:val('rb_cat'),
+    value:Number(val('rb_value')),
+    requestDate:val('rb_request'),
+    expectedDate:val('rb_expected'),
+    receivedDate:old?.receivedDate||'',
+    receiptMethod:val('rb_method'),
+    status:val('rb_status'),
+    notes:val('rb_notes'),
+    attachmentName,attachmentData,
+    flowId:old?.flowId||null
+  };
+
+  if(!obj.date||!obj.paidBy||!obj.reimbursedBy||!obj.description||!obj.value)
+    return alert('Preencha data, quem pagou, quem deve reembolsar, descrição e valor.');
+
+  if(id) reimbursements=reimbursements.map(x=>x.id===id?obj:x);
+  else reimbursements.push(obj);
+
+  saveData('reimbursements',reimbursements);
+
+  if(obj.status==='recebido'){
+    reimbursements=reimbursements.map(x=>x.id===obj.id?{...x,receivedDate:x.receivedDate||today()}:x);
+    saveData('reimbursements',reimbursements);
+    syncReimbursementToFlow(obj.id);
+  }
+
+  closeModal();
+  renderAll();
+}
+
+function requestReimbursement(id){
+  reimbursements=reimbursements.map(x=>x.id===id?{
+    ...x,
+    status:'solicitado',
+    requestDate:x.requestDate||today()
+  }:x);
+  saveData('reimbursements',reimbursements);
+  renderAll();
+}
+
+function receiveReimbursement(id){
+  if(!confirm('Marcar este reembolso como recebido e lançar a entrada no Fluxo de Caixa?')) return;
+  reimbursements=reimbursements.map(x=>x.id===id?{
+    ...x,
+    status:'recebido',
+    receivedDate:today()
+  }:x);
+  saveData('reimbursements',reimbursements);
+  syncReimbursementToFlow(id);
+  renderAll();
+}
+
+function syncReimbursementToFlow(id){
+  const r=reimbursements.find(x=>x.id===id);
+  if(!r||r.flowId)return;
+
+  const flowId=Date.now()+7;
+  transactions.push({
+    id:flowId,
+    date:r.receivedDate||today(),
+    type:'entrada',
+    description:`Reembolso recebido - ${r.description}`,
+    category:r.category||'Reembolsos',
+    party:r.reimbursedBy||'',
+    value:Number(r.value),
+    status:'pago'
+  });
+
+  reimbursements=reimbursements.map(x=>x.id===id?{...x,flowId}:x);
+  saveData('reimbursements',reimbursements);
+  saveData('transactions',transactions);
+}
+
+function openReimbursementAttachment(id){
+  const r=reimbursements.find(x=>x.id===id);
+  if(!r?.attachmentData)return alert('Este reembolso não possui anexo.');
+  const a=document.createElement('a');
+  a.href=r.attachmentData;
+  a.download=r.attachmentName||'reembolso';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function deleteReimbursement(id){
+  if(!confirm('Excluir este reembolso?'))return;
+  reimbursements=reimbursements.filter(x=>x.id!==id);
+  saveData('reimbursements',reimbursements);
+  renderAll();
+}
+
+function renderFluxo(){
+  const rows=[...transactions].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('view-fluxo').innerHTML=`
+    <div class="section-title"><div><h2>Fluxo de Caixa</h2><span>Controle simples de entradas e saídas</span></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="openReportModal('cashflow')">▤ Relatório</button><button class="btn primary" onclick="openTransaction()">+ Novo lançamento</button></div></div>
+    <div class="cards grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card accent-green"><div class="kpi-label">RECEBIDO</div><div class="kpi-value">${money(sum(transactions,'entrada',['pago']))}</div></div>
+      <div class="card accent-orange"><div class="kpi-label">PAGO</div><div class="kpi-value">${money(sum(transactions,'saida',['pago']))}</div></div>
+      <div class="card accent-blue"><div class="kpi-label">A PAGAR / AGENDADO</div><div class="kpi-value">${money(sum(transactions,'saida',['agendado','aberto','vencido']))}</div></div>
+    </div>
+    <div class="filter-bar">
+      <div class="field search">
+        <label>Pesquisar</label>
+        <input id="flux_search" type="text" placeholder="Nome, descrição, categoria, valor, status..." oninput="filterFluxoTable()">
+      </div>
+      <div class="field">
+        <label>De</label>
+        <input id="flux_from" type="date" onchange="filterFluxoTable()">
+      </div>
+      <div class="field">
+        <label>Até</label>
+        <input id="flux_to" type="date" onchange="filterFluxoTable()">
+      </div>
+      <div class="field">
+        <label>Tipo</label>
+        <select id="flux_type" onchange="filterFluxoTable()">
+          <option value="">Todos</option>
+          <option value="entrada">Entrada</option>
+          <option value="saida">Saída</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="flux_status" onchange="filterFluxoTable()">
+          <option value="">Todos</option>
+          <option value="pago">Pago</option>
+          <option value="agendado">Agendado</option>
+          <option value="aberto">A pagar</option>
+          <option value="vencido">Vencido</option>
+        </select>
+      </div>
+      <button class="btn" onclick="clearFluxoFilters()">Limpar filtros</button>
+      <div id="flux_filter_result" class="filter-result"></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Cliente/Fornecedor</th><th>Status</th><th>Valor</th><th></th></tr></thead>
+    <tbody>${rows.map(x=>`<tr data-date="${x.date||''}" data-type="${x.type}" data-status="${x.status}" data-search="${esc([
+      x.date, formatDate(x.date), x.type, x.description, x.category, x.party, x.status,
+      x.value, money(x.value)
+    ].filter(Boolean).join(' ').toLowerCase())}"><td>${formatDate(x.date)}</td><td>${x.type==='entrada'?'<span class="badge green">Entrada</span>':'<span class="badge red">Saída</span>'}</td><td>${x.description}</td><td>${x.category}</td><td>${x.party||'-'}</td><td>${statusBadge(x.status)}</td><td class="amount ${x.type==='entrada'?'pos':'neg'}">${money(x.value)}</td><td><div class="actions"><button class="btn small" onclick="openTransaction(${x.id})">Editar</button><button class="btn small danger" onclick="delTransaction(${x.id})">Excluir</button></div></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function renderDRE(){
+  const receita=sum(transactions,'entrada',['pago']);
+  const gastos=transactions.filter(x=>x.type==='saida'&&x.status==='pago');
+  const despesas=gastos.reduce((a,b)=>a+Number(b.value),0), resultado=receita-despesas;
+  const cats={};gastos.forEach(x=>cats[x.category]=(cats[x.category]||0)+Number(x.value));
+  document.getElementById('view-dre').innerHTML=`
+    <div class="section-title"><div><h2>DRE Gerencial</h2><span>Resultado com base nos lançamentos re
