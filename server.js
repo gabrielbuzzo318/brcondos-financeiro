@@ -79,12 +79,20 @@ app.listen(PORT, '0.0.0.0', async () => {
     const status = getGissConfigStatus();
     console.log(`GISS config: ${status.configured ? 'OK' : 'INCOMPLETA'}`);
 
+    const certB64 = String(process.env.GISS_CERT_PFX_BASE64 || '').trim();
+    if (certB64) {
+      const certBytes = Buffer.from(certB64, 'base64');
+      const certHash = crypto.createHash('sha256').update(certBytes).digest('hex').slice(0, 16);
+      console.log(`GISS cert: ${certBytes.length} bytes, sha256=${certHash}`);
+    }
+
     if (status.configured) {
       try {
         const result = await testGissWsdl();
         console.log(`GISS WSDL: OK (${(result.metodos || []).length} método(s) detectado(s))`);
       } catch (err) {
-        console.error(`GISS WSDL: FALHOU - ${err?.message || 'erro desconhecido'}`);
+        const detail = err?.details ? ` | ${String(err.details).slice(0, 300)}` : '';
+        console.error(`GISS WSDL: FALHOU - ${err?.message || 'erro desconhecido'}${detail}`);
       }
     }
   }
