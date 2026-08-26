@@ -79,10 +79,10 @@ app.listen(PORT, '0.0.0.0', async () => {
     const status = getGissConfigStatus();
     console.log(`GISS config: ${status.configured ? 'OK' : 'INCOMPLETA'}`);
 
-    const splitB64 = [
-      String(process.env.GISS_CERT_PFX_BASE64_1 || '').trim(),
-      String(process.env.GISS_CERT_PFX_BASE64_2 || '').trim()
-    ].filter(Boolean).join('');
+    const splitB64 = [1,2,3,4]
+      .map(i => String(process.env[`GISS_CERT_PFX_BASE64_${i}`] || '').trim())
+      .filter(Boolean)
+      .join('');
     const certB64 = splitB64 || String(process.env.GISS_CERT_PFX_BASE64 || '').trim();
     if (certB64) {
       const certBytes = Buffer.from(certB64, 'base64');
