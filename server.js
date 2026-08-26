@@ -1,7 +1,10 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import https from 'node:https';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config } from './config.js';
 import {
   buildGissPreview,
   consultarLoteRpsGiss,
@@ -66,6 +69,38 @@ app.get('/api/boletos/:nossoNumero', (_req, res) => res.status(503).json({ error
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
 app.get(/.*/, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+async function rawWsdlDiagnostic() {
+  const pfx = fs.readFileSync(config.giss.certPfxPath);
+  const url = new URL(config.giss.wsdlUrl);
+  return await new Promise((resolve, reject) => {
+    const req = https.request({
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: `${url.pathname}${url.search}`,
+      method: 'GET',
+      pfx,
+      passphrase: config.giss.certPassword,
+      minVersion: 'TLSv1.2',
+      rejectUnauthorized: true,
+      headers: { 'User-Agent': 'BRCONDOS-Financeiro/1.0' }
+    }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve({
+          status: res.statusCode || 0,
+          contentType: String(res.headers['content-type'] || ''),
+          preview: text.slice(0, 500).replace(/\s+/g, ' ')
+        });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`BRCONDOS online na porta ${PORT}`);
 
@@ -73,18 +108,14 @@ app.listen(PORT, '0.0.0.0', async () => {
     const status = getGissConfigStatus();
     console.log(`GISS config: ${status.configured ? 'OK' : 'INCOMPLETA'}`);
 
-    const splitB64 = Array.from({ length: 8 }, (_, i) => i + 1)
-      .map(i => String(process.env[`GISS_CERT_PFX_BASE64_${i}`] || '').trim())
-      .filter(Boolean)
-      .join('');
-    const certB64 = splitB64 || String(process.env.GISS_CERT_PFX_BASE64 || '').trim();
-    if (certB64) {
-      const certBytes = Buffer.from(certB64, 'base64');
-      const certHash = crypto.createHash('sha256').update(certBytes).digest('hex').slice(0, 16);
-      console.log(`GISS cert: ${certBytes.length} bytes, sha256=${certHash}`);
-    }
-
     if (status.configured) {
+      try {
+        const raw = await rawWsdlDiagnostic();
+        console.log(`GISS RAW WSDL: HTTP ${raw.status} | ${raw.contentType} | ${raw.preview}`);
+      } catch (err) {
+        console.error(`GISS RAW WSDL: FALHOU - ${err?.message || 'erro desconhecido'}`);
+      }
+
       try {
         const result = await testGissWsdl();
         console.log(`GISS WSDL: OK (${(result.metodos || []).length} método(s) detectado(s))`);
