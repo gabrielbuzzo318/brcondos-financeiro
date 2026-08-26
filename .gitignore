@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.pfx
+*.p12
+giss-envio-*.xml
+giss-retorno-*.xml
+.DS_Store
