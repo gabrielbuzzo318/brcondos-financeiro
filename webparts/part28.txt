@@ -1,0 +1,186 @@
+){
+    return alert('Não há NFS-e aptas para emissão nos resultados atuais.');
+  }
+
+  const total=eligible.reduce((a,b)=>a+Number(b.value||0),0);
+
+  if(!confirm(
+    `EMISSÃO AUTOMÁTICA - GISS\n\n` +
+    `NFS-e aptas: ${eligible.length}\n` +
+    `Valor total: ${money(total)}\n` +
+    `Ignoradas: ${skipped.length}\n\n` +
+    `As notas serão emitidas UMA POR UMA automaticamente.\n\n` +
+    `Confirmar?`
+  )) return;
+
+  openModal(
+    'Emissão automática de NFS-e',
+    `<div class="notice">
+       <b>Não feche esta tela.</b>
+       As NFS-e serão transmitidas individualmente para a Giss.
+     </div>
+     <div id="bulkProgressText">Preparando...</div>
+     <div class="bulk-progress-track">
+       <div id="bulkProgressBar" class="bulk-progress-bar"></div>
+     </div>
+     <div id="bulkProgressStats" class="subtle">
+       Emitidas: 0 • Falhas: 0
+     </div>
+     <div id="bulkProgressLog" class="bulk-log">Iniciando...</div>`
+  );
+
+  let done=0;
+  let success=0;
+  let failed=0;
+
+  for(const row of eligible){
+
+    row.status='enviando_nfse';
+    saveData('nfse',nfse);
+
+    try{
+      const payload=nfsePayload(row);
+
+      const r=await fetch('/api/nfse/emitir',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+
+      const data=await r.json();
+
+      applyGissResultToRows([row],data);
+
+      if(row.status==='emitida_nfse'){
+        success++;
+      }else{
+        failed++;
+      }
+
+      done++;
+
+      updateBulkProgress(
+        done,
+        eligible.length,
+        `${row.status==='emitida_nfse'?'✓':'✗'} RPS ${row.rpsNumber}${row.nfseNumber?' → NFS-e '+row.nfseNumber:''}`,
+        success,
+        failed
+      );
+
+    }catch(e){
+
+      row.status='erro_nfse';
+      row.lastError=e.message;
+      saveData('nfse',nfse);
+
+      failed++;
+      done++;
+
+      updateBulkProgress(
+        done,
+        eligible.length,
+        `✗ RPS ${row.rpsNumber}: ${e.message}`,
+        success,
+        failed
+      );
+    }
+
+    await sleepMs(700);
+  }
+
+  renderAll();
+
+  openModal(
+    'Emissão de NFS-e concluída',
+    `<div class="cards grid" style="grid-template-columns:repeat(3,1fr)">
+       <div class="card accent-green">
+         <div class="kpi-label">EMITIDAS</div>
+         <div class="kpi-value">${success}</div>
+       </div>
+
+       <div class="card" style="border-top:3px solid var(--danger)">
+         <div class="kpi-label">FALHAS/PENDENTES</div>
+         <div class="kpi-value">${failed}</div>
+       </div>
+
+       <div class="card accent-slate">
+         <div class="kpi-label">IGNORADAS</div>
+         <div class="kpi-value">${skipped.length}</div>
+       </div>
+     </div>
+
+     <div style="display:flex;justify-content:flex-end;margin-top:18px">
+       <button class="btn primary" onclick="closeModal()">Fechar</button>
+     </div>`
+  );
+}
+
+function filterNfseTable(){
+  const q=normalizeSearchText(document.getElementById('nfse_search')?.value||'');
+  const comp=document.getElementById('nfse_comp_filter')?.value||'';
+  const status=document.getElementById('nfse_status_filter')?.value||'';
+  const rows=[...document.querySelectorAll('#view-nfse tbody tr[data-search]')];let visible=0;
+  rows.forEach(tr=>{const ok=(!q||normalizeSearchText(tr.dataset.search).includes(q))&&(!comp||tr.dataset.comp===comp)&&(!status||tr.dataset.status===status);tr.style.display=ok?'':'none';if(ok)visible++});
+  const el=document.getElementById('nfse_filter_result');if(el)el.textContent=`${visible} resultado(s)`;
+}
+function clearNfseFilters(){['nfse_search','nfse_comp_filter','nfse_status_filter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});filterNfseTable();}
+function renderNfse(){
+  const view=document.getElementById('view-nfse');if(!view)return;
+  const emitted=nfse.filter(x=>x.status==='emitida_nfse').length;
+  const ready=nfse.filter(x=>!nfseCanEmit(x)).length;
+  const errors=nfse.filter(x=>x.status==='erro_nfse').length;
+  const comps=[...new Set(nfse.map(x=>x.competence).filter(Boolean))].sort().reverse();
+  view.innerHTML=`
+    <div class="section-title"><div><h2>Notas Fiscais</h2><span>NFS-e de Administração de Condomínios • GissOnline</span></div><div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="testGissConnection()">✓ Testar Giss</button>
+      <button class="btn" onclick="openNfseMonthSettings()">⚙ Configurar mês</button>
+      <button class="btn" onclick="syncBillingFromBoletos()">↻ Sincronizar faturamento</button>
+      <button class="btn" onclick="atualizarTodasGiss()">↻ Atualizar Giss de todas</button>
+      <button class="btn green" onclick="emitAllNfse()">⚡ Emitir todas</button>
+    </div></div>
+    <div class="notice"><b>Fluxo seguro:</b> importe o faturamento nos Boletos → sincronize aqui → configure a alíquota do mês → teste a Giss → gere uma prévia XML → emita. A integração começa em <b>HOMOLOGAÇÃO</b> pelo .env. Nenhum PDF é baixado automaticamente.</div>
+    <div class="cards grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card accent-slate"><div class="kpi-label">TOTAL</div><div class="kpi-value">${nfse.length}</div></div>
+      <div class="card accent-blue"><div class="kpi-label">APTAS</div><div class="kpi-value">${ready}</div></div>
+      <div class="card accent-green"><div class="kpi-label">EMITIDAS</div><div class="kpi-value">${emitted}</div></div>
+      <div class="card" style="border-top:3px solid var(--danger)"><div class="kpi-label">COM ERRO</div><div class="kpi-value">${errors}</div></div>
+    </div>
+    <div class="filter-bar">
+      <div class="field search"><label>Pesquisar</label><input id="nfse_search" placeholder="Cliente, RPS, NFS-e, erro..." oninput="filterNfseTable()"></div>
+      <div class="field"><label>Competência</label><select id="nfse_comp_filter" onchange="filterNfseTable()"><option value="">Todas</option>${comps.map(c=>`<option value="${c}">${nfseMonthLabel(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select id="nfse_status_filter" onchange="filterNfseTable()"><option value="">Todos</option><option value="rascunho">Rascunho</option><option value="emitida_nfse">Emitida</option><option value="cancelada_nfse">Cancelada</option><option value="erro_nfse">Erro</option><option value="enviando_nfse">Enviando/Pendente</option></select></div>
+      <button class="btn" onclick="clearNfseFilters()">Limpar filtros</button><div id="nfse_filter_result" class="filter-result"></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>RPS</th><th>Cliente</th><th>Competência</th><th>Prestação</th><th>Alíquota</th><th>Status</th><th>NFS-e</th><th>Valor</th><th></th></tr></thead><tbody>
+      ${nfse.length?nfse.slice().sort((a,b)=>(b.competence||'').localeCompare(a.competence||'')||String(a.client).localeCompare(String(b.client))).map(x=>{
+        const reason=nfseCanEmit(x), aliq=nfseAliquota(x.competence,x);
+        return `<tr data-id="${x.id}" data-comp="${esc(x.competence||'')}" data-status="${esc(x.status||'')}" data-search="${esc([x.rpsNumber,x.client,x.competence,x.nfseNumber,x.verificationCode,x.lastError,x.value].filter(Boolean).join(' '))}">
+          <td><b>${esc(x.rpsNumber||'-')}</b>${x.gissProtocol?`<div class="subtle">Prot.: ${esc(x.gissProtocol)}</div>`:''}</td>
+          <td>${esc(x.client)}<div class="subtle" style="max-width:280px;margin-top:4px"><b>Descrição:</b> ${esc(x.description||'Administração de Condomínios.')}</div>${reason&&!['emitida_nfse','cancelada_nfse'].includes(x.status)?`<div class="subtle" style="color:var(--danger)">${esc(reason)}</div>`:''}</td>
+          <td>${nfseMonthLabel(x.competence)}</td><td>${formatDate(nfseServiceDate(x.competence,x))}</td>
+          <td>${aliq?`${aliq.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:4})}%`:'<span class="badge red">Configurar</span>'}</td>
+          <td>${statusBadge(x.status||'rascunho')}${x.lastError?`<div class="subtle" style="color:var(--danger);max-width:260px">${esc(x.lastError)}</div>`:''}</td>
+          <td>${x.nfseNumber?`<b>${esc(x.nfseNumber)}</b>${x.verificationCode?`<div class="subtle">Verif.: ${esc(x.verificationCode)}</div>`:''}`:'-'}</td>
+          <td class="amount pos">${money(x.value)}</td>
+          <td><div class="actions"><button class="btn small" onclick="openNfseEdit(${x.id})">${['emitida_nfse','cancelada_nfse'].includes(x.status)?'Visualizar':'Editar NF'}</button>${!['emitida_nfse','cancelada_nfse'].includes(x.status)?`<button class="btn small" onclick="previewNfseXml(${x.id})">Prévia XML</button>`:''}${x.gissProtocol?`<button class="btn small" onclick="atualizarGissNfse(${x.id})">Atualizar Giss</button>`:''}${['emitida_nfse','cancelada_nfse'].includes(x.status)&&x.gissInternalId?`<button class="btn small primary" onclick="abrirPdfGiss(${x.id})">PDF</button>`:''}${!['emitida_nfse','cancelada_nfse'].includes(x.status)?`<button class="btn small primary" onclick="emitNfseOne(${x.id})">Emitir NF</button>`:''}</div></td>
+        </tr>`}).join(''):`<tr><td colspan="9" class="empty">Nenhuma NFS-e criada. Clique em <b>Sincronizar faturamento</b>.</td></tr>`}
+    </tbody></table></div>`;
+  setTimeout(filterNfseTable,0);
+}
+
+
+const receiptMonths=['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+const receiptMonthsTitle=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function receiptCompetenceLabel(comp){
+  const m=String(comp||'').match(/^([0-9]{4})-([0-9]{2})$/);
+  if(!m)return String(comp||'-').toUpperCase();
+  return `${receiptMonths[Number(m[2])-1]||m[2]}/${m[1]}`;
+}
+function receiptDateLong(date){
+  const m=String(date||'').match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+  if(!m)return formatDate(date);
+  return `${Number(m[3])} de ${receiptMonthsTitle[Number(m[2])-1]||m[2]} de ${m[1]}`;
+}
+
+function receiptAmountWords(v){
+const U={0:'zero',1:'um',2:'dois',3:'três',4:'quat
