@@ -1,0 +1,221 @@
+) box.textContent=`${visible} de ${rows.length} lançamento(s)`;
+}
+function clearFluxoFilters(){
+  ['flux_search','flux_from','flux_to','flux_type','flux_status'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  filterFluxoTable();
+}
+
+
+function reportStatusOptions(type){
+  if(type==='clients') return `
+    <option value="">Todos</option>
+    <option value="ATIVA">Ativa</option>
+    <option value="BAIXADA">Baixada</option>
+    <option value="INAPTA">Inapta</option>
+    <option value="SUSPENSA">Suspensa</option>
+    <option value="NULA">Nula</option>`;
+  if(type==='payables') return `
+    <option value="">Todos</option>
+    <option value="aberto">A pagar</option>
+    <option value="vencido">Vencido</option>
+    <option value="agendado">Agendado</option>
+    <option value="pago">Pago</option>`;
+  if(type==='reimbursements') return `
+    <option value="">Todos</option>
+    <option value="a_solicitar">A solicitar</option>
+    <option value="solicitado">Solicitado / A receber</option>
+    <option value="vencido">Vencido</option>
+    <option value="recebido">Recebido</option>
+    <option value="cancelado">Cancelado</option>`;
+  if(type==='boletos') return `
+    <option value="">Todos</option>
+    <option value="aberto">Em aberto</option>
+    <option value="pendente_vencimento">Sem vencimento</option>
+    <option value="recebido">Recebido</option>`;
+  if(type==='receipts') return `
+    <option value="">Todos</option>
+    <option value="pendente">Pendente</option>
+    <option value="gerado">Gerado</option>`;
+  return `
+    <option value="">Todos</option>
+    <option value="pago">Realizado / Pago</option>
+    <option value="agendado">Agendado</option>
+    <option value="aberto">A pagar</option>
+    <option value="vencido">Vencido</option>`;
+}
+function reportTitle(type){
+  return {
+    clients:'Relatório de Clientes',
+    payables:'Relatório de Contas a Pagar',
+    reimbursements:'Relatório de Reembolsos',
+    cashflow:'Relatório de Fluxo de Caixa',
+    boletos:'Relatório de Boletos',
+    receipts:'Relatório de Recibos'
+  }[type]||'Relatório';
+}
+function openReportModal(type){
+  if(type==='clients'){
+    openModal(reportTitle(type),`
+      <div class="modal-grid">
+        ${field('Situação cadastral',`<select id="rep_status">${reportStatusOptions(type)}</select>`)}
+        ${field('Pesquisar no relatório',`<input id="rep_search" type="text" placeholder="Nome, CNPJ, cidade, endereço, e-mail, CNAE...">`)}
+      </div>
+      <div class="report-help">O relatório traz os dados cadastrais dos clientes: razão social, nome fantasia, CNPJ, endereço, contato, situação cadastral e CNAE.</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="generateReport('${type}')">Gerar relatório</button>
+      </div>`);
+    return;
+  }
+
+  const typeField=type==='cashflow'
+    ? `${field('Tipo',`<select id="rep_type"><option value="">Todos</option><option value="entrada">Entrada</option><option value="saida">Saída</option></select>`)}`
+    : '';
+  openModal(reportTitle(type),`
+    <div class="modal-grid">
+      ${field('Período - De',`<input id="rep_from" type="date">`)}
+      ${field('Período - Até',`<input id="rep_to" type="date">`)}
+      ${field('Status',`<select id="rep_status">${reportStatusOptions(type)}</select>`)}
+      ${typeField}
+      ${field('Pesquisar no relatório',`<input id="rep_search" type="text" placeholder="Nome, descrição, valor, categoria...">`)}
+    </div>
+    <div class="report-help">Se deixar período e status em branco, o relatório trará todos os registros. Depois é só usar <b>Imprimir / Salvar PDF</b>.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="generateReport('${type}')">Gerar relatório</button>
+    </div>`);
+}
+function reportMatchesSearch(values,q){
+  if(!q) return true;
+  const hay=normalizeSearchText(values.filter(Boolean).join(' '));
+  const query=normalizeSearchText(q);
+  return hay.includes(query) || valueSearchVariants(query).some(v=>hay.includes(normalizeSearchText(v)));
+}
+function reportDateOk(date,from,to){
+  if(!date) return !from && !to;
+  return (!from || date>=from) && (!to || date<=to);
+}
+function printableReport(title,subtitle,summaryHtml,headers,rows){
+  const logo=document.querySelector('.brand img')?.src||document.querySelector('.login-logo')?.src||'';
+  const generated=new Date().toLocaleString('pt-BR');
+  const w=window.open('','_blank','width=1200,height=850');
+  if(!w){alert('O navegador bloqueou a abertura do relatório. Libere pop-ups para este arquivo.');return}
+  const tableRows=rows.length
+    ? rows.map(row=>`<tr>${row.map(cell=>`<td>${cell??''}</td>`).join('')}</tr>`).join('')
+    : `<tr><td colspan="${headers.length}" class="empty">Nenhum registro encontrado para os filtros selecionados.</td></tr>`;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title>
+  <style>
+    *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#26343c;margin:0;padding:28px;background:#fff}
+    .head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #f36c2f;padding-bottom:14px;margin-bottom:18px}
+    .head img{width:125px}.head h1{font-size:22px;margin:0}.head p{font-size:11px;color:#6d7b84;margin:5px 0 0}
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:15px 0 20px}.sum{border:1px solid #e2e7ea;border-radius:8px;padding:12px}.sum small{display:block;color:#71808a;font-weight:bold;font-size:10px}.sum b{display:block;margin-top:5px;font-size:17px}
+    .filters{background:#f7f9fa;border:1px solid #e4e9ec;border-radius:7px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:#667681}
+    table{width:100%;border-collapse:collapse;font-size:10px}th{background:#eef2f4;color:#56656e;text-align:left;padding:8px;border:1px solid #dfe5e8}td{padding:8px;border:1px solid #e4e8eb;vertical-align:top}.empty{text-align:center;padding:25px;color:#75838c}
+    .footer{margin-top:16px;font-size:9px;color:#7a8993;display:flex;justify-content:space-between}
+    .print-btn{position:fixed;right:22px;bottom:22px;border:0;border-radius:7px;background:#f36c2f;color:#fff;padding:12px 16px;font-weight:bold;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,.15)}
+    @media print{.print-btn{display:none}body{padding:0}.head{margin-top:0}.summary{break-inside:avoid}tr{break-inside:avoid}}
+    @media(max-width:800px){.summary{grid-template-columns:repeat(2,1fr)}}
+  </style></head><body>
+  <div class="head"><div><h1>${esc(title)}</h1><p>BRCONDOS • Financeiro - Sjrp</p></div>${logo?`<img src="${logo}">`:''}</div>
+  <div class="filters">${subtitle}</div>
+  <div class="summary">${summaryHtml}</div>
+  <table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table>
+  <div class="footer"><span>Gerado em ${generated}</span><span>${rows.length} registro(s)</span></div>
+  <button class="print-btn" onclick="window.print()">Imprimir / Salvar PDF</button>
+  </body></html>`);
+  w.document.close();
+}
+function generateReport(type){
+  const from=document.getElementById('rep_from')?.value||'';
+  const to=document.getElementById('rep_to')?.value||'';
+  const status=document.getElementById('rep_status')?.value||'';
+  const q=document.getElementById('rep_search')?.value||'';
+  const typeFilter=document.getElementById('rep_type')?.value||'';
+  const periodText=from||to?`${from?formatDate(from):'início'} até ${to?formatDate(to):'hoje'}`:'Todos os períodos';
+  const statusText=status?` • Status: ${status.replaceAll('_',' ')}`:'';
+  const searchText=q?` • Pesquisa: ${esc(q)}`:'';
+  let title='',summary='',headers=[],rows=[];
+
+  if(type==='clients'){
+    let data=clients.filter(x=>
+      (!status || String(x.status||'').toUpperCase()===status) &&
+      reportMatchesSearch([
+        x.name,x.tradeName,x.doc,x.email,x.phone,x.zip,x.street,x.number,x.complement,
+        x.district,x.city,x.state,x.status,x.cnae
+      ],q)
+    ).sort((a,b)=>(a.name||'').localeCompare(b.name||'','pt-BR'));
+
+    const contractActive=data.filter(x=>!x.contractEnd).length;
+const rescinded=data.filter(x=>!!x.contractEnd).length;
+const totalUnits=data.reduce((s,x)=>s+Number(x.units||0),0);
+
+title='Relatório de Clientes';
+
+summary=`
+  <div class="sum">
+    <small>TOTAL DE CLIENTES</small>
+    <b>${data.length}</b>
+  </div>
+
+  <div class="sum">
+    <small>CONTRATOS ATIVOS</small>
+    <b>${contractActive}</b>
+  </div>
+
+  <div class="sum">
+    <small>CONTRATOS RESCINDIDOS</small>
+    <b>${rescinded}</b>
+  </div>
+
+  <div class="sum">
+    <small>TOTAL DE UNIDADES</small>
+    <b>${totalUnits}</b>
+  </div>`;
+
+    headers=[
+  'Cliente',
+  'CNPJ / CPF',
+  'Unidades',
+  'Início contrato',
+  'Rescisão',
+  'Endereço',
+  'Contato',
+  'Situação',
+  'CNAE'
+];
+    rows=data.map(x=>[
+  `<b>${esc(x.name||'-')}</b>${x.tradeName?`<br><small>${esc(x.tradeName)}</small>`:''}`,
+
+  esc(x.doc||'-'),
+
+  Number(x.units||0)>0
+    ?Number(x.units)
+    :'-',
+
+  x.contractStart
+    ?formatDate(x.contractStart)
+    :'-',
+
+  x.contractEnd
+    ?`<b>${formatDate(x.contractEnd)}</b><br><small>Rescindido</small>`
+    :'<span style="color:#2e9d50;font-weight:700">Ativo</span>',
+
+  x.street
+    ?`${esc(x.street)}${x.number?`, ${esc(x.number)}`:''}${x.complement?` - ${esc(x.complement)}`:''}<br><small>${[x.district,x.city,x.state,x.zip].filter(Boolean).map(esc).join(' • ')}</small>`
+    :(x.city?`${esc(x.city)}${x.state?' / '+esc(x.state):''}`:'-'),
+
+  `${esc(x.email||'-')}${x.phone?`<br><small>${esc(x.phone)}</small>`:''}`,
+
+  esc(x.status||'-'),
+
+  esc(x.cnae||'-')
+]);
+
+  }else if(type==='receipts'){
+    let data=receipts.filter(x=>
+      reportDateOk(x.issueDate,from,to) &&
+      (!status || x.status===status) &&
+      reportMatchesSearch([
+  
