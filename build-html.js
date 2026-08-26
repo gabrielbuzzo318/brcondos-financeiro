@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = process.cwd();
+const partsDir = path.join(root, 'webparts');
+const publicDir = path.join(root, 'public');
+const output = path.join(publicDir, 'index.html');
+
+const expected = Array.from({ length: 36 }, (_, i) => `part${String(i).padStart(2, '0')}.txt`);
+const missing = expected.filter(name => !fs.existsSync(path.join(partsDir, name)));
+if (missing.length) {
+  throw new Error(`Frontend incompleto. Faltam: ${missing.join(', ')}`);
+}
+
+fs.mkdirSync(publicDir, { recursive: true });
+const html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8')).join('');
+fs.writeFileSync(output, html, 'utf8');
+
+if (!html.includes('<!DOCTYPE html>') || !html.includes('</html>')) {
+  throw new Error('HTML remontado parece inválido.');
+}
+
+console.log(`Frontend BRCONDOS montado: ${html.length} caracteres.`);
