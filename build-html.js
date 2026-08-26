@@ -15,12 +15,15 @@ if (missing.length) {
 fs.mkdirSync(publicDir, { recursive: true });
 let html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8')).join('');
 
-const patchPath = path.join(root, 'webpatch.js');
-if (fs.existsSync(patchPath)) {
+for (const patchName of ['webpatch.js','webpatch-finaliza-historico.js']) {
+  const patchPath = path.join(root, patchName);
+  if (!fs.existsSync(patchPath)) continue;
   let patch = fs.readFileSync(patchPath, 'utf8').trim();
-  patch = patch.replace('/api/nfse/consultar-rps?numero=', '/api/nfse/consultar-rps-historico?numero=');
+  if (patchName === 'webpatch.js') {
+    patch = patch.replace('/api/nfse/consultar-rps?numero=', '/api/nfse/consultar-rps-historico?numero=');
+  }
   const marker = html.lastIndexOf('</script>');
-  if (marker < 0) throw new Error('Não encontrei </script> para aplicar o patch do frontend.');
+  if (marker < 0) throw new Error(`Não encontrei </script> para aplicar ${patchName}.`);
   html = `${html.slice(0, marker)}\n${patch}\n${html.slice(marker)}`;
 }
 
