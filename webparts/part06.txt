@@ -1,0 +1,51 @@
+paidBy:r.paidBy||r.beneficiary||'',
+  reimbursedBy:r.reimbursedBy||'',
+  requestDate:r.requestDate||'',
+  expectedDate:r.expectedDate||'',
+  receivedDate:r.receivedDate||'',
+  receiptMethod:r.receiptMethod||r.paymentMethod||'PIX',
+  status:r.status==='pago'?'recebido':(r.status==='aprovado'||r.status==='pendente'?'solicitado':(r.status||'a_solicitar'))
+}));
+saveData('reimbursements',reimbursements);
+
+
+
+const BRCONDOS_REIMBURSEMENT_IMPORT = [{"id":4100001,"sourceKey":"reembolso-print-20260825-1","date":"2026-05-26","paidBy":"KitLar Com.Prod.Limpeza","reimbursedBy":"Hublot","description":"nf 15755 - Produtos de Limpeza","category":"Reembolsos","value":226.2,"requestDate":"","expectedDate":"","receivedDate":"2026-06-01","receiptMethod":"","status":"recebido","notes":"nf 15755 - Produtos de Limpeza","attachmentName":"","attachmentData":"","flowId":null},{"id":4100002,"sourceKey":"reembolso-print-20260825-2","date":"2026-06-03","paidBy":"2º Tabelião Protesto","reimbursedBy":"Golfe Jardins","description":"Custas para pedido de Cancelamento de um protesto feito pelo Jardins","category":"Reembolsos","value":2339.74,"requestDate":"","expectedDate":"","receivedDate":"2026-06-05","receiptMethod":"","status":"recebido","notes":"Custas para pedido de Cancelamento de um protesto feito pelo Jardins","attachmentName":"","attachmentData":"","flowId":null},{"id":4100003,"sourceKey":"reembolso-print-20260825-3","date":"2026-06-06","paidBy":"Edson Luis de Souza","reimbursedBy":"Patio Pitangueiras","description":"Salario + Vale Alimentação - Zelador","category":"Reembolsos","value":2405.37,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Salario + Vale Alimentação - Zelador","attachmentName":"","attachmentData":"","flowId":null},{"id":4100004,"sourceKey":"reembolso-print-20260825-4","date":"2026-06-03","paidBy":"Tokio Marini","reimbursedBy":"Patio Pitangueiras","description":"1ª Parcela Seguro Condomínio","category":"Reembolsos","value":1847.3,"requestDate":"","expectedDate":"","receivedDate":"2026-07-01","receiptMethod":"","status":"recebido","notes":"1ª Parcela Seguro Condomínio","attachmentName":"","attachmentData":"","flowId":null},{"id":4100005,"sourceKey":"reembolso-print-20260825-5","date":"2026-06-03","paidBy":"Tokio Marini","reimbursedBy":"Persona","description":"1ª Parcela Seguro Condomínio","category":"Reembolsos","value":1461.14,"requestDate":"","expectedDate":"","receivedDate":"2026-07-01","receiptMethod":"","status":"recebido","notes":"1ª Parcela Seguro Condomínio","attachmentName":"","attachmentData":"","flowId":null},{"id":4100006,"sourceKey":"reembolso-print-20260825-6","date":"2026-06-10","paidBy":"2º Tabelião Protesto","reimbursedBy":"Persona Lupema","description":"Certidão de Constituição de Condomínio","category":"Reembolsos","value":77.69,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Certidão de Constituição de Condomínio","attachmentName":"","attachmentData":"","flowId":null},{"id":4100007,"sourceKey":"reembolso-print-20260825-7","date":"2026-06-10","paidBy":"Giro Pagamentos","reimbursedBy":"Euro 2","description":"Custo para Registro Ata","category":"Reembolsos","value":471.64,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100008,"sourceKey":"reembolso-print-20260825-8","date":"2026-06-10","paidBy":"Giro Pagamentos","reimbursedBy":"Toscana","description":"Custo para Registro Ata","category":"Reembolsos","value":141.95,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100009,"sourceKey":"reembolso-print-20260825-9","date":"2026-06-14","paidBy":"Clarice Ap.Lamero","reimbursedBy":"-","description":"Devolução Pix errado enviado no dia 14/7 que seria pra Julice do Plaza Corporate.","category":"Reembolsos","value":340.51,"requestDate":"","expectedDate":"","receivedDate":"2026-07-27","receiptMethod":"PIX","status":"recebido","notes":"Devolução Pix errado enviado no dia 14/7 que seria pra Julice do Plaza Corporate.","attachmentName":"","attachmentData":"","flowId":null},{"id":4100010,"sourceKey":"reembolso-print-20260825-10","date":"2026-06-15","paidBy":"Oficial de Registro","reimbursedBy":"Murano","description":"Reembolso","category":"Reembolsos","value":266.26,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"???","attachmentName":"","attachmentData":"","flowId":null},{"id":4100011,"sourceKey":"reembolso-print-20260825-11","date":"2026-06-17","paidBy":"RTD Rio Preto","reimbursedBy":"Murano","description":"Custo para Registro Ata","category":"Reembolsos","value":480.65,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100012,"sourceKey":"reembolso-print-20260825-12","date":"2026-06-17","paidBy":"NRTD PJ Rio Preto","reimbursedBy":"Persona","description":"Custo para Registro Ata","category":"Reembolsos","value":152.76,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100013,"sourceKey":"reembolso-print-20260825-13","date":"2026-06-17","paidBy":"Giro Pagamentos","reimbursedBy":"Manuel Felipe","description":"Custo para Registro Ata","category":"Reembolsos","value":141.95,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100014,"sourceKey":"reembolso-print-20260825-14","date":"2026-06-17","paidBy":"Giro Pagamentos","reimbursedBy":"Hypê","description":"Custo para Registro Ata","category":"Reembolsos","value":532.89,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100015,"sourceKey":"reembolso-print-20260825-15","date":"2026-06-21","paidBy":"Cartorio Imoveis","reimbursedBy":"Patio Pitangueiras","description":"Certidão Patio Pitangueiras","category":"Reembolsos","value":77.89,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Certidão Patio Pitangueiras","attachmentName":"","attachmentData":"","flowId":null},{"id":4100016,"sourceKey":"reembolso-print-20260825-16","date":"2026-06-19","paidBy":"Giro Pagamentos","reimbursedBy":"Curimbatás","description":"Custo para Registro Ata","category":"Reembolsos","value":116.42,"requestDate":"","expectedDate":"","receivedDate":"2026-07-01","receiptMethod":"","status":"recebido","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100017,"sourceKey":"reembolso-print-20260825-17","date":"2026-06-29","paidBy":"Giro Pagamentos","reimbursedBy":"Nova Smart","description":"Custo para Registro Ata","category":"Reembolsos","value":154.56,"requestDate":"","expectedDate":"","receivedDate":"2026-07-09","receiptMethod":"","status":"recebido","notes":"Custo para Registro Ata","attachmentName":"","attachmentData":"","flowId":null},{"id":4100018,"sourceKey":"reembolso-print-20260825-18","date":"2026-07-21","paidBy":"Evandro Moreira","reimbursedBy":"Self Marteli","description":"Pago em duplicidade - Locação Impressora - Pedro solicitou o reembolso.","category":"Reembolsos","value":24.59,"requestDate":"","expectedDate":"","receivedDate":"2026-07-21","receiptMethod":"","status":"recebido","notes":"Pago em duplicidade - Locação Impressora - Pedro solicitou o reembolso.","attachmentName":"","attachmentData":"","flowId":null},{"id":4100019,"sourceKey":"reembolso-print-20260825-19","date":"2026-07-24","paidBy":"Casas Bahia","reimbursedBy":"Plaza Corporate","description":"Compra Micro-Ondas.","category":"Reembolsos","value":899.0,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Compra Micro-Ondas.","attachmentName":"","attachmentData":"","flowId":null},{"id":4100020,"sourceKey":"reembolso-print-20260825-20","date":"2026-08-05","paidBy":"CEC Facil","reimbursedBy":"Quinta do Golf","description":"Consulta Cadastral","category":"Reembolsos","value":59.9,"requestDate":"","expectedDate":"","receivedDate":"","receiptMethod":"","status":"solicitado","notes":"Consulta Cadastral","attachmentName":"","attachmentData":"","flowId":null}];
+
+(function mergeImportedReimbursements(){
+  // Remove apenas o registro demonstrativo antigo.
+  reimbursements=reimbursements.filter(r=>!(r.id===1 && r.description==='Compra emergencial de material'));
+
+  const existingKeys=new Set(reimbursements.map(r=>r.sourceKey).filter(Boolean));
+  BRCONDOS_REIMBURSEMENT_IMPORT.forEach(item=>{
+    if(!existingKeys.has(item.sourceKey)){
+      reimbursements.push({...item});
+      existingKeys.add(item.sourceKey);
+    }
+  });
+
+  // Para os históricos já reembolsados, gera entrada no Fluxo de Caixa na data do reembolso.
+  BRCONDOS_REIMBURSEMENT_IMPORT.forEach(item=>{
+    if(item.status!=='recebido') return;
+    const current=reimbursements.find(r=>r.sourceKey===item.sourceKey);
+    if(!current || current.flowId) return;
+
+    const flowId=5200000 + Number(item.id||0);
+    const already=transactions.some(t=>t.id===flowId);
+    if(!already){
+      transactions.push({
+        id:flowId,
+        date:item.receivedDate,
+        type:'entrada',
+        description:`Reembolso recebido - ${item.notes||item.description}`,
+        category:'Reembolsos',
+        party:item.reimbursedBy||'',
+        value:Number(item.value),
+        status:'pago'
+      });
+    }
+
+    current.flowId=flowId;
+  });
+
+  saveData('reimbursements',reimbur
