@@ -92,6 +92,169 @@ function val(id){return document.getElementById(id).value.trim()}
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function formatDate(d){if(!d)return '-';const [y,m,day]=d.split('-');return `${day}/${m}/${y}`}
 
+// Migração online 26/08/2026: histórico até 07/2026 não volta para a fila de emissão.
+// Mantém documentos efetivamente emitidos/gerados e reconstrói 08/2026 em diante.
+function brcondosRpsSortKey(row){
+  const b=boletos.find(x=>String(x.id)===String(row.sourceBoletoId));
+  return [
+    String(row.competence||''),
+    String(b?.due||''),
+    looseName(row.client||''),
+    String(row.sourceBoletoId||row.id||'')
+  ].join('|');
+}
+
+function brcondosRenumerarRpsPendentes(){
+  const lockedStatus=new Set(['emitida_nfse','cancelada_nfse']);
+  const usadosBloqueados=nfse
+    .filter(x=>lockedStatus.has(x.status))
+    .map(x=>Number(x.rpsNumber||x.gissRpsNumber))
+    .filter(n=>Number.isFinite(n)&&n>0&&n<1000000);
+
+  const salvo=Number(localStorage.getItem('brcondos_giss_last_rps')||0);
+  const ultimoUsado=Math.max(218,Number.isFinite(salvo)?salvo:0,...(usadosBloqueados.length?usadosBloqueados:[0]));
+  if(!Number.isFinite(salvo)||salvo<ultimoUsado){
+    localStorage.setItem('brcondos_giss_last_rps',String(ultimoUsado));
+  }
+
+  let proximo=ultimoUsado+1;
+  const pendentes=[...nfse]
+    .filter(x=>!lockedStatus.has(x.status)&&String(x.competence||'')>='2026-08')
+    .sort((a,b)=>brcondosRpsSortKey(a).localeCompare(brcondosRpsSortKey(b),'pt-BR'));
+
+  const novos=new Map();
+  pendentes.forEach(row=>novos.set(row.id,String(proximo++)));
+  nfse=nfse.map(row=>novos.has(row.id)?{...row,rpsNumber:novos.get(row.id)}:row);
+
+  return {
+    primeiro:pendentes.length?String(ultimoUsado+1):'',
+    ultimo:pendentes.length?String(proximo-1):'',
+    quantidade:pendentes.length
+  };
+}
+
+function brcondosSyncBillingAtual({silent=false,rebuild=false}={}){
+  const nfLocked=new Set(['emitida_nfse','cancelada_nfse']);
+  const recLocked=new Set(['gerado','gerado_recibo']);
+
+  if(rebuild){
+    // Remove somente rascunhos/pendências. Histórico efetivamente emitido ou gerado é preservado.
+    nfse=nfse.filter(x=>nfLocked.has(x.status));
+    receipts=receipts.filter(x=>recLocked.has(x.status));
+  }
+
+  const source=boletos
+    .filter(b=>
+      String(b.competence||'')>='2026-08' &&
+      b.section!=='CONTABIL' &&
+      !/CONTABIL/i.test(String(b.description||''))
+    )
+    .sort((a,b)=>[
+      String(a.competence||''),String(a.due||''),looseName(a.client||''),String(a.id||'')
+    ].join('|').localeCompare([
+      String(b.competence||''),String(b.due||''),looseName(b.client||''),String(b.id||'')
+    ].join('|'),'pt-BR'));
+
+  let addedNfse=0,addedReceipts=0,ignored=0,missingClient=0,converted=0,locked=0;
+
+  source.forEach((b,i)=>{
+    const c=clients.find(x=>x.id===b.clientId)||findClientByLooseName(b.client);
+    if(!c){missingClient++;return;}
+
+    const nfExisting=nfse.find(x=>String(x.sourceBoletoId)===String(b.id));
+    const recExisting=receipts.find(x=>String(x.sourceBoletoId)===String(b.id));
+
+    if(c.billingDocument==='receipt'){
+      if(recExisting){ignored++;return;}
+      if(nfExisting){
+        if(nfLocked.has(nfExisting.status)){locked++;return;}
+        nfse=nfse.filter(x=>x.id!==nfExisting.id);
+        converted++;
+      }
+
+      const issueDate=receiptDefaultIssueDate(b.competence,b.due||'');
+      const year=String(b.competence||issueDate).slice(0,4);
+      receipts.push(normalizeReceipt({
+        id:Date.now()+i+Math.floor(Math.random()*100),
+        sourceBoletoId:b.id,
+        clientId:c.id,
+        client:c.name||b.client,
+        competence:b.competence,
+        issueDate,
+        value:Number(b.value||0),
+        description:'Honorários administrativos',
+        receiptNumber:nextReceiptNumber(year),
+        status:'pendente'
+      }));
+      addedReceipts++;
+      return;
+    }
+
+    if(nfExisting){ignored++;return;}
+    if(recExisting){
+      if(recLocked.has(recExisting.status)){locked++;return;}
+      receipts=receipts.filter(x=>x.id!==recExisting.id);
+      converted++;
+    }
+
+    nfse.push({
+      id:Date.now()+i+Math.floor(Math.random()*100),
+      sourceBoletoId:b.id,
+      clientId:c.id||b.clientId||0,
+      client:c.name||b.client,
+      competence:b.competence,
+      value:Number(b.value||0),
+      description:'Administração de Condomínios.',
+      rpsNumber:'',
+      issueDate:today(),
+      serviceDate:'',
+      aliquotaPct:null,
+      status:'rascunho',
+      nfseNumber:'',verificationCode:'',gissProtocol:'',lastError:'',gissResponse:null
+    });
+    addedNfse++;
+  });
+
+  const seq=brcondosRenumerarRpsPendentes();
+  saveData('nfse',nfse);
+  saveData('receipts',receipts);
+  renderAll();
+
+  const resumo={addedNfse,addedReceipts,ignored,missingClient,converted,locked,seq};
+  localStorage.setItem('brcondos_rebuild_docs_result',JSON.stringify(resumo));
+
+  if(!silent){
+    alert(
+      `Sincronização concluída.\n\n`+
+      `NFS-e criadas: ${addedNfse}\n`+
+      `Recibos criados: ${addedReceipts}\n`+
+      `Convertidos: ${converted}\n`+
+      `Já sincronizados: ${ignored}\n`+
+      `Cliente não encontrado: ${missingClient}\n`+
+      `Documentos emitidos/gerados preservados: ${locked}\n\n`+
+      `RPS pendentes: ${seq.quantidade}${seq.quantidade?` • ${seq.primeiro} até ${seq.ultimo}`:''}\n\n`+
+      `Janeiro a julho/2026 NÃO entram novamente na fila de emissão.`
+    );
+  }
+
+  return resumo;
+}
+
+// Substitui a sincronização antiga sem alterar as demais telas.
+syncBillingFromBoletos=function(){return brcondosSyncBillingAtual({silent:false,rebuild:false});};
+syncNfseFromBoletos=function(){return syncBillingFromBoletos();};
+
+(function brcondosReconstruirDocsOnlineUmaVez(){
+  const chave='brcondos_reconstroi_nf_recibos_202608_v2';
+  if(localStorage.getItem(chave)==='ok')return;
+  if(!boletos.some(b=>String(b.competence||'')>='2026-08'))return;
+
+  const resumo=brcondosSyncBillingAtual({silent:true,rebuild:true});
+  localStorage.setItem(chave,'ok');
+  localStorage.setItem('brcondos_giss_last_rps',String(Math.max(218,Number(localStorage.getItem('brcondos_giss_last_rps')||0))));
+  console.log('BRCONDOS: NFS-e/recibos reconstruídos.',resumo);
+})();
+
 if(localStorage.getItem('brcondos_session')){
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
