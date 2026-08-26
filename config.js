@@ -7,7 +7,12 @@ const text = (name, fallback = '') => String(process.env[name] ?? fallback).trim
 const digits = (name, fallback = '') => text(name, fallback).replace(/\D/g, '');
 
 let certPfxPath = text('GISS_CERT_PFX_PATH');
-const certPfxBase64 = text('GISS_CERT_PFX_BASE64');
+const certPfxBase64Parts = [
+  text('GISS_CERT_PFX_BASE64_1'),
+  text('GISS_CERT_PFX_BASE64_2')
+].filter(Boolean).join('');
+const certPfxBase64 = certPfxBase64Parts || text('GISS_CERT_PFX_BASE64');
+
 if (!certPfxPath && certPfxBase64) {
   certPfxPath = path.join(os.tmpdir(), 'brcondos-giss-cert.pfx');
   try {
