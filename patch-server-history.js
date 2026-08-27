@@ -12,6 +12,18 @@ if (!src.includes("app.set('etag', false);")) {
   );
 }
 
+const authImport = "} from './auth-server.js';";
+if (!src.includes("from './state-server.js';")) {
+  if (!src.includes(authImport)) throw new Error('PATCH STATE: import de auth não encontrado.');
+  src = src.replace(authImport, `${authImport}\nimport { getSharedState, putSharedState } from './state-server.js';`);
+}
+
+const authRoute = "app.post('/api/auth/first-access-complete', requireAuth, route((req, res) => markFirstAccessDone(req, res)));";
+if (!src.includes("app.use('/api/state', requireAuth);")) {
+  if (!src.includes(authRoute)) throw new Error('PATCH STATE: rota de autenticação não encontrada.');
+  src = src.replace(authRoute, `${authRoute}\n\n// Estado central compartilhado por todos os logins.\napp.use('/api/state', requireAuth);\napp.get('/api/state', route(req => getSharedState(req)));\napp.put('/api/state', requireWriteAccess, route(req => putSharedState(req, req.body)));`);
+}
+
 const oldRoute = `app.get('/api/nfse/consultar-rps-historico', route(req => consultarNfsePorRpsEndpointGiss({
   numero: req.query.numero,
   serie: req.query.serie || 'RPS',
@@ -66,4 +78,4 @@ if (src.includes(oldRoute)) {
 }
 
 fs.writeFileSync(file, src, 'utf8');
-console.log('GISS HISTORY PATCH: sem cache + retry de E89 ativado.');
+console.log('GISS HISTORY PATCH: sem cache + retry de E89 + estado compartilhado ativado.');
