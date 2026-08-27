@@ -5,33 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>BRCONDOS | Financeiro - Sjrp</title>
 <style>
-:root{--orange:#f36c2f;--slate-dark:#46545d;--green:#52b957;--green-dark:#3f9c45;--danger:#df4c4c;--muted:#7a8993}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;color:#26343c;background:#fff}button,input{font:inherit}button{cursor:pointer}.hidden{display:none!important}
-#loginScreen{min-height:100vh;background:#fff;display:flex;align-items:flex-start;justify-content:center;position:relative;overflow:hidden;padding-top:9vh}
-.login-card{width:350px;background:#fff;border:1px solid #e2e6e9;border-radius:7px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:28px 28px 24px;z-index:2}
-.login-logo{display:block;width:175px;max-width:100%;margin:0 auto 4px;font-size:28px;font-weight:900;color:var(--orange);text-align:center}
-.login-subtitle{text-align:center;font-size:14px;font-weight:700;color:var(--slate-dark);letter-spacing:.3px;margin:3px 0 18px}
-.login-row{display:flex;border:1px solid #dfe4e8;border-radius:3px;height:42px;margin:10px 0;overflow:hidden;background:#fff}.login-row:focus-within{border-color:var(--orange);box-shadow:0 0 0 1px rgba(243,108,47,.12)}
-.login-icon{width:42px;display:grid;place-items:center;color:#8a969e;border-right:1px solid #e8ecef}.login-row input{border:0;outline:0;width:100%;padding:0 12px}
-.login-btn{width:100%;height:42px;border:0;border-radius:4px;background:var(--green);color:#fff;font-weight:700;margin-top:11px}.login-btn:hover{background:var(--green-dark)}.login-btn:disabled{opacity:.65;cursor:wait}
-.login-links{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:14px}.login-link{border:0;background:none;padding:0;font-size:12px;text-decoration:underline;color:#4d5960;cursor:pointer}
-.login-error{font-size:12px;color:var(--danger);margin-top:8px;text-align:center;min-height:16px;line-height:1.4}.success{color:#2f8b3b}.city{position:absolute;left:0;right:0;bottom:0;height:29vh;min-height:180px;background:linear-gradient(180deg,#eef3f6,#dfe8ed);z-index:1;pointer-events:none}.login-footer{position:absolute;left:12px;bottom:9px;z-index:2;font-size:10px;color:#7690a1}
-.panel-title{margin:2px 0 6px;font-size:18px;text-align:center;color:#26343c}.panel-info{font-size:12px;color:#68757d;line-height:1.45;text-align:center;margin:0 0 15px}.back{border:0;background:none;color:#4d5960;text-decoration:underline;font-size:12px;padding:0;margin-bottom:12px}.field-label{display:block;font-size:11px;font-weight:700;color:#68757d;margin:10px 0 5px}.plain-input{width:100%;height:42px;border:1px solid #dfe4e8;border-radius:3px;padding:0 12px;outline:0}.plain-input:focus{border-color:var(--orange);box-shadow:0 0 0 1px rgba(243,108,47,.12)}
-@media(max-width:760px){#loginScreen{padding-top:7vh}.login-card{width:92%;max-width:350px}.city{height:24vh}}
+:root{--orange:#f36c2f;--green:#55b957;--green-dark:#449a48;--danger:#d94b4b;--muted:#6f7d86}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;color:#222;background:#fff}button,input{font:inherit}.hidden{display:none!important}
+#loginScreen{min-height:100vh;position:relative;overflow:hidden;background:#fff;display:flex;justify-content:center;align-items:flex-start;padding-top:68px}
+.login-card{position:relative;z-index:5;width:360px;min-height:392px;background:#fff;border:1px solid #ddd;border-radius:7px;box-shadow:0 2px 8px rgba(0,0,0,.15);padding:30px 27px 25px}
+.brand-logo{width:146px;height:128px;margin:0 auto 10px;display:block}
+.logo-blocks{transform:translateY(0)}
+.login-row{height:45px;display:flex;border:1px solid #d9d9d9;border-radius:3px;overflow:hidden;background:#fff;margin:9px 0}.login-row:focus-within{border-color:var(--orange);box-shadow:0 0 0 1px rgba(243,108,47,.13)}
+.login-icon{width:45px;flex:0 0 45px;display:grid;place-items:center;border-right:1px solid #ddd;color:#a8a8a8;font-size:17px}.login-row input{border:0;outline:0;width:100%;padding:0 13px;font-size:12px;color:#222}.eye{width:45px;flex:0 0 45px;border:0;border-left:1px solid #ddd;background:#fff;color:#aaa;cursor:pointer}
+.login-btn{display:block;width:180px;height:36px;margin:22px auto 0;border:0;border-radius:4px;background:var(--green);color:#fff;font-size:12px;cursor:pointer}.login-btn:hover{background:var(--green-dark)}.login-btn:disabled{opacity:.65;cursor:wait}
+.login-error{min-height:16px;margin-top:7px;color:var(--danger);font-size:11px;text-align:center;line-height:1.35}.success{color:#2d8a3c}
+.login-links{display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap;margin-top:14px}.login-link,.back{border:0;background:none;color:#222;text-decoration:underline;font-size:11px;cursor:pointer;padding:0}
+.panel-title{font-size:17px;text-align:center;margin:2px 0 7px}.panel-info{font-size:11px;line-height:1.45;color:#68757d;text-align:center;margin:0 0 13px}.field-label{display:block;font-size:11px;font-weight:700;color:#68757d;margin:9px 0 5px}.plain-input{width:100%;height:42px;border:1px solid #d9d9d9;border-radius:3px;padding:0 12px;outline:0}.plain-input:focus{border-color:var(--orange)}
+.city-wrap{position:absolute;left:0;right:0;bottom:0;height:315px;z-index:1;pointer-events:none}.city-wrap svg{position:absolute;left:0;bottom:0;width:100%;height:100%;display:block}.cloud{position:absolute;height:12px;border-radius:999px;background:#edf9fe;opacity:.95}.cloud:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#edf9fe;left:9px;top:-6px}.c1{left:7%;bottom:275px;width:38px}.c2{left:22%;bottom:255px;width:43px}.c3{left:33%;bottom:160px;width:44px}.c4{left:52%;bottom:155px;width:40px}.c5{left:68%;bottom:225px;width:43px}.c6{right:8%;bottom:255px;width:40px}.c7{right:19%;bottom:165px;width:44px}
+.login-footer{position:absolute;left:11px;bottom:6px;z-index:3;font-size:9px;color:#8aa6b7}
+@media(max-width:760px){#loginScreen{padding-top:34px}.login-card{width:92%;max-width:360px}.city-wrap{height:230px}.brand-logo{width:132px;height:116px}.login-footer{display:none}}
 </style>
 </head>
 <body>
 <section id="loginScreen">
   <div class="login-card">
-    <div class="login-logo">BRCONDOS</div>
-    <div class="login-subtitle">Financeiro - Sjrp</div>
+    <svg class="brand-logo" viewBox="0 0 160 135" aria-label="BRCONDOS">
+      <g class="logo-blocks" fill="#6d7b84">
+        <polygon points="49,23 69,12 89,23 69,34"/><polygon points="72,35 92,24 112,35 92,46"/><polygon points="26,35 46,24 66,35 46,46"/>
+        <polygon points="49,47 69,36 89,47 69,58" fill="#f36c2f"/>
+        <polygon points="95,47 115,36 135,47 115,58"/><polygon points="3,47 23,36 43,47 23,58"/>
+        <polygon points="26,59 46,48 66,59 46,70"/><polygon points="72,59 92,48 112,59 92,70"/>
+        <g opacity=".8"><rect x="4" y="61" width="18" height="25"/><rect x="27" y="71" width="18" height="25"/><rect x="50" y="60" width="18" height="25"/><rect x="73" y="71" width="18" height="25"/><rect x="96" y="60" width="18" height="25"/><rect x="119" y="59" width="10" height="20"/></g>
+      </g>
+      <text x="80" y="120" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="25" fill="#f36c2f"><tspan font-weight="700">BR</tspan><tspan font-weight="300">CONDOS</tspan></text>
+    </svg>
 
     <section id="loginPanel">
       <div class="login-row"><div class="login-icon">👤</div><input id="email" type="email" autocomplete="username" placeholder="E-mail"></div>
-      <div class="login-row"><div class="login-icon">🔑</div><input id="password" type="password" autocomplete="current-password" placeholder="Senha"></div>
+      <div class="login-row"><div class="login-icon">🔑</div><input id="password" type="password" autocomplete="current-password" placeholder="Senha"><button id="togglePass" class="eye" type="button">◉</button></div>
       <button id="loginBtn" class="login-btn" type="button">ENTRAR →</button>
       <div id="loginMsg" class="login-error"></div>
-      <div class="login-links"><button id="firstBtn" class="login-link" type="button">Primeiro acesso</button><button id="forgotBtn" class="login-link" type="button">Esqueceu sua senha?</button></div>
+      <div class="login-links"><button id="forgotBtn" class="login-link" type="button">Esqueceu sua senha?</button><button id="firstBtn" class="login-link" type="button">Primeiro acesso</button></div>
     </section>
 
     <section id="emailPanel" class="hidden">
@@ -52,7 +62,23 @@
       <div id="passwordMsg" class="login-error"></div>
     </section>
   </div>
-  <div class="city"></div>
+
+  <span class="cloud c1"></span><span class="cloud c2"></span><span class="cloud c3"></span><span class="cloud c4"></span><span class="cloud c5"></span><span class="cloud c6"></span><span class="cloud c7"></span>
+  <div class="city-wrap">
+    <svg viewBox="0 0 1440 330" preserveAspectRatio="none" aria-hidden="true">
+      <circle cx="88" cy="220" r="42" fill="#fff9ae"/><circle cx="1147" cy="220" r="42" fill="#fff9ae"/>
+      <path d="M0 228h25v-13h17v13h24v-24h16v24h22v-14h18v14h22v-30h14v30h31v-15h18v15h25v-27h15v27h31v-18h17v18h25v-42h16v42h21v-12h19v12h25v-31h14v31h30v-20h16v20h23v-37h15v37h26v-13h17v13h25v-28h17v28h28v-23h16v23h24v-35h15v35h26v-14h18v14h22v-29h15v29h30v-21h16v21h31v-44h14v44h22v-16h17v16h26v-27h16v27h26v-19h15v19h25v-39h15v39h23v-16h19v16h29v-31h16v31h26v-21h17v21h28v-36h15v36h25v-13h19v13h26v-28h16v28h26v-20h18v20h31v-40h15v40h24v-16h17v16h28v-27h15v27h29v-21h15v21h29v-34h16v34h24v-15h18v15h31v-25h15v25h24v-18h18v18h31v102H0z" fill="#def4fd"/>
+      <path d="M0 248h34v-42h27v42h20v-70h34v70h30v-55h27v55h33v-86h35v86h30v-45h28v45h24v-72h38v72h32v-64h29v64h23v-91h41v91h27v-48h32v48h28v-76h38v76h27v-61h33v61h31v-95h36v95h23v-53h31v53h35v-80h37v80h29v-64h34v64h28v-87h39v87h25v-50h30v50h30v-71h38v71h28v-56h31v56h34v-89h38v89h29v-59h32v59h28v-77h37v77h32v-66h31v66h30v-90h36v90h28v-54h31v54h27v-73h37v73h34v-62h31v62h29v-83h39v83h28v-49h31v49h31v-68h34v68h36v-60h28v60h38v82H0z" fill="#afe0f7"/>
+      <g fill="#4fb4df">
+        <rect x="12" y="236" width="32" height="94"/><rect x="60" y="211" width="32" height="119"/><rect x="112" y="232" width="44" height="98"/><rect x="174" y="190" width="38" height="140"/><rect x="230" y="218" width="37" height="112"/><rect x="287" y="181" width="43" height="149"/><rect x="350" y="225" width="32" height="105"/><rect x="401" y="199" width="42" height="131"/><rect x="463" y="213" width="39" height="117"/><rect x="524" y="174" width="46" height="156"/><rect x="591" y="224" width="34" height="106"/><rect x="646" y="190" width="45" height="140"/><rect x="710" y="213" width="38" height="117"/><rect x="768" y="182" width="47" height="148"/><rect x="835" y="226" width="36" height="104"/><rect x="892" y="196" width="43" height="134"/><rect x="956" y="214" width="38" height="116"/><rect x="1015" y="179" width="48" height="151"/><rect x="1084" y="225" width="36" height="105"/><rect x="1141" y="190" width="44" height="140"/><rect x="1205" y="212" width="38" height="118"/><rect x="1264" y="179" width="47" height="151"/><rect x="1331" y="226" width="36" height="104"/><rect x="1388" y="198" width="40" height="132"/>
+      </g>
+      <g fill="#ff742d"><rect x="174" y="190" width="38" height="140"/><rect x="1015" y="179" width="48" height="151"/></g>
+      <g fill="#f9c43f">
+        <rect x="182" y="205" width="6" height="8"/><rect x="196" y="205" width="6" height="8"/><rect x="182" y="222" width="6" height="8"/><rect x="196" y="222" width="6" height="8"/><rect x="1025" y="195" width="7" height="9"/><rect x="1044" y="195" width="7" height="9"/><rect x="1025" y="214" width="7" height="9"/><rect x="1044" y="214" width="7" height="9"/>
+      </g>
+      <path d="M0 302h1440v28H0z" fill="#75c9eb"/>
+    </svg>
+  </div>
   <div class="login-footer">BRCondos © 2026. Todos os direitos reservados.</div>
 </section>
 <script>
@@ -67,7 +93,7 @@
   async function sendEmail(){const email=$('accessEmail').value.trim().toLowerCase(),msg=$('emailMsg'),btn=$('sendBtn');if(!email){msg.textContent='Informe o e-mail.';return;}btn.disabled=true;btn.textContent='Enviando...';msg.classList.remove('success');msg.textContent='';try{const path=mode==='first-access'?'/api/auth/first-access':'/api/auth/forgot-password';const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await json(r);if(!r.ok)throw new Error(d.error||'Não foi possível enviar o e-mail.');msg.classList.add('success');msg.textContent=d.message||'Instruções enviadas.';btn.textContent='Enviado';}catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Enviar instruções';}}
   function readCallback(){const p=new URLSearchParams(location.hash.replace(/^#/,''));const access=p.get('access_token');if(!access)return false;callbackSession={access_token:access,refresh_token:p.get('refresh_token')||'',expires_in:Number(p.get('expires_in')||3600),type:p.get('type')||'recovery'};history.replaceState({},document.title,location.pathname+location.search);show('passwordPanel');return true;}
   async function setPassword(){const p1=$('newPassword').value,p2=$('newPassword2').value,msg=$('passwordMsg'),btn=$('setPasswordBtn');if(p1.length<8){msg.textContent='Use pelo menos 8 caracteres.';return;}if(p1!==p2){msg.textContent='As senhas não coincidem.';return;}if(!callbackSession?.access_token){msg.textContent='Link inválido ou expirado.';return;}btn.disabled=true;btn.textContent='Salvando...';try{const r=await fetch(`${cfg.supabaseUrl}/auth/v1/user`,{method:'PUT',headers:{'Content-Type':'application/json','apikey':cfg.publishableKey,'Authorization':`Bearer ${callbackSession.access_token}`},body:JSON.stringify({password:p1})});const d=await json(r);if(!r.ok)throw new Error(d.msg||d.message||'Não foi possível salvar a senha.');const a=await fetch('/api/auth/adopt-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(callbackSession)});const ad=await json(a);if(!a.ok)throw new Error(ad.error||'Não foi possível concluir o acesso.');await fetch('/api/auth/first-access-complete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).catch(()=>{});location.replace('/');}catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Salvar senha e entrar';}}
-  $('loginBtn').onclick=login;$('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('firstBtn').onclick=()=>openEmail('first-access');$('forgotBtn').onclick=()=>openEmail('forgot-password');$('emailBack').onclick=()=>show('loginPanel');$('sendBtn').onclick=sendEmail;$('setPasswordBtn').onclick=setPassword;
+  $('loginBtn').onclick=login;$('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('firstBtn').onclick=()=>openEmail('first-access');$('forgotBtn').onclick=()=>openEmail('forgot-password');$('emailBack').onclick=()=>show('loginPanel');$('sendBtn').onclick=sendEmail;$('setPasswordBtn').onclick=setPassword;$('togglePass').onclick=()=>{const p=$('password');p.type=p.type==='password'?'text':'password';};
   loadConfig().then(()=>{if(!readCallback())show('loginPanel')}).catch(e=>{$('loginMsg').textContent=e.message});
 })();
 </script>
