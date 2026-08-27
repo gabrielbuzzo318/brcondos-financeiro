@@ -1,6 +1,6 @@
 import { DOMParser } from '@xmldom/xmldom';
 import { SignedXml } from 'xml-crypto';
-import { buildGissPreview } from './giss.js';
+import { buildGissPreview, consultarNfsePorRpsEndpointGiss } from './giss.js';
 
 function localName(node){return String(node?.localName||node?.nodeName||'').split(':').pop();}
 function certPemFromSignature(sig){
@@ -44,4 +44,21 @@ try{
   console.log('GISS SIGNATURE SELF-CHECK:',JSON.stringify({count:sigs.length,results}));
 }catch(e){
   console.log('GISS SIGNATURE SELF-CHECK ERROR:',String(e?.message||e).slice(0,300));
+}
+
+try {
+  const d = await consultarNfsePorRpsEndpointGiss({
+    numero: '264',
+    serie: 'RPS',
+    tipo: 1,
+    serviceUrl: 'https://ws-sjrp.giss.com.br/service-ws/nf/nfse-ws'
+  });
+  console.log('GISS CHECK RPS 264:', JSON.stringify({
+    nfse: Array.isArray(d.nfse) ? d.nfse : [],
+    erros: Array.isArray(d.erros) ? d.erros : [],
+    situacao: d.situacao || '',
+    protocolo: d.protocolo || ''
+  }));
+} catch (e) {
+  console.log('GISS CHECK RPS 264 ERROR:', String(e?.message || e).slice(0,300), String(e?.details || '').slice(0,300));
 }
