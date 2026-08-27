@@ -3,17 +3,17 @@ import fs from 'node:fs';
 const file = new URL('./giss.js', import.meta.url);
 let src = fs.readFileSync(file, 'utf8');
 
-// Repõe o formato do XML que foi efetivamente aceito pela GISS em 26/08/2026:
-// ds:Signature, namespaces explícitos no RPS, tributos federais e Código NBS.
+// Formato compatível com a GISS 2.04 atual: assinatura ds, namespaces explícitos,
+// tributos federais + NBS e SEM tpRetPisCofins 1/2 (suprimidos após NT-007).
 const rpsWithoutLocalNs = '<tipos:Rps><tipos:InfDeclaracaoPrestacaoServico';
 const rpsWithLocalNs = '<tipos:Rps xmlns:tipos="${NS.tipos}" xmlns:ds="${NS.ds}" xmlns:giss="${NS.envio}"><tipos:InfDeclaracaoPrestacaoServico';
 if (src.includes(rpsWithoutLocalNs)) src = src.replace(rpsWithoutLocalNs, rpsWithLocalNs);
 else if (!src.includes(rpsWithLocalNs)) throw new Error('GISS PATCH: não encontrei abertura do RPS esperada.');
 
 const oldValores = '<tipos:Aliquota>${a}</tipos:Aliquota>${ibs}</tipos:Valores>';
-const tributosAceitos = '<tipos:Aliquota>${a}</tipos:Aliquota><tipos:trib><tipos:tribFed><tipos:piscofins><tipos:CST>00</tipos:CST><tipos:vBCPisCofins>0.00</tipos:vBCPisCofins><tipos:pAliqPis>0.00</tipos:pAliqPis><tipos:pAliqCofins>0.00</tipos:pAliqCofins><tipos:vPis>0.00</tipos:vPis><tipos:vCofins>0.00</tipos:vCofins><tipos:tpRetPisCofins>2</tipos:tpRetPisCofins></tipos:piscofins></tipos:tribFed><tipos:totTrib><tipos:pTotTribSN>0.00</tipos:pTotTribSN></tipos:totTrib></tipos:trib>${ibs}</tipos:Valores>';
-if (src.includes(oldValores)) src = src.replace(oldValores, tributosAceitos);
-else if (!src.includes('<tipos:tpRetPisCofins>2</tipos:tpRetPisCofins>')) throw new Error('GISS PATCH: não encontrei bloco Valores esperado.');
+const tributosAtuais = '<tipos:Aliquota>${a}</tipos:Aliquota><tipos:trib><tipos:tribFed><tipos:piscofins><tipos:CST>00</tipos:CST><tipos:vBCPisCofins>0.00</tipos:vBCPisCofins><tipos:pAliqPis>0.00</tipos:pAliqPis><tipos:pAliqCofins>0.00</tipos:pAliqCofins><tipos:vPis>0.00</tipos:vPis><tipos:vCofins>0.00</tipos:vCofins></tipos:piscofins></tipos:tribFed><tipos:totTrib><tipos:pTotTribSN>0.00</tipos:pTotTribSN></tipos:totTrib></tipos:trib>${ibs}</tipos:Valores>';
+if (src.includes(oldValores)) src = src.replace(oldValores, tributosAtuais);
+else if (!src.includes('<tipos:piscofins><tipos:CST>00</tipos:CST>')) throw new Error('GISS PATCH: não encontrei bloco Valores esperado.');
 
 const discriminacao = '<tipos:Discriminacao>${x(item.discriminacao||item.descricao||config.giss.discriminacaoPadrao)}</tipos:Discriminacao>';
 const nbsEDiscriminacao = '${config.giss.codigoNbs?`<tipos:CodigoNbs>${x(config.giss.codigoNbs)}</tipos:CodigoNbs>`:\'\'}' + discriminacao;
@@ -37,4 +37,4 @@ if (!src.includes('export async function consultarNfsePorRpsEndpointGiss')) {
 }
 
 fs.writeFileSync(file, src, 'utf8');
-console.log('GISS PATCH: emissão restaurada ao XML aceito (ds + tributos + NBS) e consulta histórica isolada.');
+console.log('GISS PATCH: XML atual sem tpRetPisCofins 1/2 + ds + NBS + consulta histórica isolada.');
