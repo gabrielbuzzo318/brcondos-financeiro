@@ -11,6 +11,7 @@
   let setupMode=false;
   let pushTimer=null;
   let watchTimer=null;
+  let pendingSharedState=null;
 
   function isReadOnly(){return profile?.access_level==='consulta';}
   function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
@@ -54,6 +55,43 @@
     if(!r.ok)throw new Error(d.error||'Não foi possível carregar a base compartilhada.');
     return d;
   }
+
+  function removeSharedUpdateNotice(){
+    document.getElementById('brSharedUpdateNotice')?.remove();
+  }
+
+  function isOwnSharedUpdate(shared){
+    const me=String(profile?.id||'');
+    const by=String(shared?.updated_by||'');
+    return !!me && !!by && me===by;
+  }
+
+  function applyPendingSharedUpdate(){
+    const shared=pendingSharedState;
+    if(!shared)return;
+    const storage=shared?.data?.storage;
+    const rev=String(shared?.updated_at||'');
+    if(!storage||typeof storage!=='object')return;
+    if(!applyStorage(storage))return;
+    if(rev)sessionStorage.setItem(SHARED_REV,rev);
+    pendingSharedState=null;
+    removeSharedUpdateNotice();
+    location.reload();
+  }
+  window.brcondosApplySharedUpdate=applyPendingSharedUpdate;
+
+  function showSharedUpdateNotice(shared){
+    pendingSharedState=shared;
+    let box=document.getElementById('brSharedUpdateNotice');
+    if(!box){
+      box=document.createElement('div');
+      box.id='brSharedUpdateNotice';
+      box.style.cssText='position:fixed;right:22px;top:88px;z-index:9999;max-width:390px;background:#fff;border:1px solid #d9e1e6;border-left:4px solid #43b4df;border-radius:10px;box-shadow:0 12px 35px rgba(20,40,55,.18);padding:13px 14px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#26343c;';
+      box.innerHTML='<div style="font-size:12px;font-weight:800;margin-bottom:4px">Há dados novos no sistema</div><div style="font-size:11px;color:#687780;line-height:1.4;margin-bottom:10px">Outra sessão fez uma alteração. A página não será mais atualizada sozinha. Clique abaixo quando puder atualizar os dados.</div><button type="button" style="border:0;border-radius:7px;background:#43b4df;color:white;padding:8px 11px;font-size:11px;font-weight:800;cursor:pointer" onclick="brcondosApplySharedUpdate()">Atualizar dados agora</button>';
+      document.body.appendChild(box);
+    }
+  }
+
   async function pushSharedState(){
     if(setupMode||isReadOnly()||!profile)return null;
     const storage=captureStorage();
@@ -66,6 +104,8 @@
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d.error||'Não foi possível salvar a base compartilhada.');
     if(d.updated_at)sessionStorage.setItem(SHARED_REV,String(d.updated_at));
+    pendingSharedState=null;
+    removeSharedUpdateNotice();
     return d;
   }
   function scheduleSharedPush(){
@@ -93,18 +133,26 @@
   }
   async function checkSharedUpdate(){
     if(setupMode||!profile||document.visibilityState!=='visible')return;
-    const active=document.activeElement;
-    if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return;
     try{
       const shared=await readSharedState();
       if(!shared.exists)return;
       const rev=String(shared.updated_at||'');
       if(!rev||sessionStorage.getItem(SHARED_REV)===rev)return;
+
+      // Alterações feitas pelo próprio usuário/sessão nunca devem provocar reload.
+      if(isOwnSharedUpdate(shared)){
+        sessionStorage.setItem(SHARED_REV,rev);
+        pendingSharedState=null;
+        removeSharedUpdateNotice();
+        return;
+      }
+
       const storage=shared?.data?.storage;
       if(!storage||typeof storage!=='object')return;
-      applyStorage(storage);
-      sessionStorage.setItem(SHARED_REV,rev);
-      location.reload();
+
+      // Alterações de outra sessão ficam pendentes e só são aplicadas por ação do usuário.
+      // Isso evita perder formulários, lançamentos ou a posição atual por um reload inesperado.
+      showSharedUpdateNotice(shared);
     }catch(err){console.error('BRCONDOS SYNC LOAD:',err);}
   }
   function startSharedWatch(){
