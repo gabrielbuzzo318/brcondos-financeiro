@@ -12,6 +12,32 @@
     return account ? account.dre!==false : true;
   }
 
+  function currentMonthPrefix(){
+    const d=String(typeof today==='function'?today():'');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d.slice(0,7);
+    const now=new Date();
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+
+  function monthLabel(prefix){
+    const [y,m]=String(prefix).split('-').map(Number);
+    const names=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    return `${names[(m||1)-1]||''}/${y||''}`;
+  }
+
+  function dreSummary(prefix=currentMonthPrefix()){
+    const base=transactions.filter(x=>String(x.date||'').startsWith(prefix)&&x.status==='pago'&&goesToDre(x));
+    const entradas=base.filter(x=>x.type==='entrada');
+    const gastos=base.filter(x=>x.type==='saida');
+    const receita=entradas.reduce((a,b)=>a+Number(b.value||0),0);
+    const despesas=gastos.reduce((a,b)=>a+Number(b.value||0),0);
+    const cats={};
+    gastos.forEach(x=>cats[x.category]=(cats[x.category]||0)+Number(x.value||0));
+    return {prefix,receita,despesas,resultado:receita-despesas,cats};
+  }
+
+  window.brDreSummaryForMonth=dreSummary;
+
   chartAccounts=chartAccounts.map(a=>({...a,dre:a.dre!==false}));
   saveData('chartAccounts',chartAccounts);
 
@@ -20,20 +46,16 @@
     chartAccounts=chartAccounts.map(a=>a.id===id?{...a,dre}:a);
     saveData('chartAccounts',chartAccounts);
     renderDRE();
+    if(typeof renderDashboard==='function')renderDashboard();
   };
 
   window.renderDRE=function(){
-    const entradas=transactions.filter(x=>x.type==='entrada'&&x.status==='pago'&&goesToDre(x));
-    const gastos=transactions.filter(x=>x.type==='saida'&&x.status==='pago'&&goesToDre(x));
-    const receita=entradas.reduce((a,b)=>a+Number(b.value||0),0);
-    const despesas=gastos.reduce((a,b)=>a+Number(b.value||0),0);
-    const resultado=receita-despesas;
-    const cats={};
-    gastos.forEach(x=>cats[x.category]=(cats[x.category]||0)+Number(x.value||0));
+    const dre=dreSummary();
+    const {receita,despesas,resultado,cats,prefix}=dre;
     const view=document.getElementById('view-dre');
     if(!view)return;
     view.innerHTML=`
-      <div class="section-title"><div><h2>DRE Gerencial</h2><span>Somente contas marcadas como “Vai para DRE: Sim” no Plano de Contas</span></div><div class="field"><select><option>Agosto/2026</option></select></div></div>
+      <div class="section-title"><div><h2>DRE Gerencial</h2><span>Somente contas marcadas como “Vai para DRE: Sim” no Plano de Contas</span></div><div class="field"><select><option>${monthLabel(prefix)}</option></select></div></div>
       <div class="grid two-cols">
         <div class="card">
           <div class="panel-title">Demonstrativo</div>
@@ -49,7 +71,7 @@
           <div class="dre-row"><span>Margem operacional</span><b>${receita?((resultado/receita)*100).toFixed(1):'0.0'}%</b></div>
           <div class="dre-row"><span>Despesas / Receita</span><b>${receita?((despesas/receita)*100).toFixed(1):'0.0'}%</b></div>
           <div class="dre-row"><span>Resultado</span><b style="color:${resultado>=0?'#278c3a':'#c94848'}">${money(resultado)}</b></div>
-          <div class="notice" style="margin-top:20px">No <b>Plano de Contas</b>, altere diretamente a coluna <b>Vai para DRE?</b> para incluir ou excluir uma conta da DRE.</div>
+          <div class="notice" style="margin-top:20px">A DRE mostra o <b>mês atual</b>. No <b>Plano de Contas</b>, altere diretamente a coluna <b>Vai para DRE?</b> para incluir ou excluir uma conta.</div>
         </div>
       </div>`;
   };
@@ -128,4 +150,6 @@
     closeModal();
     renderAll();
   };
+
+  setTimeout(()=>{try{renderDRE();renderDashboard()}catch(_){ }},0);
 })();
