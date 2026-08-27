@@ -25,6 +25,15 @@
     return `${names[(m||1)-1]||''}/${y||''}`;
   }
 
+  function availableDreMonths(){
+    const months=new Set([currentMonthPrefix()]);
+    transactions.forEach(x=>{
+      const m=String(x.date||'').match(/^(\d{4}-\d{2})-\d{2}$/);
+      if(m)months.add(m[1]);
+    });
+    return [...months].sort((a,b)=>b.localeCompare(a));
+  }
+
   function dreSummary(prefix=currentMonthPrefix()){
     const base=transactions.filter(x=>String(x.date||'').startsWith(prefix)&&x.status==='pago'&&goesToDre(x));
     const entradas=base.filter(x=>x.type==='entrada');
@@ -37,9 +46,16 @@
   }
 
   window.brDreSummaryForMonth=dreSummary;
+  let selectedDreMonth=currentMonthPrefix();
 
   chartAccounts=chartAccounts.map(a=>({...a,dre:a.dre!==false}));
   saveData('chartAccounts',chartAccounts);
+
+  window.setDreMonth=function(prefix){
+    if(!/^\d{4}-\d{2}$/.test(String(prefix||'')))return;
+    selectedDreMonth=String(prefix);
+    renderDRE();
+  };
 
   window.setChartAccountDre=function(id,value){
     const dre=String(value)==='sim';
@@ -50,15 +66,25 @@
   };
 
   window.renderDRE=function(){
-    const dre=dreSummary();
+    const months=availableDreMonths();
+    if(!months.includes(selectedDreMonth))selectedDreMonth=currentMonthPrefix();
+    const dre=dreSummary(selectedDreMonth);
     const {receita,despesas,resultado,cats,prefix}=dre;
     const view=document.getElementById('view-dre');
     if(!view)return;
     view.innerHTML=`
-      <div class="section-title"><div><h2>DRE Gerencial</h2><span>Somente contas marcadas como “Vai para DRE: Sim” no Plano de Contas</span></div><div class="field"><select><option>${monthLabel(prefix)}</option></select></div></div>
+      <div class="section-title">
+        <div><h2>DRE Gerencial</h2><span>Somente contas marcadas como “Vai para DRE: Sim” no Plano de Contas</span></div>
+        <div class="field">
+          <label style="display:block;margin-bottom:5px">Período</label>
+          <select id="dre_month" onchange="setDreMonth(this.value)">
+            ${months.map(m=>`<option value="${m}" ${m===prefix?'selected':''}>${monthLabel(m)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
       <div class="grid two-cols">
         <div class="card">
-          <div class="panel-title">Demonstrativo</div>
+          <div class="panel-title">Demonstrativo — ${monthLabel(prefix)}</div>
           <div class="dre-row"><span>(+) Receita operacional</span><b>${money(receita)}</b></div>
           <div class="dre-row"><span>(-) Deduções / estornos</span><b>${money(0)}</b></div>
           <div class="dre-row"><span>(=) Receita líquida</span><b>${money(receita)}</b></div>
@@ -67,11 +93,11 @@
           <div class="dre-row result"><span>RESULTADO DO PERÍODO</span><span>${money(resultado)}</span></div>
         </div>
         <div class="card">
-          <div class="panel-title">Indicadores</div>
+          <div class="panel-title">Indicadores — ${monthLabel(prefix)}</div>
           <div class="dre-row"><span>Margem operacional</span><b>${receita?((resultado/receita)*100).toFixed(1):'0.0'}%</b></div>
           <div class="dre-row"><span>Despesas / Receita</span><b>${receita?((despesas/receita)*100).toFixed(1):'0.0'}%</b></div>
           <div class="dre-row"><span>Resultado</span><b style="color:${resultado>=0?'#278c3a':'#c94848'}">${money(resultado)}</b></div>
-          <div class="notice" style="margin-top:20px">A DRE mostra o <b>mês atual</b>. No <b>Plano de Contas</b>, altere diretamente a coluna <b>Vai para DRE?</b> para incluir ou excluir uma conta.</div>
+          <div class="notice" style="margin-top:20px">Use o seletor de <b>Período</b> para consultar meses anteriores. O card <b>Saldo DRE</b> do Dashboard continua mostrando somente o mês atual.</div>
         </div>
       </div>`;
   };
