@@ -26,22 +26,22 @@
     const box=document.getElementById('dre_notes_history');
     if(!box)return;
     if(!notes?.length){
-      box.innerHTML='<div class="subtle" style="padding:12px 0">Nenhuma anotação registrada neste período.</div>';
+      box.innerHTML='<div class="subtle" style="padding:10px 0">Nenhuma anotação registrada neste período.</div>';
       return;
     }
     box.innerHTML=notes.map(n=>`
-      <div style="padding:12px 0;border-top:1px solid #e5eaee">
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <div style="padding:11px 0;border-top:1px solid #e5eaee">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:5px">
           <b>${escNote(n.author_name||'Usuário')}</b>
           <span class="subtle">${escNote(formatDateTime(n.created_at))}</span>
         </div>
-        <div style="white-space:pre-wrap;line-height:1.5">${escNote(n.note)}</div>
+        <div style="white-space:pre-wrap;line-height:1.45">${escNote(n.note)}</div>
       </div>`).join('');
   }
 
   async function loadNotes(period){
     const history=document.getElementById('dre_notes_history');
-    if(history)history.innerHTML='<div class="subtle" style="padding:12px 0">Carregando anotações...</div>';
+    if(history)history.innerHTML='<div class="subtle" style="padding:10px 0">Carregando anotações...</div>';
     try{
       const r=await fetch(`/api/dre/notes?period=${encodeURIComponent(period)}`,{cache:'no-store'});
       const d=await r.json().catch(()=>({}));
@@ -87,23 +87,28 @@
     const view=document.getElementById('view-dre');
     const period=currentPeriod();
     if(!view||!period)return;
+
+    document.getElementById('dre_notes_section')?.remove();
     document.getElementById('dre_notes_card')?.remove();
-    const card=document.createElement('div');
-    card.id='dre_notes_card';
-    card.className='card';
-    card.style.marginTop='14px';
-    card.innerHTML=`
-      <div class="panel-title">Anotações — ${escNote(periodLabel())}</div>
-      <div class="subtle" style="margin-bottom:12px">Histórico da DRE deste período. Cada anotação registra automaticamente o usuário, a data e o horário.</div>
+
+    const cards=view.querySelectorAll('.grid.two-cols > .card');
+    const indicatorsCard=cards[1]||view;
+    const section=document.createElement('div');
+    section.id='dre_notes_section';
+    section.style.cssText='margin-top:20px;padding-top:18px;border-top:1px solid #e5eaee';
+    section.innerHTML=`
+      <div class="panel-title" style="margin-bottom:5px">Anotações — ${escNote(periodLabel())}</div>
+      <div class="subtle" style="margin-bottom:12px">Histórico deste período, com usuário, data e horário.</div>
       <div id="dre_notes_composer" style="display:none;margin-bottom:14px">
-        <textarea id="dre_note_text" rows="4" maxlength="3000" placeholder="Escreva uma observação sobre a DRE deste mês..." style="width:100%;resize:vertical"></textarea>
+        <textarea id="dre_note_text" rows="3" maxlength="3000" placeholder="Escreva uma observação sobre a DRE deste mês..." style="width:100%;resize:vertical"></textarea>
         <div style="display:flex;justify-content:flex-end;margin-top:8px">
           <input id="dre_note_save" type="button" class="btn primary" value="Salvar anotação">
         </div>
       </div>
       <div id="dre_notes_readonly" class="notice" style="display:none;margin-bottom:12px">Você pode consultar o histórico de anotações, mas seu usuário não tem permissão para escrever neste campo.</div>
-      <div id="dre_notes_history"></div>`;
-    view.appendChild(card);
+      <div id="dre_notes_history" style="max-height:360px;overflow:auto"></div>`;
+
+    indicatorsCard.appendChild(section);
     document.getElementById('dre_note_save')?.addEventListener('click',saveNote);
     loadNotes(period);
   }
