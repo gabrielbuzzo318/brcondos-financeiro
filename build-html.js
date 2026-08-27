@@ -15,7 +15,7 @@ if (missing.length) {
 fs.mkdirSync(publicDir, { recursive: true });
 let html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8')).join('');
 
-const frontendPatches=['webpatch-auth.js','webpatch.js','webpatch-finaliza-historico.js','webpatch-retry-v3.js','webpatch-giss-authoritative-20260826.js','webpatch-giss-pendentes-v1.js','webpatch-sicredi-status.js','webpatch-sicredi-pdf.js','webpatch-apagar-nav.js','webpatch-cnpj.js','webpatch-ui-fixes.js','webpatch-reports-excel.js','webpatch-report-click-guard.js','webpatch-fluxo-money.js','webpatch-brand-logo.js'];
+const frontendPatches=['webpatch-auth.js','webpatch.js','webpatch-finaliza-historico.js','webpatch-retry-v3.js','webpatch-giss-authoritative-20260826.js','webpatch-giss-pendentes-v1.js','webpatch-sicredi-status.js','webpatch-sicredi-pdf.js','webpatch-apagar-nav.js','webpatch-cnpj.js','webpatch-ui-fixes.js','webpatch-reports-excel.js','webpatch-report-click-guard.js','webpatch-fluxo-money.js','webpatch-brand-logo.js','webpatch-dashboard-nav.js'];
 
 for (const patchName of frontendPatches) {
   const patchPath = path.join(root, patchName);
@@ -36,10 +36,11 @@ if (!fs.existsSync(loginSource)) throw new Error('Tela de login não encontrada.
 let loginHtml = fs.readFileSync(loginSource, 'utf8');
 loginHtml = loginHtml.replace('</head>', '<style>.login-links{display:none!important}</style>\n</head>');
 
-const brandPatchPath=path.join(root,'webpatch-brand-logo.js');
-if(fs.existsSync(brandPatchPath)){
-  const brandPatch=fs.readFileSync(brandPatchPath,'utf8').trim();
-  loginHtml=loginHtml.replace('</body>',`<script>\n${brandPatch}\n</script>\n</body>`);
+for(const patchName of ['webpatch-brand-logo.js','webpatch-dashboard-nav.js']){
+  const patchPath=path.join(root,patchName);
+  if(!fs.existsSync(patchPath))continue;
+  const patch=fs.readFileSync(patchPath,'utf8').trim();
+  loginHtml=loginHtml.replace('</body>',`<script>\n${patch}\n</script>\n</body>`);
 }
 
 fs.writeFileSync(path.join(publicDir, 'login.html'), loginHtml, 'utf8');
