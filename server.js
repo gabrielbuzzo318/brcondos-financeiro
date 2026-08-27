@@ -15,6 +15,12 @@ import {
   getGissConfigStatus,
   testGissWsdl
 } from './giss.js';
+import {
+  consultarBoletoSicredi,
+  getSicrediConfigStatus,
+  registrarBoletoSicredi,
+  testSicredi
+} from './sicredi.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -71,8 +77,10 @@ app.get('/api/nfse/consultar-rps-historico', route(req => consultarNfsePorRpsEnd
   serviceUrl: GISS_HISTORY_SERVICE_URL
 })));
 
-app.post('/api/boletos', (_req, res) => res.status(503).json({ error: 'Integração Sicredi ainda não configurada neste servidor.' }));
-app.get('/api/boletos/:nossoNumero', (_req, res) => res.status(503).json({ error: 'Integração Sicredi ainda não configurada neste servidor.' }));
+app.get('/api/boletos/health', route(() => getSicrediConfigStatus()));
+app.get('/api/boletos/test', route(() => testSicredi()));
+app.post('/api/boletos', route(req => registrarBoletoSicredi(req.body)));
+app.get('/api/boletos/:nossoNumero', route(req => consultarBoletoSicredi(req.params.nossoNumero)));
 
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
 app.get(/.*/, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
