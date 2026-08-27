@@ -28,9 +28,13 @@ for (const patchName of ['webpatch-auth.js','webpatch.js','webpatch-finaliza-his
 }
 
 fs.writeFileSync(output, html, 'utf8');
+const loginSource = path.join(root, 'login.html');
+if (!fs.existsSync(loginSource)) throw new Error('Tela de login não encontrada.');
+fs.copyFileSync(loginSource, path.join(publicDir, 'login.html'));
 
 if (!html.includes('<!DOCTYPE html>') || !html.includes('</html>')) {
   throw new Error('HTML remontado parece inválido.');
 }
 
 console.log(`Frontend BRCONDOS montado: ${html.length} caracteres.`);
+console.log('Tela pública de login publicada.');
