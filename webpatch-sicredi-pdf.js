@@ -25,22 +25,27 @@
     const resp=b.sicrediResponse||{};
     const codigoBarras=String(pick(resp,['codigoBarras','codigo_barras','codigoDeBarras'])||'');
     const qrCode=String(b.sicrediQrCode||pick(resp,['qrCode','qrcode','qrCodePix','pixCopiaECola','codigoQrCode'])||'');
+    const enderecoPagador=[c?.street,c?.number,c?.complement,c?.district].filter(Boolean).join(', ');
 
     try{
       const r=await fetch('/api/boletos/pdf',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          beneficiario:'BRCONDOS',
-          codigoBeneficiario:String(pick(resp,['codigoBeneficiario','beneficiario'])||''),
           documento:String(b.docNumber||''),
           nossoNumero,
           seuNumero:String(pick(resp,['seuNumero'])||String(b.id).replace(/\D/g,'').slice(-10)),
           dataVencimento:b.due||'',
+          dataDocumento:typeof today==='function'?today():'',
           valor:Number(b.value||0),
           pagador:b.client||c?.name||'',
           documentoPagador:String(c?.doc||''),
+          enderecoPagador,
+          cidadePagador:String(c?.city||''),
+          ufPagador:String(c?.state||''),
+          cepPagador:String(c?.zip||''),
           descricao:b.description||'Cobrança BRCONDOS',
+          detalhes:b.details||'',
           linhaDigitavel,
           codigoBarras,
           qrCode
