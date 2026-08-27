@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BRCONDOS Financeiro</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(135deg,#eef6f0,#f8fafc);min-height:100vh;color:#152019}.wrap{min-height:100vh;display:grid;place-items:center;padding:24px}.card{width:min(430px,100%);background:#fff;border:1px solid #dce7df;border-radius:22px;padding:30px;box-shadow:0 22px 60px rgba(18,50,30,.12)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:24px}.mark{width:44px;height:44px;border-radius:13px;background:#1f7a3f;color:#fff;display:grid;place-items:center;font-weight:900;font-size:20px}.brand h1{font-size:22px;margin:0}.brand p{margin:3px 0 0;color:#64748b;font-size:12px}.badge{display:inline-block;background:#ecfdf3;color:#166534;border:1px solid #bbf7d0;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;margin-bottom:13px}label{display:block;font-size:12px;font-weight:800;margin:13px 0 6px}input{width:100%;padding:12px 13px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;outline:none}input:focus{border-color:#2f8f52;box-shadow:0 0 0 3px rgba(47,143,82,.12)}button{font:inherit}.primary{width:100%;border:0;border-radius:10px;padding:12px;background:#1f7a3f;color:#fff;font-weight:900;margin-top:17px;cursor:pointer}.primary:disabled{opacity:.6;cursor:wait}.links{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:16px}.link{border:0;background:none;color:#2563eb;text-decoration:underline;cursor:pointer;font-size:12px}.msg{min-height:18px;margin-top:12px;font-size:12px;color:#b91c1c;line-height:1.45}.info{font-size:12px;color:#64748b;line-height:1.45;margin:0 0 14px}.footer{text-align:center;color:#94a3b8;font-size:11px;margin-top:18px}.hidden{display:none!important}.back{border:0;background:none;color:#475569;cursor:pointer;padding:0;margin-bottom:13px;font-size:12px}.success{color:#15803d}.readonly-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:9px 10px;font-size:11px;line-height:1.4;margin-top:16px}
+  </style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <div class="brand"><div class="mark">B</div><div><h1>BRCONDOS</h1><p>Financeiro • São José do Rio Preto</p></div></div>
+
+  <section id="loginPanel">
+    <span class="badge">Acesso restrito</span>
+    <label for="email">E-mail</label><input id="email" type="email" autocomplete="username" placeholder="seu-email@empresa.com">
+    <label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" placeholder="Digite sua senha">
+    <button id="loginBtn" class="primary" type="button">ENTRAR →</button>
+    <div class="links"><button id="firstBtn" class="link" type="button">Primeiro acesso</button><button id="forgotBtn" class="link" type="button">Esqueci minha senha</button></div>
+    <div id="loginMsg" class="msg"></div>
+  </section>
+
+  <section id="emailPanel" class="hidden">
+    <button class="back" id="emailBack" type="button">← Voltar</button>
+    <h2 id="emailTitle" style="margin:0 0 8px;font-size:19px"></h2>
+    <p id="emailInfo" class="info"></p>
+    <label for="accessEmail">E-mail cadastrado</label><input id="accessEmail" type="email" placeholder="seu-email@empresa.com">
+    <button id="sendBtn" class="primary" type="button">Enviar instruções</button>
+    <div id="emailMsg" class="msg"></div>
+  </section>
+
+  <section id="passwordPanel" class="hidden">
+    <h2 style="margin:0 0 8px;font-size:19px">Criar sua senha</h2>
+    <p class="info">Escolha uma senha com pelo menos 8 caracteres.</p>
+    <label for="newPassword">Nova senha</label><input id="newPassword" type="password" autocomplete="new-password">
+    <label for="newPassword2">Confirme a senha</label><input id="newPassword2" type="password" autocomplete="new-password">
+    <button id="setPasswordBtn" class="primary" type="button">Salvar senha e entrar</button>
+    <div id="passwordMsg" class="msg"></div>
+  </section>
+
+  <div class="readonly-note">Antonio, Marco e Contabilidade entram em modo somente consulta. Ester e Bia possuem acesso operacional completo.</div>
+  <div class="footer">BRCondos © 2026</div>
+</div></div>
+<script>
+(function(){
+  let cfg=null,callbackSession=null,mode='first-access';
+  const $=id=>document.getElementById(id);
+  function show(id){['loginPanel','emailPanel','passwordPanel'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
+  async function json(r){try{return await r.json()}catch{return {}}}
+  async function loadConfig(){const r=await fetch('/api/auth/config',{cache:'no-store'});cfg=await json(r);if(!r.ok||!cfg.configured)throw new Error('Login ainda não configurado.');}
+  async function login(){
+    const email=$('email').value.trim().toLowerCase(),password=$('password').value,msg=$('loginMsg'),btn=$('loginBtn');
+    if(!email||!password){msg.textContent='Informe e-mail e senha.';return;}
+    btn.disabled=true;btn.textContent='Entrando...';msg.textContent='';
+    try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const d=await json(r);if(!r.ok)throw new Error(d.error||'E-mail ou senha inválidos.');location.replace('/');}
+    catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='ENTRAR →';}
+  }
+  function openEmail(which){mode=which;show('emailPanel');$('emailMsg').textContent='';$('accessEmail').value=$('email').value||'';$('emailTitle').textContent=which==='first-access'?'Primeiro acesso':'Recuperar senha';$('emailInfo').textContent=which==='first-access'?'Informe seu e-mail. Você receberá um link para criar sua senha.':'Informe seu e-mail. Você receberá um link para definir uma nova senha.';}
+  async function sendEmail(){
+    const email=$('accessEmail').value.trim().toLowerCase(),msg=$('emailMsg'),btn=$('sendBtn');if(!email){msg.textContent='Informe o e-mail.';return;}btn.disabled=true;btn.textContent='Enviando...';msg.classList.remove('success');msg.textContent='';
+    try{const path=mode==='first-access'?'/api/auth/first-access':'/api/auth/forgot-password';const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await json(r);if(!r.ok)throw new Error(d.error||'Não foi possível enviar o e-mail.');msg.classList.add('success');msg.textContent=d.message||'Instruções enviadas.';btn.textContent='Enviado';}
+    catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Enviar instruções';}
+  }
+  function readCallback(){
+    const p=new URLSearchParams(location.hash.replace(/^#/,''));const access=p.get('access_token');if(!access)return false;callbackSession={access_token:access,refresh_token:p.get('refresh_token')||'',expires_in:Number(p.get('expires_in')||3600),type:p.get('type')||'recovery'};history.replaceState({},document.title,location.pathname+location.search);show('passwordPanel');return true;
+  }
+  async function setPassword(){
+    const p1=$('newPassword').value,p2=$('newPassword2').value,msg=$('passwordMsg'),btn=$('setPasswordBtn');if(p1.length<8){msg.textContent='Use pelo menos 8 caracteres.';return;}if(p1!==p2){msg.textContent='As senhas não coincidem.';return;}if(!callbackSession?.access_token){msg.textContent='Link inválido ou expirado.';return;}btn.disabled=true;btn.textContent='Salvando...';
+    try{
+      const r=await fetch(`${cfg.supabaseUrl}/auth/v1/user`,{method:'PUT',headers:{'Content-Type':'application/json','apikey':cfg.publishableKey,'Authorization':`Bearer ${callbackSession.access_token}`},body:JSON.stringify({password:p1})});const d=await json(r);if(!r.ok)throw new Error(d.msg||d.message||'Não foi possível salvar a senha.');
+      const a=await fetch('/api/auth/adopt-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(callbackSession)});const ad=await json(a);if(!a.ok)throw new Error(ad.error||'Não foi possível concluir o acesso.');
+      await fetch('/api/auth/first-access-complete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).catch(()=>{});location.replace('/');
+    }catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Salvar senha e entrar';}
+  }
+  $('loginBtn').onclick=login;$('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('firstBtn').onclick=()=>openEmail('first-access');$('forgotBtn').onclick=()=>openEmail('forgot-password');$('emailBack').onclick=()=>show('loginPanel');$('sendBtn').onclick=sendEmail;$('setPasswordBtn').onclick=setPassword;
+  loadConfig().then(()=>{if(!readCallback())show('loginPanel')}).catch(e=>{$('loginMsg').textContent=e.message});
+})();
+</script>
+</body></html>
