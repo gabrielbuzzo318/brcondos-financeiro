@@ -4,8 +4,13 @@
 
   const oldFetch=window.fetch.bind(window);
   const oldSaveData=typeof window.saveData==='function'?window.saveData:null;
+  const SHARED_REV='brcondos_shared_rev_v1';
+  const SHARED_SEED_EMAIL='bpobrcondos@gmail.com';
+  const LOCAL_EXACT_SKIP=new Set(['brcondos_session','brcondos_auth_session_v2']);
   let profile=null;
   let setupMode=false;
+  let pushTimer=null;
+  let watchTimer=null;
 
   function isReadOnly(){return profile?.access_level==='consulta';}
   function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
@@ -13,6 +18,101 @@
     const email=String(profile?.email||'').toLowerCase();
     return email==='antonio@zacchi.com.br'||email==='marco.dosualdo@brcondos.com';
   }
+  function shouldShareKey(key){
+    const k=String(key||'');
+    if(!k||LOCAL_EXACT_SKIP.has(k))return false;
+    if(k.startsWith('sb-'))return false;
+    return true;
+  }
+  function captureStorage(){
+    const storage={};
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!shouldShareKey(key))continue;
+      storage[key]=localStorage.getItem(key);
+    }
+    return storage;
+  }
+  function applyStorage(storage){
+    if(!storage||typeof storage!=='object'||Array.isArray(storage))return false;
+    const remove=[];
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(shouldShareKey(key))remove.push(key);
+    }
+    remove.forEach(key=>localStorage.removeItem(key));
+    Object.entries(storage).forEach(([key,value])=>{
+      if(!shouldShareKey(key)||value==null)return;
+      localStorage.setItem(key,String(value));
+    });
+    return true;
+  }
+  async function readSharedState(){
+    const r=await oldFetch('/api/state',{cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'Não foi possível carregar a base compartilhada.');
+    return d;
+  }
+  async function pushSharedState(){
+    if(setupMode||isReadOnly()||!profile)return null;
+    const storage=captureStorage();
+    if(!Object.keys(storage).length)return null;
+    const r=await oldFetch('/api/state',{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({data:{version:1,storage}})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'Não foi possível salvar a base compartilhada.');
+    if(d.updated_at)sessionStorage.setItem(SHARED_REV,String(d.updated_at));
+    return d;
+  }
+  function scheduleSharedPush(){
+    if(setupMode||isReadOnly()||!profile)return;
+    clearTimeout(pushTimer);
+    pushTimer=setTimeout(()=>{pushSharedState().catch(err=>console.error('BRCONDOS SYNC SAVE:',err));},350);
+  }
+  async function hydrateSharedState(){
+    if(setupMode||!profile)return false;
+    const shared=await readSharedState();
+    if(!shared.exists){
+      if(String(profile.email||'').toLowerCase()===SHARED_SEED_EMAIL&&!isReadOnly()){
+        await pushSharedState();
+      }
+      return false;
+    }
+    const rev=String(shared.updated_at||'');
+    if(rev&&sessionStorage.getItem(SHARED_REV)===rev)return false;
+    const storage=shared?.data?.storage;
+    if(!storage||typeof storage!=='object')return false;
+    if(!applyStorage(storage))return false;
+    if(rev)sessionStorage.setItem(SHARED_REV,rev);
+    location.reload();
+    return true;
+  }
+  async function checkSharedUpdate(){
+    if(setupMode||!profile||document.visibilityState!=='visible')return;
+    const active=document.activeElement;
+    if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return;
+    try{
+      const shared=await readSharedState();
+      if(!shared.exists)return;
+      const rev=String(shared.updated_at||'');
+      if(!rev||sessionStorage.getItem(SHARED_REV)===rev)return;
+      const storage=shared?.data?.storage;
+      if(!storage||typeof storage!=='object')return;
+      applyStorage(storage);
+      sessionStorage.setItem(SHARED_REV,rev);
+      location.reload();
+    }catch(err){console.error('BRCONDOS SYNC LOAD:',err);}
+  }
+  function startSharedWatch(){
+    if(watchTimer)return;
+    watchTimer=setInterval(checkSharedUpdate,20000);
+    window.addEventListener('focus',checkSharedUpdate);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkSharedUpdate();});
+  }
+
   window.brcondosIsReadOnly=isReadOnly;
 
   function showApp(){
@@ -23,6 +123,7 @@
     applyAccessMode();
     try{if(typeof renderAll==='function')renderAll();}catch(_){ }
     cleanUi();
+    startSharedWatch();
   }
 
   function goLogin(){location.replace('/login');}
@@ -55,7 +156,9 @@
         alert('Acesso somente para consulta. Nenhuma alteração é permitida para este usuário.');
         return;
       }
-      return oldSaveData.apply(this,arguments);
+      const result=oldSaveData.apply(this,arguments);
+      scheduleSharedPush();
+      return result;
     };
   }
 
@@ -167,8 +270,13 @@
       const data=await r.json().catch(()=>({}));
       if(!r.ok) return goLogin();
       profile=data;
+      const reloading=await hydrateSharedState();
+      if(reloading)return;
       showApp();
-    }catch(_){goLogin();}
+    }catch(err){
+      console.error('BRCONDOS BOOT:',err);
+      goLogin();
+    }
   }
 
   setTimeout(boot,0);
