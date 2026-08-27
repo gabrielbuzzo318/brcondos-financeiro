@@ -2,7 +2,7 @@
   const FEE_ACCOUNT='Juros e Multas';
   const TAX_ACCOUNT='Simples Nacional';
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
-  const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   function periodLabel(prefix){
     const [y,m]=String(prefix||'').split('-').map(Number);
@@ -126,8 +126,17 @@
     const rows=baseTransactions(prefix);
     const out=[];
 
-    if(kind==='revenue'||kind==='net-revenue'){
+    if(kind==='revenue'){
       rows.filter(x=>x.type==='entrada'&&accountAllowed('entrada',x.category)).forEach(x=>out.push({...x,value:Number(x.value||0)}));
+      return out;
+    }
+
+    if(kind==='net-revenue'){
+      rows.filter(x=>x.type==='entrada'&&accountAllowed('entrada',x.category)).forEach(x=>out.push({...x,value:Number(x.value||0)}));
+      rows.filter(x=>x.type==='saida'&&isSimpleTax(x.category)&&accountAllowed('saida',x.category)).forEach(x=>{
+        const base=baseValue(x);
+        if(base)out.push({...x,id:`tax-${x.id}`,value:-base,category:TAX_ACCOUNT,description:`(-) Simples Nacional — ${x.description||TAX_ACCOUNT}`});
+      });
       return out;
     }
 
@@ -198,7 +207,7 @@
           <td>${escHtml(x.category||'-')}</td>
           <td>${escHtml(x.party||'-')}</td>
           <td>${statusBadge(x.status)}</td>
-          <td class="amount ${x.type==='entrada'?'pos':'neg'}">${money(x.value)}</td>
+          <td class="amount ${Number(x.value||0)>=0&&x.type==='entrada'?'pos':'neg'}">${money(x.value)}</td>
         </tr>`).join(''):`<tr><td colspan="6" class="empty">Nenhum lançamento encontrado para esta conta neste período.</td></tr>`}</tbody>
       </table></div>
       <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn primary" onclick="closeModal()">Fechar</button></div>`);
