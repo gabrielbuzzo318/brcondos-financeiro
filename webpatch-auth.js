@@ -14,9 +14,10 @@
 
   function isReadOnly(){return profile?.access_level==='consulta';}
   function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+  function isContabilidade(){return String(profile?.email||'').toLowerCase()==='contabil01@logucomarc.com.br';}
   function canOpenAPagar(){
     const email=String(profile?.email||'').toLowerCase();
-    return email==='antonio@zacchi.com.br'||email==='marco.dosualdo@brcondos.com';
+    return email==='antonio@zacchi.com.br'||email==='marco.dosualdo@brcondos.com'||email==='contabil01@logucomarc.com.br';
   }
   function shouldShareKey(key){
     const k=String(key||'');
@@ -187,6 +188,30 @@
     });
   }
 
+  function restrictContabilidadeTabs(){
+    if(!isContabilidade())return;
+    const allowed=new Set(['a pagar','fluxo de caixa','sair','logout']);
+    const navRoots=[...document.querySelectorAll('#app nav,#app aside,#app .sidebar,#app [class*="sidebar"],#app [class*="menu"]')];
+    navRoots.forEach(root=>{
+      root.querySelectorAll('button,a,[role="button"]').forEach(el=>{
+        const t=norm(el.textContent);
+        if(!t)return;
+        if(allowed.has(t)){
+          el.style.display='';
+          el.dataset.brContabilidadeAllowed='1';
+          return;
+        }
+        if(t.includes('a pagar')||t.includes('fluxo de caixa')){
+          el.style.display='';
+          el.dataset.brContabilidadeAllowed='1';
+          return;
+        }
+        el.style.display='none';
+        el.dataset.brHiddenContabilidade='1';
+      });
+    });
+  }
+
   function hideNoticeByPhrase(phrase){
     const candidates=[...document.querySelectorAll('#app p,#app div,#app span,#app aside,#app small')]
       .filter(el=>norm(el.textContent).includes(phrase))
@@ -205,6 +230,7 @@
     hideNoticeByPhrase('simples de manter: voce pode criar quantas contas quiser. elas passam a aparecer automaticamente nos cadastros financeiros.');
     hideNoticeByPhrase('dre gerencial. o plano de contas pode ser ajustado depois para ficar exatamente igual ao formato usado pela brcondos.');
     if(isReadOnly()) hideReadOnlyOnlyButtons();
+    restrictContabilidadeTabs();
   }
 
   function lockReadOnlyControls(){
