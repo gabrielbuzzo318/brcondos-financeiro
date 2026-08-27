@@ -80,13 +80,13 @@ app.get('/health', (_req, res) => res.json({ ok: true, service: 'brcondos-financ
 
 // Rotas públicas de autenticação.
 app.get('/api/auth/config', route(() => authConfig()));
-app.post('/api/auth/login', route(req => loginWithPassword(req.body, res)));
-app.post('/api/auth/adopt-session', route(req => adoptSession(req.body, res)));
+app.post('/api/auth/login', route((req, res) => loginWithPassword(req.body, res)));
+app.post('/api/auth/adopt-session', route((req, res) => adoptSession(req.body, res)));
 app.post('/api/auth/first-access', route(req => requestFirstAccess(req.body)));
 app.post('/api/auth/forgot-password', route(req => requestPasswordRecovery(req.body)));
-app.post('/api/auth/logout', route(req => logoutSession(req, res)));
-app.get('/api/auth/me', requireAuth, route(req => getCurrentUser(req, res)));
-app.post('/api/auth/first-access-complete', requireAuth, route(req => markFirstAccessDone(req, res)));
+app.post('/api/auth/logout', route((req, res) => logoutSession(req, res)));
+app.get('/api/auth/me', requireAuth, route((req, res) => getCurrentUser(req, res)));
+app.post('/api/auth/first-access-complete', requireAuth, route((req, res) => markFirstAccessDone(req, res)));
 
 // Todas as integrações bancárias/fiscais exigem uma sessão válida.
 app.use('/api/nfse', requireAuth);
