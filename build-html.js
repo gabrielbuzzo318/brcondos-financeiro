@@ -15,7 +15,9 @@ if (missing.length) {
 fs.mkdirSync(publicDir, { recursive: true });
 let html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8')).join('');
 
-for (const patchName of ['webpatch-auth.js','webpatch.js','webpatch-finaliza-historico.js','webpatch-retry-v3.js','webpatch-giss-authoritative-20260826.js','webpatch-giss-pendentes-v1.js','webpatch-sicredi-status.js','webpatch-sicredi-pdf.js','webpatch-apagar-nav.js','webpatch-cnpj.js','webpatch-ui-fixes.js','webpatch-reports-excel.js','webpatch-report-click-guard.js','webpatch-fluxo-money.js']) {
+const frontendPatches=['webpatch-auth.js','webpatch.js','webpatch-finaliza-historico.js','webpatch-retry-v3.js','webpatch-giss-authoritative-20260826.js','webpatch-giss-pendentes-v1.js','webpatch-sicredi-status.js','webpatch-sicredi-pdf.js','webpatch-apagar-nav.js','webpatch-cnpj.js','webpatch-ui-fixes.js','webpatch-reports-excel.js','webpatch-report-click-guard.js','webpatch-fluxo-money.js','webpatch-brand-logo.js'];
+
+for (const patchName of frontendPatches) {
   const patchPath = path.join(root, patchName);
   if (!fs.existsSync(patchPath)) continue;
   let patch = fs.readFileSync(patchPath, 'utf8').trim();
@@ -28,10 +30,18 @@ for (const patchName of ['webpatch-auth.js','webpatch.js','webpatch-finaliza-his
 }
 
 fs.writeFileSync(output, html, 'utf8');
+
 const loginSource = path.join(root, 'login.html');
 if (!fs.existsSync(loginSource)) throw new Error('Tela de login não encontrada.');
 let loginHtml = fs.readFileSync(loginSource, 'utf8');
 loginHtml = loginHtml.replace('</head>', '<style>.login-links{display:none!important}</style>\n</head>');
+
+const brandPatchPath=path.join(root,'webpatch-brand-logo.js');
+if(fs.existsSync(brandPatchPath)){
+  const brandPatch=fs.readFileSync(brandPatchPath,'utf8').trim();
+  loginHtml=loginHtml.replace('</body>',`<script>\n${brandPatch}\n</script>\n</body>`);
+}
+
 fs.writeFileSync(path.join(publicDir, 'login.html'), loginHtml, 'utf8');
 
 if (!html.includes('<!DOCTYPE html>') || !html.includes('</html>')) {
