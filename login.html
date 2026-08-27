@@ -1,47 +1,60 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>BRCONDOS Financeiro</title>
-  <style>
-    *{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(135deg,#eef6f0,#f8fafc);min-height:100vh;color:#152019}.wrap{min-height:100vh;display:grid;place-items:center;padding:24px}.card{width:min(430px,100%);background:#fff;border:1px solid #dce7df;border-radius:22px;padding:30px;box-shadow:0 22px 60px rgba(18,50,30,.12)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:24px}.mark{width:44px;height:44px;border-radius:13px;background:#1f7a3f;color:#fff;display:grid;place-items:center;font-weight:900;font-size:20px}.brand h1{font-size:22px;margin:0}.brand p{margin:3px 0 0;color:#64748b;font-size:12px}.badge{display:inline-block;background:#ecfdf3;color:#166534;border:1px solid #bbf7d0;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;margin-bottom:13px}label{display:block;font-size:12px;font-weight:800;margin:13px 0 6px}input{width:100%;padding:12px 13px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;outline:none}input:focus{border-color:#2f8f52;box-shadow:0 0 0 3px rgba(47,143,82,.12)}button{font:inherit}.primary{width:100%;border:0;border-radius:10px;padding:12px;background:#1f7a3f;color:#fff;font-weight:900;margin-top:17px;cursor:pointer}.primary:disabled{opacity:.6;cursor:wait}.links{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:16px}.link{border:0;background:none;color:#2563eb;text-decoration:underline;cursor:pointer;font-size:12px}.msg{min-height:18px;margin-top:12px;font-size:12px;color:#b91c1c;line-height:1.45}.info{font-size:12px;color:#64748b;line-height:1.45;margin:0 0 14px}.footer{text-align:center;color:#94a3b8;font-size:11px;margin-top:18px}.hidden{display:none!important}.back{border:0;background:none;color:#475569;cursor:pointer;padding:0;margin-bottom:13px;font-size:12px}.success{color:#15803d}.readonly-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:9px 10px;font-size:11px;line-height:1.4;margin-top:16px}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BRCONDOS | Financeiro - Sjrp</title>
+<style>
+:root{--orange:#f36c2f;--slate-dark:#46545d;--green:#52b957;--green-dark:#3f9c45;--danger:#df4c4c;--muted:#7a8993}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;color:#26343c;background:#fff}button,input{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+#loginScreen{min-height:100vh;background:#fff;display:flex;align-items:flex-start;justify-content:center;position:relative;overflow:hidden;padding-top:9vh}
+.login-card{width:350px;background:#fff;border:1px solid #e2e6e9;border-radius:7px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:28px 28px 24px;z-index:2}
+.login-logo{display:block;width:175px;max-width:100%;margin:0 auto 4px;font-size:28px;font-weight:900;color:var(--orange);text-align:center}
+.login-subtitle{text-align:center;font-size:14px;font-weight:700;color:var(--slate-dark);letter-spacing:.3px;margin:3px 0 18px}
+.login-row{display:flex;border:1px solid #dfe4e8;border-radius:3px;height:42px;margin:10px 0;overflow:hidden;background:#fff}.login-row:focus-within{border-color:var(--orange);box-shadow:0 0 0 1px rgba(243,108,47,.12)}
+.login-icon{width:42px;display:grid;place-items:center;color:#8a969e;border-right:1px solid #e8ecef}.login-row input{border:0;outline:0;width:100%;padding:0 12px}
+.login-btn{width:100%;height:42px;border:0;border-radius:4px;background:var(--green);color:#fff;font-weight:700;margin-top:11px}.login-btn:hover{background:var(--green-dark)}.login-btn:disabled{opacity:.65;cursor:wait}
+.login-links{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:14px}.login-link{border:0;background:none;padding:0;font-size:12px;text-decoration:underline;color:#4d5960;cursor:pointer}
+.login-error{font-size:12px;color:var(--danger);margin-top:8px;text-align:center;min-height:16px;line-height:1.4}.success{color:#2f8b3b}.city{position:absolute;left:0;right:0;bottom:0;height:29vh;min-height:180px;background:linear-gradient(180deg,#eef3f6,#dfe8ed);z-index:1;pointer-events:none}.login-footer{position:absolute;left:12px;bottom:9px;z-index:2;font-size:10px;color:#7690a1}
+.panel-title{margin:2px 0 6px;font-size:18px;text-align:center;color:#26343c}.panel-info{font-size:12px;color:#68757d;line-height:1.45;text-align:center;margin:0 0 15px}.back{border:0;background:none;color:#4d5960;text-decoration:underline;font-size:12px;padding:0;margin-bottom:12px}.field-label{display:block;font-size:11px;font-weight:700;color:#68757d;margin:10px 0 5px}.plain-input{width:100%;height:42px;border:1px solid #dfe4e8;border-radius:3px;padding:0 12px;outline:0}.plain-input:focus{border-color:var(--orange);box-shadow:0 0 0 1px rgba(243,108,47,.12)}
+@media(max-width:760px){#loginScreen{padding-top:7vh}.login-card{width:92%;max-width:350px}.city{height:24vh}}
+</style>
 </head>
 <body>
-<div class="wrap"><div class="card">
-  <div class="brand"><div class="mark">B</div><div><h1>BRCONDOS</h1><p>Financeiro • São José do Rio Preto</p></div></div>
+<section id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">BRCONDOS</div>
+    <div class="login-subtitle">Financeiro - Sjrp</div>
 
-  <section id="loginPanel">
-    <span class="badge">Acesso restrito</span>
-    <label for="email">E-mail</label><input id="email" type="email" autocomplete="username" placeholder="seu-email@empresa.com">
-    <label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" placeholder="Digite sua senha">
-    <button id="loginBtn" class="primary" type="button">ENTRAR →</button>
-    <div class="links"><button id="firstBtn" class="link" type="button">Primeiro acesso</button><button id="forgotBtn" class="link" type="button">Esqueci minha senha</button></div>
-    <div id="loginMsg" class="msg"></div>
-  </section>
+    <section id="loginPanel">
+      <div class="login-row"><div class="login-icon">👤</div><input id="email" type="email" autocomplete="username" placeholder="E-mail"></div>
+      <div class="login-row"><div class="login-icon">🔑</div><input id="password" type="password" autocomplete="current-password" placeholder="Senha"></div>
+      <button id="loginBtn" class="login-btn" type="button">ENTRAR →</button>
+      <div id="loginMsg" class="login-error"></div>
+      <div class="login-links"><button id="firstBtn" class="login-link" type="button">Primeiro acesso</button><button id="forgotBtn" class="login-link" type="button">Esqueceu sua senha?</button></div>
+    </section>
 
-  <section id="emailPanel" class="hidden">
-    <button class="back" id="emailBack" type="button">← Voltar</button>
-    <h2 id="emailTitle" style="margin:0 0 8px;font-size:19px"></h2>
-    <p id="emailInfo" class="info"></p>
-    <label for="accessEmail">E-mail cadastrado</label><input id="accessEmail" type="email" placeholder="seu-email@empresa.com">
-    <button id="sendBtn" class="primary" type="button">Enviar instruções</button>
-    <div id="emailMsg" class="msg"></div>
-  </section>
+    <section id="emailPanel" class="hidden">
+      <button class="back" id="emailBack" type="button">← Voltar</button>
+      <h2 id="emailTitle" class="panel-title"></h2>
+      <p id="emailInfo" class="panel-info"></p>
+      <label class="field-label" for="accessEmail">E-mail cadastrado</label><input id="accessEmail" class="plain-input" type="email" placeholder="E-mail">
+      <button id="sendBtn" class="login-btn" type="button">Enviar instruções</button>
+      <div id="emailMsg" class="login-error"></div>
+    </section>
 
-  <section id="passwordPanel" class="hidden">
-    <h2 style="margin:0 0 8px;font-size:19px">Criar sua senha</h2>
-    <p class="info">Escolha uma senha com pelo menos 8 caracteres.</p>
-    <label for="newPassword">Nova senha</label><input id="newPassword" type="password" autocomplete="new-password">
-    <label for="newPassword2">Confirme a senha</label><input id="newPassword2" type="password" autocomplete="new-password">
-    <button id="setPasswordBtn" class="primary" type="button">Salvar senha e entrar</button>
-    <div id="passwordMsg" class="msg"></div>
-  </section>
-
-  <div class="readonly-note">Antonio, Marco e Contabilidade entram em modo somente consulta. Ester e Bia possuem acesso operacional completo.</div>
-  <div class="footer">BRCondos © 2026</div>
-</div></div>
+    <section id="passwordPanel" class="hidden">
+      <h2 class="panel-title">Criar sua senha</h2>
+      <p class="panel-info">Escolha uma senha com pelo menos 8 caracteres.</p>
+      <label class="field-label" for="newPassword">Nova senha</label><input id="newPassword" class="plain-input" type="password" autocomplete="new-password">
+      <label class="field-label" for="newPassword2">Confirme a senha</label><input id="newPassword2" class="plain-input" type="password" autocomplete="new-password">
+      <button id="setPasswordBtn" class="login-btn" type="button">Salvar senha e entrar</button>
+      <div id="passwordMsg" class="login-error"></div>
+    </section>
+  </div>
+  <div class="city"></div>
+  <div class="login-footer">BRCondos © 2026. Todos os direitos reservados.</div>
+</section>
 <script>
 (function(){
   let cfg=null,callbackSession=null,mode='first-access';
@@ -49,30 +62,11 @@
   function show(id){['loginPanel','emailPanel','passwordPanel'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
   async function json(r){try{return await r.json()}catch{return {}}}
   async function loadConfig(){const r=await fetch('/api/auth/config',{cache:'no-store'});cfg=await json(r);if(!r.ok||!cfg.configured)throw new Error('Login ainda não configurado.');}
-  async function login(){
-    const email=$('email').value.trim().toLowerCase(),password=$('password').value,msg=$('loginMsg'),btn=$('loginBtn');
-    if(!email||!password){msg.textContent='Informe e-mail e senha.';return;}
-    btn.disabled=true;btn.textContent='Entrando...';msg.textContent='';
-    try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const d=await json(r);if(!r.ok)throw new Error(d.error||'E-mail ou senha inválidos.');location.replace('/');}
-    catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='ENTRAR →';}
-  }
-  function openEmail(which){mode=which;show('emailPanel');$('emailMsg').textContent='';$('accessEmail').value=$('email').value||'';$('emailTitle').textContent=which==='first-access'?'Primeiro acesso':'Recuperar senha';$('emailInfo').textContent=which==='first-access'?'Informe seu e-mail. Você receberá um link para criar sua senha.':'Informe seu e-mail. Você receberá um link para definir uma nova senha.';}
-  async function sendEmail(){
-    const email=$('accessEmail').value.trim().toLowerCase(),msg=$('emailMsg'),btn=$('sendBtn');if(!email){msg.textContent='Informe o e-mail.';return;}btn.disabled=true;btn.textContent='Enviando...';msg.classList.remove('success');msg.textContent='';
-    try{const path=mode==='first-access'?'/api/auth/first-access':'/api/auth/forgot-password';const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await json(r);if(!r.ok)throw new Error(d.error||'Não foi possível enviar o e-mail.');msg.classList.add('success');msg.textContent=d.message||'Instruções enviadas.';btn.textContent='Enviado';}
-    catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Enviar instruções';}
-  }
-  function readCallback(){
-    const p=new URLSearchParams(location.hash.replace(/^#/,''));const access=p.get('access_token');if(!access)return false;callbackSession={access_token:access,refresh_token:p.get('refresh_token')||'',expires_in:Number(p.get('expires_in')||3600),type:p.get('type')||'recovery'};history.replaceState({},document.title,location.pathname+location.search);show('passwordPanel');return true;
-  }
-  async function setPassword(){
-    const p1=$('newPassword').value,p2=$('newPassword2').value,msg=$('passwordMsg'),btn=$('setPasswordBtn');if(p1.length<8){msg.textContent='Use pelo menos 8 caracteres.';return;}if(p1!==p2){msg.textContent='As senhas não coincidem.';return;}if(!callbackSession?.access_token){msg.textContent='Link inválido ou expirado.';return;}btn.disabled=true;btn.textContent='Salvando...';
-    try{
-      const r=await fetch(`${cfg.supabaseUrl}/auth/v1/user`,{method:'PUT',headers:{'Content-Type':'application/json','apikey':cfg.publishableKey,'Authorization':`Bearer ${callbackSession.access_token}`},body:JSON.stringify({password:p1})});const d=await json(r);if(!r.ok)throw new Error(d.msg||d.message||'Não foi possível salvar a senha.');
-      const a=await fetch('/api/auth/adopt-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(callbackSession)});const ad=await json(a);if(!a.ok)throw new Error(ad.error||'Não foi possível concluir o acesso.');
-      await fetch('/api/auth/first-access-complete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).catch(()=>{});location.replace('/');
-    }catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Salvar senha e entrar';}
-  }
+  async function login(){const email=$('email').value.trim().toLowerCase(),password=$('password').value,msg=$('loginMsg'),btn=$('loginBtn');if(!email||!password){msg.textContent='Informe e-mail e senha.';return;}btn.disabled=true;btn.textContent='Entrando...';msg.textContent='';try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const d=await json(r);if(!r.ok)throw new Error(d.error||'E-mail ou senha inválidos.');location.replace('/');}catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='ENTRAR →';}}
+  function openEmail(which){mode=which;show('emailPanel');$('emailMsg').textContent='';$('emailMsg').classList.remove('success');$('accessEmail').value=$('email').value||'';$('emailTitle').textContent=which==='first-access'?'Primeiro acesso':'Recuperar senha';$('emailInfo').textContent=which==='first-access'?'Informe seu e-mail. Você receberá um link para criar sua senha.':'Informe seu e-mail. Você receberá um link para definir uma nova senha.';}
+  async function sendEmail(){const email=$('accessEmail').value.trim().toLowerCase(),msg=$('emailMsg'),btn=$('sendBtn');if(!email){msg.textContent='Informe o e-mail.';return;}btn.disabled=true;btn.textContent='Enviando...';msg.classList.remove('success');msg.textContent='';try{const path=mode==='first-access'?'/api/auth/first-access':'/api/auth/forgot-password';const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await json(r);if(!r.ok)throw new Error(d.error||'Não foi possível enviar o e-mail.');msg.classList.add('success');msg.textContent=d.message||'Instruções enviadas.';btn.textContent='Enviado';}catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Enviar instruções';}}
+  function readCallback(){const p=new URLSearchParams(location.hash.replace(/^#/,''));const access=p.get('access_token');if(!access)return false;callbackSession={access_token:access,refresh_token:p.get('refresh_token')||'',expires_in:Number(p.get('expires_in')||3600),type:p.get('type')||'recovery'};history.replaceState({},document.title,location.pathname+location.search);show('passwordPanel');return true;}
+  async function setPassword(){const p1=$('newPassword').value,p2=$('newPassword2').value,msg=$('passwordMsg'),btn=$('setPasswordBtn');if(p1.length<8){msg.textContent='Use pelo menos 8 caracteres.';return;}if(p1!==p2){msg.textContent='As senhas não coincidem.';return;}if(!callbackSession?.access_token){msg.textContent='Link inválido ou expirado.';return;}btn.disabled=true;btn.textContent='Salvando...';try{const r=await fetch(`${cfg.supabaseUrl}/auth/v1/user`,{method:'PUT',headers:{'Content-Type':'application/json','apikey':cfg.publishableKey,'Authorization':`Bearer ${callbackSession.access_token}`},body:JSON.stringify({password:p1})});const d=await json(r);if(!r.ok)throw new Error(d.msg||d.message||'Não foi possível salvar a senha.');const a=await fetch('/api/auth/adopt-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(callbackSession)});const ad=await json(a);if(!a.ok)throw new Error(ad.error||'Não foi possível concluir o acesso.');await fetch('/api/auth/first-access-complete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).catch(()=>{});location.replace('/');}catch(e){msg.textContent=e.message;btn.disabled=false;btn.textContent='Salvar senha e entrar';}}
   $('loginBtn').onclick=login;$('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('firstBtn').onclick=()=>openEmail('first-access');$('forgotBtn').onclick=()=>openEmail('forgot-password');$('emailBack').onclick=()=>show('loginPanel');$('sendBtn').onclick=sendEmail;$('setPasswordBtn').onclick=setPassword;
   loadConfig().then(()=>{if(!readCallback())show('loginPanel')}).catch(e=>{$('loginMsg').textContent=e.message});
 })();
