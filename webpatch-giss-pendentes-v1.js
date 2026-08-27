@@ -115,6 +115,10 @@
         const data=await r.json();if(!r.ok)throw new Error(data.error||'Falha ao consultar a GISS.');
         applyGissResultToRows([row],data);
       }
+      if(row.status==='erro_nfse'||String(row.lastError||'').trim()){
+        alert(`GISS rejeitou o RPS ${row.rpsNumber||''} ❌\n\n${row.lastError||'Confira o retorno da GISS.'}`);
+        return;
+      }
       alert(`${row.status==='cancelada_nfse'?'NFS-e CANCELADA na GISS ⛔':'NFS-e atualizada na GISS ✅'}\n\nRPS: ${row.rpsNumber||''}\nNFS-e: ${row.nfseNumber||''}${row.verificationCode?`\nCódigo de verificação: ${row.verificationCode}`:''}`);
     }catch(e){alert(`Erro ao atualizar GISS:\n${e.message}`);}
   };
