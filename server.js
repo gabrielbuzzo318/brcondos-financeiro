@@ -22,6 +22,15 @@ import {
   testSicredi
 } from './sicredi.js';
 import { gerarBoletoPdf } from './boleto-pdf.js';
+import {
+  authConfig,
+  getCurrentUser,
+  markFirstAccessDone,
+  requestFirstAccess,
+  requestPasswordRecovery,
+  requireAuth,
+  requireWriteAccess
+} from './auth-server.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,7 +48,7 @@ function safeEqual(a, b) {
   return A.length === B.length && crypto.timingSafeEqual(A, B);
 }
 function basicAuth(req, res, next) {
-  if (!APP_USER || !APP_PASSWORD || req.path === '/health') return next();
+  if (!APP_USER || !APP_PASSWORD || req.path === '/health' || req.path.startsWith('/api/auth/')) return next();
   const auth = String(req.headers.authorization || '');
   if (auth.startsWith('Basic ')) {
     try {
@@ -64,10 +73,22 @@ const route = fn => async (req, res) => {
 };
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'brcondos-financeiro' }));
+
+// Autenticação do aplicativo. O domínio definitivo será configurado antes de disparar primeiro acesso.
+app.get('/api/auth/config', route(() => authConfig()));
+app.post('/api/auth/first-access', route(req => requestFirstAccess(req.body)));
+app.post('/api/auth/forgot-password', route(req => requestPasswordRecovery(req.body)));
+app.get('/api/auth/me', requireAuth, route(req => getCurrentUser(req)));
+app.post('/api/auth/first-access-complete', requireAuth, route(req => markFirstAccessDone(req)));
+
+// Todas as integrações bancárias/fiscais exigem uma sessão válida.
+app.use('/api/nfse', requireAuth);
+app.use('/api/boletos', requireAuth);
+
 app.get('/api/nfse/health', route(() => getGissConfigStatus()));
 app.get('/api/nfse/wsdl-test', route(() => testGissWsdl()));
 app.post('/api/nfse/preview', route(req => buildGissPreview(req.body, { sign: String(req.query.assinar || '') === '1' })));
-app.post('/api/nfse/emitir', route(req => emitirNfseGiss(req.body)));
+app.post('/api/nfse/emitir', requireWriteAccess, route(req => emitirNfseGiss(req.body)));
 app.get('/api/nfse/consultar-lote', route(req => consultarLoteRpsGiss(req.query.protocolo)));
 app.get('/api/nfse/consultar-numero', route(req => consultarNfsePorNumeroGiss({ numero: req.query.numero, pagina: req.query.pagina })));
 app.get('/api/nfse/consultar-rps', route(req => consultarNfsePorRpsGiss({ numero: req.query.numero, serie: req.query.serie, tipo: req.query.tipo })));
@@ -80,7 +101,7 @@ app.get('/api/nfse/consultar-rps-historico', route(req => consultarNfsePorRpsEnd
 
 app.get('/api/boletos/health', route(() => getSicrediConfigStatus()));
 app.get('/api/boletos/test', route(() => testSicredi()));
-app.post('/api/boletos', route(req => registrarBoletoSicredi(req.body)));
+app.post('/api/boletos', requireWriteAccess, route(req => registrarBoletoSicredi(req.body)));
 app.post('/api/boletos/pdf', async (req, res) => {
   try {
     const pdf = await gerarBoletoPdf(req.body || {});
