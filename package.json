@@ -6,7 +6,7 @@
   "engines": {"node": ">=20"},
   "scripts": {
     "build:frontend": "node build-html.js",
-    "start": "node build-html.js && node patch-giss.js && node patch-server-history.js && node debug-giss-signatures.js && node server.js"
+    "start": "node build-html.js && node patch-giss.js && node patch-server-history.js && node debug-giss-signatures.js && node debug-v2-homolog.js && node server.js"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.8.11",
