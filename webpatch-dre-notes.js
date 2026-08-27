@@ -88,6 +88,11 @@
     const period=currentPeriod();
     if(!view||!period)return;
 
+    view.querySelectorAll('.notice').forEach(el=>{
+      const text=String(el.textContent||'');
+      if(text.includes('Use o seletor de Período')&&text.includes('Saldo DRE'))el.remove();
+    });
+
     document.getElementById('dre_notes_section')?.remove();
     document.getElementById('dre_notes_card')?.remove();
 
