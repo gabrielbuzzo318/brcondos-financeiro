@@ -1,7 +1,8 @@
 (function(){
   const FEE_ACCOUNT='Juros e Multas';
+  const TAX_ACCOUNT='Simples Nacional';
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
-  const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 
   function periodLabel(prefix){
     const [y,m]=String(prefix||'').split('-').map(Number);
@@ -17,6 +18,11 @@
   function accountAllowed(type,category){
     const account=accountFor(type,category);
     return account?account.dre!==false:true;
+  }
+
+  function isSimpleTax(category){
+    const n=norm(category);
+    return n===norm(TAX_ACCOUNT)||n==='simples';
   }
 
   function ensureFeeAccount(){
@@ -60,22 +66,27 @@
     const entradas=rows.filter(x=>x.type==='entrada'&&accountAllowed('entrada',x.category));
     const receita=entradas.reduce((s,x)=>s+Number(x.value||0),0);
     const cats={};
+    let simples=0;
 
     rows.filter(x=>x.type==='saida').forEach(x=>{
       const base=baseValue(x);
       const fees=feeValue(x);
-      if(base&&accountAllowed('saida',x.category)){
-        const cat=x.category||'Contas a pagar';
-        cats[cat]=(cats[cat]||0)+base;
+      const cat=x.category||'Contas a pagar';
+
+      if(base&&accountAllowed('saida',cat)){
+        if(isSimpleTax(cat)) simples+=base;
+        else cats[cat]=(cats[cat]||0)+base;
       }
+
       if(fees){
         ensureFeeAccount();
         if(accountAllowed('saida',FEE_ACCOUNT))cats[FEE_ACCOUNT]=(cats[FEE_ACCOUNT]||0)+fees;
       }
     });
 
+    const receitaLiquida=receita-simples;
     const despesas=Object.values(cats).reduce((s,v)=>s+Number(v||0),0);
-    return {receita,cats,despesas,resultado:receita-despesas};
+    return {receita,simples,receitaLiquida,cats,despesas,resultado:receitaLiquida-despesas};
   }
 
   function clickableRow(label,value,kind,category='',bold=false,extraClass=''){
@@ -93,12 +104,12 @@
     const demo=cards?.[0], indicators=cards?.[1];
     if(!demo)return;
 
-    const {receita,cats,despesas,resultado}=buildSummary(prefix);
+    const {receita,simples,receitaLiquida,cats,despesas,resultado}=buildSummary(prefix);
     demo.innerHTML=`
       <div class="panel-title">Demonstrativo — ${periodLabel(prefix)}</div>
       ${clickableRow('(+) Receita operacional',receita,'revenue','',true)}
-      <div class="dre-row"><span>(-) Deduções / estornos</span><b>${money(0)}</b></div>
-      ${clickableRow('(=) Receita líquida',receita,'revenue','',true)}
+      ${clickableRow('(-) Simples Nacional',simples,'deduction',TAX_ACCOUNT)}
+      ${clickableRow('(=) Receita líquida',receitaLiquida,'net-revenue','',true)}
       ${Object.entries(cats).map(([k,v])=>clickableRow(`(-) ${k}`,v,'expense',k)).join('')}
       ${clickableRow('Total de despesas',despesas,'all-expenses','',false,'total')}
       <div class="dre-row result"><span>RESULTADO DO PERÍODO</span><span>${money(resultado)}</span></div>`;
@@ -115,8 +126,16 @@
     const rows=baseTransactions(prefix);
     const out=[];
 
-    if(kind==='revenue'){
+    if(kind==='revenue'||kind==='net-revenue'){
       rows.filter(x=>x.type==='entrada'&&accountAllowed('entrada',x.category)).forEach(x=>out.push({...x,value:Number(x.value||0)}));
+      return out;
+    }
+
+    if(kind==='deduction'){
+      rows.filter(x=>x.type==='saida'&&isSimpleTax(x.category)&&accountAllowed('saida',x.category)).forEach(x=>{
+        const base=baseValue(x);
+        if(base)out.push({...x,value:base,category:TAX_ACCOUNT});
+      });
       return out;
     }
 
@@ -124,8 +143,9 @@
       const base=baseValue(x);
       const fees=feeValue(x);
       const originalCat=x.category||'Contas a pagar';
+      const baseIsSimple=isSimpleTax(originalCat);
 
-      if(kind==='all-expenses'||(kind==='expense'&&norm(category)===norm(originalCat))){
+      if(!baseIsSimple&&(kind==='all-expenses'||(kind==='expense'&&norm(category)===norm(originalCat)))){
         if(base&&accountAllowed('saida',originalCat))out.push({...x,value:base,category:originalCat});
       }
 
@@ -163,12 +183,12 @@
     let rows=detailRows(prefix,kind,category);
     rows=[...rows].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
     const total=rows.reduce((s,x)=>s+Number(x.value||0),0);
-    const title=kind==='expense'?`${category} — ${periodLabel(prefix)}`:kind==='all-expenses'?`Total de despesas — ${periodLabel(prefix)}`:`Receita operacional — ${periodLabel(prefix)}`;
+    const title=kind==='deduction'?`${TAX_ACCOUNT} — ${periodLabel(prefix)}`:kind==='expense'?`${category} — ${periodLabel(prefix)}`:kind==='all-expenses'?`Total de despesas — ${periodLabel(prefix)}`:kind==='net-revenue'?`Receita líquida — ${periodLabel(prefix)}`:`Receita operacional — ${periodLabel(prefix)}`;
 
     openModal(title,`
       <div class="cards grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px">
         <div class="card accent-blue"><div class="kpi-label">LANÇAMENTOS</div><div class="kpi-value">${rows.length}</div></div>
-        <div class="card ${kind==='revenue'?'accent-green':'accent-orange'}"><div class="kpi-label">TOTAL</div><div class="kpi-value">${money(total)}</div></div>
+        <div class="card ${kind==='revenue'||kind==='net-revenue'?'accent-green':'accent-orange'}"><div class="kpi-label">TOTAL</div><div class="kpi-value">${money(total)}</div></div>
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Cliente / Fornecedor</th><th>Status</th><th>Valor</th></tr></thead>
