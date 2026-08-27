@@ -27,6 +27,22 @@
     );
   }
 
+  function widenDetailsModal(){
+    const modal=document.getElementById('modal');
+    const card=modal?.querySelector('.modal-card');
+    if(card){
+      card.style.width='min(1180px,96vw)';
+      card.style.maxWidth='1180px';
+    }
+    const wrap=card?.querySelector('.table-wrap');
+    if(wrap)wrap.style.overflowX='auto';
+    const table=wrap?.querySelector('table');
+    if(table){
+      table.style.minWidth='980px';
+      table.style.width='100%';
+    }
+  }
+
   window.openDreDetails=function(kind,encodedCategory=''){
     const prefix=String(document.getElementById('dre_month')?.value||'').trim();
     if(!/^\d{4}-\d{2}$/.test(prefix))return alert('Selecione um período válido na DRE.');
@@ -60,7 +76,6 @@
           <div class="kpi-value">${money(total)}</div>
         </div>
       </div>
-      <div class="notice"><b>Período:</b> ${escHtml(periodLabel(prefix))}. Este detalhamento usa a mesma regra da DRE: somente lançamentos <b>pagos/recebidos</b> e contas marcadas para compor a DRE.</div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Data</th><th>Descrição</th><th>Conta</th><th>Cliente / Fornecedor</th><th>Status</th><th>Valor</th></tr></thead>
@@ -78,6 +93,7 @@
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn primary" onclick="closeModal()">Fechar</button></div>
     `);
+    widenDetailsModal();
   };
 
   function makeClickable(row,kind,category=''){
