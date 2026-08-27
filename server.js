@@ -23,12 +23,16 @@ import {
 } from './sicredi.js';
 import { gerarBoletoPdf } from './boleto-pdf.js';
 import {
+  adoptSession,
   authConfig,
   getCurrentUser,
+  loginWithPassword,
+  logoutSession,
   markFirstAccessDone,
   requestFirstAccess,
   requestPasswordRecovery,
   requireAuth,
+  requirePageAuth,
   requireWriteAccess
 } from './auth-server.js';
 
@@ -74,12 +78,15 @@ const route = fn => async (req, res) => {
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'brcondos-financeiro' }));
 
-// Autenticação do aplicativo. O domínio definitivo será configurado antes de disparar primeiro acesso.
+// Rotas públicas de autenticação.
 app.get('/api/auth/config', route(() => authConfig()));
+app.post('/api/auth/login', route(req => loginWithPassword(req.body, res)));
+app.post('/api/auth/adopt-session', route(req => adoptSession(req.body, res)));
 app.post('/api/auth/first-access', route(req => requestFirstAccess(req.body)));
 app.post('/api/auth/forgot-password', route(req => requestPasswordRecovery(req.body)));
-app.get('/api/auth/me', requireAuth, route(req => getCurrentUser(req)));
-app.post('/api/auth/first-access-complete', requireAuth, route(req => markFirstAccessDone(req)));
+app.post('/api/auth/logout', route(req => logoutSession(req, res)));
+app.get('/api/auth/me', requireAuth, route(req => getCurrentUser(req, res)));
+app.post('/api/auth/first-access-complete', requireAuth, route(req => markFirstAccessDone(req, res)));
 
 // Todas as integrações bancárias/fiscais exigem uma sessão válida.
 app.use('/api/nfse', requireAuth);
@@ -120,8 +127,11 @@ app.post('/api/boletos/pdf', async (req, res) => {
 });
 app.get('/api/boletos/:nossoNumero', route(req => consultarBoletoSicredi(req.params.nossoNumero)));
 
-app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
-app.get(/.*/, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// O HTML financeiro contém dados e nunca é servido sem sessão válida.
+app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/login.html', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get(['/', '/index.html'], requirePageAuth, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get(/.*/, requirePageAuth, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 async function rawWsdlDiagnostic() {
   const pfx = fs.readFileSync(config.giss.certPfxPath);
