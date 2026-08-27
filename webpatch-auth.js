@@ -8,6 +8,11 @@
   let setupMode=false;
 
   function isReadOnly(){return profile?.access_level==='consulta';}
+  function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+  function canOpenAPagar(){
+    const email=String(profile?.email||'').toLowerCase();
+    return email==='antonio@zacchi.com.br'||email==='marco.dosualdo@brcondos.com';
+  }
   window.brcondosIsReadOnly=isReadOnly;
 
   function showApp(){
@@ -17,6 +22,7 @@
     if(mini&&profile) mini.textContent=setupMode?'Configuração • Completo':`${profile.full_name} • ${isReadOnly()?'Consulta':'Completo'}`;
     applyAccessMode();
     try{if(typeof renderAll==='function')renderAll();}catch(_){ }
+    cleanUi();
   }
 
   function goLogin(){location.replace('/login');}
@@ -59,14 +65,58 @@
   function mutationButton(el){
     if(!el||!el.closest('#app'))return false;
     const text=String(el.textContent||'').trim();
+    const n=norm(text);
     const oc=String(el.getAttribute?.('onclick')||'');
+    if(canOpenAPagar()&&n==='a pagar')return false;
     if(/pdf|imprimir|visualizar|consultar|pesquisar|filtrar/i.test(text))return false;
     return mutationText.test(text)||mutationOnclick.test(oc);
   }
 
+  function hideReadOnlyOnlyButtons(){
+    if(!isReadOnly())return;
+    const exactPhrases=['criar recibo','configurar mes','importar pdf mensal'];
+    document.querySelectorAll('#app button,#app a').forEach(el=>{
+      const t=norm(el.textContent);
+      if(exactPhrases.some(p=>t===p||t.endsWith(' '+p)||t.includes(p))){
+        el.style.display='none';
+        el.dataset.brHiddenConsulta='1';
+      }
+    });
+  }
+
+  function hideNoticeByPhrase(phrase){
+    const candidates=[...document.querySelectorAll('#app p,#app div,#app span,#app aside,#app small')]
+      .filter(el=>norm(el.textContent).includes(phrase))
+      .sort((a,b)=>norm(a.textContent).length-norm(b.textContent).length);
+    const hit=candidates[0];
+    if(!hit)return;
+    let target=hit;
+    const decorated=hit.closest('[style*="background"],[class*="notice"],[class*="alert"],[class*="hint"],[class*="info"],[class*="banner"]');
+    if(decorated&&decorated.closest('#app')) target=decorated;
+    target.style.display='none';
+    target.dataset.brHiddenNotice='1';
+  }
+
+  function cleanUi(){
+    document.getElementById('brReadOnlyBanner')?.remove();
+    hideNoticeByPhrase('simples de manter: voce pode criar quantas contas quiser. elas passam a aparecer automaticamente nos cadastros financeiros.');
+    hideNoticeByPhrase('dre gerencial. o plano de contas pode ser ajustado depois para ficar exatamente igual ao formato usado pela brcondos.');
+    if(isReadOnly()) hideReadOnlyOnlyButtons();
+  }
+
   function lockReadOnlyControls(){
     if(!isReadOnly())return;
+    hideReadOnlyOnlyButtons();
     document.querySelectorAll('#app button,#app a[onclick]').forEach(el=>{
+      const n=norm(el.textContent);
+      if(canOpenAPagar()&&n==='a pagar'){
+        el.disabled=false;
+        el.style.opacity='';
+        el.style.cursor='';
+        el.title='';
+        delete el.dataset.brReadOnly;
+        return;
+      }
       if(mutationButton(el)){
         el.dataset.brReadOnly='1';
         el.disabled=true;
@@ -80,6 +130,8 @@
   document.addEventListener('click',function(e){
     if(!isReadOnly())return;
     const el=e.target.closest('button,a[onclick]');
+    if(!el)return;
+    if(canOpenAPagar()&&norm(el.textContent)==='a pagar')return;
     if(mutationButton(el)){
       e.preventDefault();e.stopImmediatePropagation();
       alert('Acesso somente para consulta. Nenhuma alteração é permitida para este usuário.');
@@ -88,19 +140,15 @@
 
   function applyAccessMode(){
     document.body.classList.toggle('br-readonly',isReadOnly());
-    let banner=document.getElementById('brReadOnlyBanner');
-    if(isReadOnly()){
-      if(!banner){
-        banner=document.createElement('div');banner.id='brReadOnlyBanner';
-        banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#fff7ed;color:#9a3412;border-bottom:1px solid #fdba74;padding:7px 12px;text-align:center;font:700 12px Arial,sans-serif;';
-        document.body.appendChild(banner);
-      }
-      banner.textContent='MODO CONSULTA — sem permissão para criar, editar, excluir, emitir, baixar ou cancelar informações.';
-      lockReadOnlyControls();
-    }else if(banner)banner.remove();
+    document.getElementById('brReadOnlyBanner')?.remove();
+    cleanUi();
+    if(isReadOnly())lockReadOnlyControls();
   }
 
-  const observer=new MutationObserver(()=>{if(isReadOnly())lockReadOnlyControls();});
+  const observer=new MutationObserver(()=>{
+    cleanUi();
+    if(isReadOnly())lockReadOnlyControls();
+  });
   observer.observe(document.documentElement,{childList:true,subtree:true});
 
   async function boot(){
