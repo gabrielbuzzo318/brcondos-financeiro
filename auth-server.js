@@ -39,10 +39,43 @@ async function supabaseFetch(path, options = {}) {
   return await fetch(`${SUPABASE_URL}${path}`, { ...options, headers });
 }
 
+function parseCookies(req) {
+  const out = {};
+  const raw = String(req.headers.cookie || '');
+  raw.split(';').forEach(part => {
+    const idx = part.indexOf('=');
+    if (idx < 0) return;
+    const key = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (!key) return;
+    try { out[key] = decodeURIComponent(value); } catch { out[key] = value; }
+  });
+  return out;
+}
+
 function bearer(req) {
   const auth = String(req.headers.authorization || '');
   if (!auth.startsWith('Bearer ')) return '';
   return auth.slice(7).trim();
+}
+
+function requestAccessToken(req) {
+  return bearer(req) || parseCookies(req).br_access || '';
+}
+function requestRefreshToken(req) {
+  return parseCookies(req).br_refresh || '';
+}
+
+function cookieBase() {
+  return { httpOnly: true, secure: true, sameSite: 'lax', path: '/' };
+}
+function setAuthCookies(res, data = {}) {
+  if (data.access_token) res.cookie('br_access', data.access_token, { ...cookieBase(), maxAge: Math.max(300, Number(data.expires_in || 3600) - 30) * 1000 });
+  if (data.refresh_token) res.cookie('br_refresh', data.refresh_token, { ...cookieBase(), maxAge: 30 * 24 * 60 * 60 * 1000 });
+}
+function clearAuthCookies(res) {
+  res.clearCookie('br_access', cookieBase());
+  res.clearCookie('br_refresh', cookieBase());
 }
 
 async function resolveUser(accessToken) {
@@ -92,6 +125,35 @@ async function resolveUser(accessToken) {
   return value;
 }
 
+async function refreshSession(refreshToken) {
+  if (!refreshToken) return null;
+  const res = await supabaseFetch('/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    body: JSON.stringify({ refresh_token: refreshToken })
+  });
+  const data = await readJson(res);
+  if (!res.ok || !data?.access_token) return null;
+  return data;
+}
+
+async function resolveRequestUser(req, res) {
+  let accessToken = requestAccessToken(req);
+  try {
+    const user = await resolveUser(accessToken);
+    req.brAccessToken = accessToken;
+    return user;
+  } catch (err) {
+    if (Number(err?.status) !== 401) throw err;
+    const refreshed = await refreshSession(requestRefreshToken(req));
+    if (!refreshed?.access_token) throw err;
+    setAuthCookies(res, refreshed);
+    accessToken = refreshed.access_token;
+    const user = await resolveUser(accessToken);
+    req.brAccessToken = accessToken;
+    return user;
+  }
+}
+
 export function authConfig() {
   return {
     configured: Boolean(SUPABASE_URL && SUPABASE_KEY),
@@ -101,12 +163,66 @@ export function authConfig() {
   };
 }
 
+export async function loginWithPassword(body = {}, res) {
+  const email = String(body.email || '').trim().toLowerCase();
+  const password = String(body.password || '');
+  if (!email || !password) {
+    const err = new Error('Informe e-mail e senha.');
+    err.status = 400;
+    throw err;
+  }
+  checkAllowed(email);
+  const tokenRes = await supabaseFetch('/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  });
+  const data = await readJson(tokenRes);
+  if (!tokenRes.ok || !data?.access_token) {
+    const err = new Error('E-mail ou senha inválidos.');
+    err.status = 401;
+    throw err;
+  }
+  const user = await resolveUser(data.access_token);
+  setAuthCookies(res, data);
+  return { ok: true, user };
+}
+
+export async function adoptSession(body = {}, res) {
+  const accessToken = String(body.access_token || '').trim();
+  const refreshToken = String(body.refresh_token || '').trim();
+  const user = await resolveUser(accessToken);
+  setAuthCookies(res, { access_token: accessToken, refresh_token: refreshToken, expires_in: Number(body.expires_in || 3600) });
+  return { ok: true, user };
+}
+
+export async function logoutSession(req, res) {
+  const token = requestAccessToken(req);
+  if (token) {
+    try {
+      await supabaseFetch('/auth/v1/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: '{}' });
+    } catch {}
+  }
+  clearAuthCookies(res);
+  return { ok: true };
+}
+
 export async function requireAuth(req, res, next) {
   try {
-    req.appUser = await resolveUser(bearer(req));
+    req.appUser = await resolveRequestUser(req, res);
     next();
   } catch (err) {
+    clearAuthCookies(res);
     res.status(Number(err?.status || 401)).json({ error: err?.message || 'Autenticação necessária.' });
+  }
+}
+
+export async function requirePageAuth(req, res, next) {
+  try {
+    req.appUser = await resolveRequestUser(req, res);
+    next();
+  } catch {
+    clearAuthCookies(res);
+    res.status(401).sendFile('login.html', { root: process.cwd() + '/public' });
   }
 }
 
@@ -117,8 +233,8 @@ export function requireWriteAccess(req, res, next) {
   next();
 }
 
-export async function getCurrentUser(req) {
-  return req.appUser || await resolveUser(bearer(req));
+export async function getCurrentUser(req, res) {
+  return req.appUser || await resolveRequestUser(req, res);
 }
 
 function normalizeEmail(v) {
@@ -183,8 +299,6 @@ export async function requestFirstAccess(body = {}) {
   checkCooldown(email, 'first-access');
   const redirect = redirectUrl();
 
-  // Para usuários já existentes, o signup retorna conta já existente/identidade vazia.
-  // Para o usuário ainda não criado, ele dispara a confirmação para o domínio definitivo.
   const tempPassword = `${crypto.randomBytes(24).toString('base64url')}Aa1!`;
   const signupRes = await supabaseFetch(`/auth/v1/signup?redirect_to=${encodeURIComponent(redirect)}`, {
     method: 'POST',
@@ -195,29 +309,22 @@ export async function requestFirstAccess(body = {}) {
   const identities = Array.isArray(signupData?.user?.identities) ? signupData.user.identities : [];
   const newlyCreatedAndAwaitingConfirmation = signupRes.ok && signupData?.user && identities.length > 0 && !signupData?.session;
 
-  if (!newlyCreatedAndAwaitingConfirmation) {
-    // Conta existente (ou confirmação de e-mail desativada): envia link para definição/troca da senha.
-    await sendRecovery(email);
-  }
-
+  if (!newlyCreatedAndAwaitingConfirmation) await sendRecovery(email);
   return { ok: true, message: 'Enviamos as instruções de primeiro acesso para o e-mail informado.' };
 }
 
-export async function markFirstAccessDone(req) {
-  const user = await getCurrentUser(req);
-  const token = bearer(req);
-  const res = await supabaseFetch(`/rest/v1/app_users?email=eq.${encodeURIComponent(user.email)}`, {
+export async function markFirstAccessDone(req, res) {
+  const user = await getCurrentUser(req, res);
+  const token = req.brAccessToken || requestAccessToken(req);
+  const patchRes = await supabaseFetch(`/rest/v1/app_users?email=eq.${encodeURIComponent(user.email)}`, {
     method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Prefer: 'return=minimal'
-    },
+    headers: { Authorization: `Bearer ${token}`, Prefer: 'return=minimal' },
     body: JSON.stringify({ first_access_required: false })
   });
-  if (!res.ok) {
-    const data = await readJson(res);
+  if (!patchRes.ok) {
+    const data = await readJson(patchRes);
     const err = new Error(data?.message || 'Não foi possível concluir o primeiro acesso.');
-    err.status = res.status;
+    err.status = patchRes.status;
     throw err;
   }
   return { ok: true };
