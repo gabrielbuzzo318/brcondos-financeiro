@@ -288,7 +288,7 @@ function redirectUrl() {
     err.status = 503;
     throw err;
   }
-  return `${APP_PUBLIC_URL}/?auth=callback`;
+  return `${APP_PUBLIC_URL}/login?auth=callback`;
 }
 
 async function sendRecovery(email) {
