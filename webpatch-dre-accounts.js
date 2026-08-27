@@ -15,6 +15,13 @@
   chartAccounts=chartAccounts.map(a=>({...a,dre:a.dre!==false}));
   saveData('chartAccounts',chartAccounts);
 
+  window.setChartAccountDre=function(id,value){
+    const dre=String(value)==='sim';
+    chartAccounts=chartAccounts.map(a=>a.id===id?{...a,dre}:a);
+    saveData('chartAccounts',chartAccounts);
+    renderDRE();
+  };
+
   window.renderDRE=function(){
     const entradas=transactions.filter(x=>x.type==='entrada'&&x.status==='pago'&&goesToDre(x));
     const gastos=transactions.filter(x=>x.type==='saida'&&x.status==='pago'&&goesToDre(x));
@@ -42,7 +49,7 @@
           <div class="dre-row"><span>Margem operacional</span><b>${receita?((resultado/receita)*100).toFixed(1):'0.0'}%</b></div>
           <div class="dre-row"><span>Despesas / Receita</span><b>${receita?((despesas/receita)*100).toFixed(1):'0.0'}%</b></div>
           <div class="dre-row"><span>Resultado</span><b style="color:${resultado>=0?'#278c3a':'#c94848'}">${money(resultado)}</b></div>
-          <div class="notice" style="margin-top:20px">Para incluir ou excluir uma conta da DRE, abra <b>Plano de Contas → Editar</b> e altere o campo <b>Vai para DRE?</b>.</div>
+          <div class="notice" style="margin-top:20px">No <b>Plano de Contas</b>, altere diretamente a coluna <b>Vai para DRE?</b> para incluir ou excluir uma conta da DRE.</div>
         </div>
       </div>`;
   };
@@ -50,25 +57,36 @@
   window.renderChartAccounts=function(){
     const entries=chartAccounts.filter(x=>x.type==='entrada').sort((a,b)=>(a.code||'').localeCompare(b.code||''));
     const exits=chartAccounts.filter(x=>x.type==='saida').sort((a,b)=>(a.code||'').localeCompare(b.code||''));
-    const row=x=>`<tr><td><b>${esc(x.code||'-')}</b></td><td>${esc(x.name)}</td><td>${esc(x.group||'-')}</td><td>${x.dre!==false?'<span class="badge green">Sim</span>':'<span class="badge gray">Não</span>'}</td><td><div class="actions"><button class="btn small" onclick="openChartAccount(${x.id})">Editar</button><button class="btn small danger" onclick="deleteChartAccount(${x.id})">Excluir</button></div></td></tr>`;
+    const row=x=>`<tr>
+      <td><b>${esc(x.code||'-')}</b></td>
+      <td>${esc(x.name)}</td>
+      <td>${esc(x.group||'-')}</td>
+      <td style="min-width:125px">
+        <select onchange="setChartAccountDre(${x.id},this.value)" style="min-width:95px;font-weight:700">
+          <option value="sim" ${x.dre!==false?'selected':''}>Sim</option>
+          <option value="nao" ${x.dre===false?'selected':''}>Não</option>
+        </select>
+      </td>
+      <td><div class="actions"><button class="btn small" onclick="openChartAccount(${x.id})">Editar</button><button class="btn small danger" onclick="deleteChartAccount(${x.id})">Excluir</button></div></td>
+    </tr>`;
     const view=document.getElementById('view-plano');
     if(!view)return;
     view.innerHTML=`
       <div class="section-title">
-        <div><h2>Plano de Contas</h2><span>Defina também quais contas devem compor a DRE</span></div>
+        <div><h2>Plano de Contas</h2><span>Defina quais contas devem ou não compor a DRE</span></div>
         <button class="btn primary" onclick="openChartAccount()">+ Nova conta</button>
       </div>
-      <div class="notice"><b>Controle da DRE:</b> contas marcadas como <b>Não</b> continuam disponíveis normalmente no Fluxo de Caixa e no Contas a Pagar, mas seus lançamentos não entram no cálculo da DRE.</div>
+      <div class="notice"><b>Vai para DRE?</b> Escolha <b>Sim</b> ou <b>Não</b> diretamente em cada conta. Se marcar <b>Não</b>, a conta continua disponível no Fluxo de Caixa e no Contas a Pagar, mas seus lançamentos ficam fora da DRE.</div>
       <div class="grid two-cols">
         <div class="card">
           <div class="panel-title">Entradas / Receitas</div>
-          <div class="table-wrap"><table style="min-width:0"><thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th>DRE</th><th></th></tr></thead><tbody>
+          <div class="table-wrap"><table style="min-width:0"><thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th>Vai para DRE?</th><th></th></tr></thead><tbody>
           ${entries.length?entries.map(row).join(''):`<tr><td colspan="5" class="empty">Nenhuma conta de entrada.</td></tr>`}
           </tbody></table></div>
         </div>
         <div class="card">
           <div class="panel-title">Saídas / Despesas</div>
-          <div class="table-wrap"><table style="min-width:0"><thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th>DRE</th><th></th></tr></thead><tbody>
+          <div class="table-wrap"><table style="min-width:0"><thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th>Vai para DRE?</th><th></th></tr></thead><tbody>
           ${exits.length?exits.map(row).join(''):`<tr><td colspan="5" class="empty">Nenhuma conta de saída.</td></tr>`}
           </tbody></table></div>
         </div>
