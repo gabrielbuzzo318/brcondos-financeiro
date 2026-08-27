@@ -3,6 +3,15 @@ import crypto from 'node:crypto';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim().replace(/\/$/, '');
 const SUPABASE_KEY = String(process.env.SUPABASE_PUBLISHABLE_KEY || '').trim();
 const APP_PUBLIC_URL = String(process.env.APP_PUBLIC_URL || '').trim().replace(/\/$/, '');
+const AUTH_ENFORCED = Boolean(APP_PUBLIC_URL);
+const SETUP_USER = Object.freeze({
+  id: 'setup',
+  email: 'configuracao@local',
+  full_name: 'Configuração',
+  access_level: 'admin',
+  first_access_required: false,
+  setup_mode: true
+});
 
 const ALLOWED_USERS = new Map([
   ['esterzsilva@hotmail.com', { full_name: 'Ester Zacchi', access_level: 'admin' }],
@@ -159,7 +168,8 @@ export function authConfig() {
     configured: Boolean(SUPABASE_URL && SUPABASE_KEY),
     supabaseUrl: SUPABASE_URL,
     publishableKey: SUPABASE_KEY,
-    publicUrlConfigured: Boolean(APP_PUBLIC_URL)
+    publicUrlConfigured: AUTH_ENFORCED,
+    setupMode: !AUTH_ENFORCED
   };
 }
 
@@ -207,6 +217,10 @@ export async function logoutSession(req, res) {
 }
 
 export async function requireAuth(req, res, next) {
+  if (!AUTH_ENFORCED) {
+    req.appUser = SETUP_USER;
+    return next();
+  }
   try {
     req.appUser = await resolveRequestUser(req, res);
     next();
@@ -217,6 +231,10 @@ export async function requireAuth(req, res, next) {
 }
 
 export async function requirePageAuth(req, res, next) {
+  if (!AUTH_ENFORCED) {
+    req.appUser = SETUP_USER;
+    return next();
+  }
   try {
     req.appUser = await resolveRequestUser(req, res);
     next();
@@ -234,7 +252,9 @@ export function requireWriteAccess(req, res, next) {
 }
 
 export async function getCurrentUser(req, res) {
-  return req.appUser || await resolveRequestUser(req, res);
+  if (req.appUser) return req.appUser;
+  if (!AUTH_ENFORCED) return SETUP_USER;
+  return await resolveRequestUser(req, res);
 }
 
 function normalizeEmail(v) {
@@ -314,6 +334,7 @@ export async function requestFirstAccess(body = {}) {
 }
 
 export async function markFirstAccessDone(req, res) {
+  if (!AUTH_ENFORCED) return { ok: true, setupMode: true };
   const user = await getCurrentUser(req, res);
   const token = req.brAccessToken || requestAccessToken(req);
   const patchRes = await supabaseFetch(`/rest/v1/app_users?email=eq.${encodeURIComponent(user.email)}`, {
