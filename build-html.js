@@ -15,7 +15,7 @@ if (missing.length) {
 fs.mkdirSync(publicDir, { recursive: true });
 let html = expected.map(name => fs.readFileSync(path.join(partsDir, name), 'utf8')).join('');
 
-for (const patchName of ['webpatch.js','webpatch-finaliza-historico.js','webpatch-retry-v3.js','webpatch-giss-authoritative-20260826.js','webpatch-giss-pendentes-v1.js','webpatch-sicredi-status.js']) {
+for (const patchName of ['webpatch.js','webpatch-finaliza-historico.js','webpatch-retry-v3.js','webpatch-giss-authoritative-20260826.js','webpatch-giss-pendentes-v1.js','webpatch-sicredi-status.js','webpatch-sicredi-pdf.js']) {
   const patchPath = path.join(root, patchName);
   if (!fs.existsSync(patchPath)) continue;
   let patch = fs.readFileSync(patchPath, 'utf8').trim();
