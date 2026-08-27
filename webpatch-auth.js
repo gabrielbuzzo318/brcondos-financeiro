@@ -5,6 +5,7 @@
   const oldFetch=window.fetch.bind(window);
   const oldSaveData=typeof window.saveData==='function'?window.saveData:null;
   let profile=null;
+  let setupMode=false;
 
   function isReadOnly(){return profile?.access_level==='consulta';}
   window.brcondosIsReadOnly=isReadOnly;
@@ -13,7 +14,7 @@
     document.getElementById('loginScreen')?.classList.add('hidden');
     document.getElementById('app')?.classList.remove('hidden');
     const mini=document.getElementById('userEmailMini');
-    if(mini&&profile) mini.textContent=`${profile.full_name} • ${isReadOnly()?'Consulta':'Completo'}`;
+    if(mini&&profile) mini.textContent=setupMode?'Configuração • Completo':`${profile.full_name} • ${isReadOnly()?'Consulta':'Completo'}`;
     applyAccessMode();
     try{if(typeof renderAll==='function')renderAll();}catch(_){ }
   }
@@ -24,7 +25,7 @@
     const res=await oldFetch(input,init);
     try{
       const u=new URL(typeof input==='string'?input:input.url,location.href);
-      if(u.origin===location.origin&&u.pathname.startsWith('/api/')&&res.status===401&&!u.pathname.startsWith('/api/auth/')){
+      if(!setupMode&&u.origin===location.origin&&u.pathname.startsWith('/api/')&&res.status===401&&!u.pathname.startsWith('/api/auth/')){
         setTimeout(goLogin,0);
       }
     }catch(_){ }
@@ -33,6 +34,10 @@
 
   window.login=goLogin;
   window.logout=async function(){
+    if(setupMode){
+      alert('O login definitivo será ativado assim que o domínio for conectado.');
+      return;
+    }
     try{await oldFetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}catch(_){ }
     localStorage.removeItem('brcondos_session');
     goLogin();
@@ -102,6 +107,14 @@
     document.getElementById('loginScreen')?.classList.add('hidden');
     document.getElementById('app')?.classList.add('hidden');
     try{
+      const cr=await oldFetch('/api/auth/config',{cache:'no-store'});
+      const cfg=await cr.json().catch(()=>({}));
+      if(!cr.ok||!cfg.configured) throw new Error('Login ainda não configurado.');
+      if(!cfg.publicUrlConfigured){
+        setupMode=true;
+        profile={full_name:'Configuração',email:'configuracao@local',access_level:'admin',first_access_required:false,setup_mode:true};
+        return showApp();
+      }
       const r=await oldFetch('/api/auth/me',{cache:'no-store'});
       const data=await r.json().catch(()=>({}));
       if(!r.ok) return goLogin();
