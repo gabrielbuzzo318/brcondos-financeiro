@@ -26,6 +26,9 @@
     const codigoBarras=String(pick(resp,['codigoBarras','codigo_barras','codigoDeBarras'])||'');
     const qrCode=String(b.sicrediQrCode||pick(resp,['qrCode','qrcode','qrCodePix','pixCopiaECola','codigoQrCode'])||'');
     const enderecoPagador=[c?.street,c?.number,c?.complement,c?.district].filter(Boolean).join(', ');
+    const hoje=typeof today==='function'?today():'';
+    const dataDocumento=String(pick(resp,['dataDocumento','dataEmissao','dataCadastro','dataGeracao'])||b.issueDate||b.createdDate||hoje).slice(0,10);
+    const dataProcessamento=String(pick(resp,['dataProcessamento','dataRegistro','dataCadastro','dataGeracao','dataEmissao'])||hoje).slice(0,10);
 
     try{
       const r=await fetch('/api/boletos/pdf',{
@@ -36,7 +39,8 @@
           nossoNumero,
           seuNumero:String(pick(resp,['seuNumero'])||String(b.id).replace(/\D/g,'').slice(-10)),
           dataVencimento:b.due||'',
-          dataDocumento:typeof today==='function'?today():'',
+          dataDocumento,
+          dataProcessamento,
           valor:Number(b.value||0),
           pagador:b.client||c?.name||'',
           documentoPagador:String(c?.doc||''),
