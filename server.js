@@ -21,6 +21,7 @@ import {
   registrarBoletoSicredi,
   testSicredi
 } from './sicredi.js';
+import { gerarBoletoPdf } from './boleto-pdf.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,6 +81,22 @@ app.get('/api/nfse/consultar-rps-historico', route(req => consultarNfsePorRpsEnd
 app.get('/api/boletos/health', route(() => getSicrediConfigStatus()));
 app.get('/api/boletos/test', route(() => testSicredi()));
 app.post('/api/boletos', route(req => registrarBoletoSicredi(req.body)));
+app.post('/api/boletos/pdf', async (req, res) => {
+  try {
+    const pdf = await gerarBoletoPdf(req.body || {});
+    const nossoNumero = String(req.body?.nossoNumero || '').replace(/\D/g, '') || 'sicredi';
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="boleto-sicredi-${nossoNumero}.pdf"`,
+      'Content-Length': String(pdf.length),
+      'Cache-Control': 'no-store'
+    });
+    res.send(pdf);
+  } catch (err) {
+    const status = Number(err?.status || 500);
+    res.status(status).json({ error: err?.message || 'Erro ao gerar PDF do boleto.', details: err?.details ?? null });
+  }
+});
 app.get('/api/boletos/:nossoNumero', route(req => consultarBoletoSicredi(req.params.nossoNumero)));
 
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
