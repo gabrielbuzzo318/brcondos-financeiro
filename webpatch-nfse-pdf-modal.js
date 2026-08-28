@@ -3,6 +3,14 @@
     document.getElementById('brNfsePdfViewerOverlay')?.remove();
   }
 
+  function safePdfName(client,numero){
+    const nome=String(client||'NFS-e')
+      .replace(/[<>:"/\\|?*\u0000-\u001F]/g,' ')
+      .replace(/\s+/g,' ')
+      .trim()||'NFS-e';
+    return `${nome} - NF ${numero}.pdf`;
+  }
+
   window.abrirPdfGiss=function(id){
     const row=(nfse||[]).find(x=>Number(x.id)===Number(id));
     if(!row)return;
@@ -11,6 +19,7 @@
     const numero=String(row.nfseNumber||'').trim();
     const rps=String(row.gissRpsNumber||row.rpsNumber||'').trim();
     const verificacao=String(row.verificationCode||'').trim();
+    const cliente=String(row.client||'').trim();
     if(!numero){
       return alert('O número da NFS-e ainda não foi carregado. Clique em Atualizar Giss primeiro.');
     }
@@ -25,6 +34,7 @@
     const base=`/api/nfse/pdf/${encodeURIComponent(idInterno||'0')}?${params.toString()}`;
     const src=base;
     const downloadUrl=`${base}&download=1`;
+    const downloadName=safePdfName(cliente,numero);
 
     const overlay=document.createElement('div');
     overlay.id='brNfsePdfViewerOverlay';
@@ -48,7 +58,7 @@
     const titleWrap=document.createElement('div');
     titleWrap.style.minWidth='0';
     const title=document.createElement('div');
-    title.textContent=`NFS-e ${numero}${row.client?' • '+row.client:''}`.trim();
+    title.textContent=`NFS-e ${numero}${cliente?' • '+cliente:''}`.trim();
     Object.assign(title.style,{fontWeight:'800',fontSize:'16px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'});
     const sub=document.createElement('div');
     sub.textContent=`RPS ${rps} • ${typeof money==='function'?money(row.value):row.value||''}`;
@@ -62,8 +72,33 @@
     download.className='btn primary';
     download.textContent='⬇ Baixar PDF';
     download.href=downloadUrl;
-    download.setAttribute('download',`NFS-e-${numero}.pdf`);
+    download.setAttribute('download',downloadName);
     download.style.textDecoration='none';
+    download.addEventListener('click',async e=>{
+      e.preventDefault();
+      const oldText=download.textContent;
+      try{
+        download.textContent='Baixando...';
+        download.style.pointerEvents='none';
+        const resp=await fetch(downloadUrl,{cache:'no-store'});
+        if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+        const blob=await resp.blob();
+        if(!String(blob.type||'').toLowerCase().includes('pdf'))throw new Error('A resposta não é um PDF.');
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=downloadName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1500);
+      }catch(err){
+        alert(`Não foi possível baixar o PDF.\n${err?.message||err}`);
+      }finally{
+        download.textContent=oldText;
+        download.style.pointerEvents='';
+      }
+    });
 
     const close=document.createElement('button');
     close.type='button';close.className='btn';close.textContent='Fechar';
