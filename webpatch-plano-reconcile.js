@@ -39,7 +39,7 @@
       return{group:'Despesas com Estrutura',dre:true};
     }
 
-    if(n.includes('assistencia t.i')||n.includes('assistencia ti')||n.includes('honorario')&&n.includes('contab')||
+    if(n.includes('assistencia t.i')||n.includes('assistencia ti')||(n.includes('honorario')&&n.includes('contab'))||
        n.includes('internet')||n.includes('telefone')||n.includes('energia')||n.includes('material de escritorio')||
        n.includes('limpeza')||n.includes('mensageiro')||n.includes('bpo')||n.includes('sistema')||
        n.includes('software')||n.includes('contabil')){
@@ -81,13 +81,13 @@
         return;
       }
 
-      // Corrige somente contas sem grupo e as classificações que foram definidas explicitamente no modelo atual.
+      // Só preenche o que estiver realmente vazio. Alterações manuais têm prioridade.
       if(!clean(account.group)){
         account.group=target.group;
         changed=true;
       }
-      if(target.dre===false&&account.dre!==false){
-        account.dre=false;
+      if(typeof account.dre!=='boolean'&&typeof target.dre==='boolean'){
+        account.dre=target.dre;
         changed=true;
       }
     });
