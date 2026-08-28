@@ -8,6 +8,7 @@
     'Despesas Comerciais',
     'Despesas Financeiras',
     'Despesas com Estrutura',
+    'Investimentos – Imobilizados',
     'Outras Despesas',
     'Movimentações dos Sócios',
     'Contas fora da DRE',
@@ -65,7 +66,13 @@
   function fallbackGroup(category){
     const n=norm(category);
     if(n.includes('distribuicao de lucros')&&n.includes('outros'))return'Despesas com Pessoal';
-    if(n.includes('salario')||n.includes('pro-labore')||n.includes('pro labore')||n.includes('ferias')||n.includes('13')||n.includes('fgts')||n.includes('inss')||n.includes('beneficio')||n.includes('vale-transporte')||n.includes('vale transporte'))return'Despesas com Pessoal';
+    if(
+      n.includes('salario')||n.includes('pro-labore')||n.includes('pro labore')||n.includes('ferias')||
+      n.includes('13')||n.includes('fgts')||n.includes('inss')||n.includes('beneficio')||
+      n.includes('vale-transporte')||n.includes('vale transporte')||n.includes('vale alimentacao')||
+      n.includes('plano de saude')||n.includes('sindicato patronal')||(n.includes('assoc')&&n.includes('classe'))
+    )return'Despesas com Pessoal';
+    if(n==='imovel'||n.includes('imobilizado'))return'Investimentos – Imobilizados';
     if(n.includes('patrocin')||n.includes('publicidade')||n.includes('marketing')||n.includes('evento')||n.includes('brinde')||n.includes('comissao'))return'Despesas Comerciais';
     if(n.includes('despesa bancaria')||n.includes('tarifa bancaria')||n.includes('juros')||n.includes('multa')||n==='iof')return'Despesas Financeiras';
     if(n.includes('aluguel')||n.includes('condominio')||n.includes('manutencao')||n.includes('reparo')||n.includes('aparelho')||n.includes('equipamento'))return'Despesas com Estrutura';
@@ -74,7 +81,16 @@
     return'Outras Despesas';
   }
 
+  function forcedGroup(category){
+    const n=norm(category);
+    if(n.includes('vale alimentacao')||n.includes('plano de saude')||n.includes('sindicato patronal')||(n.includes('assoc')&&n.includes('classe')))return'Despesas com Pessoal';
+    if(n==='imovel'||n.includes('imobilizado'))return'Investimentos – Imobilizados';
+    return'';
+  }
+
   function groupFor(category){
+    const forced=forcedGroup(category);
+    if(forced)return forced;
     try{
       const account=(window.chartAccounts||chartAccounts||[]).find(a=>a.type==='saida'&&norm(a.name)===norm(category));
       return String(account?.group||'').trim()||fallbackGroup(category);
