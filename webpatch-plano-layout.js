@@ -25,7 +25,7 @@
         border-radius:999px;background:#f1f4f6;color:#65727d;font-size:12px;font-weight:800;
       }
       #view-plano .br-plan-table-wrap{overflow-x:auto}
-      #view-plano .br-plan-table{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed}
+      #view-plano .br-plan-table{width:100%;min-width:680px;border-collapse:collapse;table-layout:fixed}
       #view-plano .br-plan-table thead th{
         padding:10px 14px;background:#f7f9fa;border-bottom:1px solid #e6eaed;
         color:#66737e;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;text-align:left;
@@ -35,9 +35,12 @@
       }
       #view-plano .br-plan-table tbody tr:last-child td{border-bottom:0}
       #view-plano .br-plan-table tbody tr:hover{background:#fafcfd}
-      #view-plano .br-plan-code{font-weight:800;color:#52616b;white-space:nowrap}
       #view-plano .br-plan-name{font-weight:700;color:#202b33}
-      #view-plano .br-plan-group{color:#6d7881}
+      #view-plano .br-plan-group{color:#55636e}
+      #view-plano .br-plan-group-chip{
+        display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border-radius:999px;
+        background:#f2f5f7;color:#596873;font-size:12px;font-weight:700;line-height:1.2;
+      }
       #view-plano .br-plan-dre-cell{text-align:center!important}
       #view-plano .br-plan-actions{text-align:right!important}
       #view-plano .br-plan-actions .actions{display:flex;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
@@ -61,6 +64,10 @@
     document.head.appendChild(style);
   }
 
+  const collator=new Intl.Collator('pt-BR',{sensitivity:'base',numeric:true});
+  const clean=v=>String(v||'').trim();
+  const displayGroup=x=>clean(x.group)||'Sem grupo';
+
   window.toggleChartAccountDre=function(id){
     const item=chartAccounts.find(a=>Number(a.id)===Number(id));
     if(!item)return;
@@ -71,20 +78,21 @@
 
   window.renderChartAccounts=function(){
     ensurePlanStyles();
-    const byCodeThenName=(a,b)=>{
-      const ca=String(a.code||'').trim(), cb=String(b.code||'').trim();
-      if(ca&&cb){const c=ca.localeCompare(cb,'pt-BR',{numeric:true});if(c)return c;}
-      if(ca&&!cb)return -1;
-      if(!ca&&cb)return 1;
-      return String(a.name||'').localeCompare(String(b.name||''),'pt-BR');
-    };
-    const entries=chartAccounts.filter(x=>x.type==='entrada').sort(byCodeThenName);
-    const exits=chartAccounts.filter(x=>x.type==='saida').sort(byCodeThenName);
+
+    const entries=chartAccounts
+      .filter(x=>x.type==='entrada')
+      .sort((a,b)=>collator.compare(clean(a.name),clean(b.name)));
+
+    const exits=chartAccounts
+      .filter(x=>x.type==='saida')
+      .sort((a,b)=>{
+        const g=collator.compare(displayGroup(a),displayGroup(b));
+        return g||collator.compare(clean(a.name),clean(b.name));
+      });
 
     const rows=list=>list.length?list.map(x=>`<tr>
-      <td class="br-plan-code">${esc(x.code||'—')}</td>
       <td class="br-plan-name">${esc(x.name||'—')}</td>
-      <td class="br-plan-group">${esc(x.group||'—')}</td>
+      <td class="br-plan-group"><span class="br-plan-group-chip">${esc(displayGroup(x))}</span></td>
       <td class="br-plan-dre-cell">
         <button type="button" class="br-dre-status ${x.dre!==false?'sim':'nao'}" onclick="toggleChartAccountDre(${x.id})" title="Clique para alterar">
           ${x.dre!==false?'Sim':'Não'}
@@ -94,7 +102,7 @@
         <button class="btn small" onclick="openChartAccount(${x.id})">Editar</button>
         <button class="btn small danger" onclick="deleteChartAccount(${x.id})">Excluir</button>
       </div></td>
-    </tr>`).join(''):`<tr><td colspan="5" class="br-plan-empty">Nenhuma conta cadastrada.</td></tr>`;
+    </tr>`).join(''):`<tr><td colspan="4" class="br-plan-empty">Nenhuma conta cadastrada.</td></tr>`;
 
     const card=(title,list,kind)=>`<div class="card br-plan-card ${kind}">
       <div class="br-plan-card-head">
@@ -102,8 +110,8 @@
         <span class="br-plan-count">${list.length}</span>
       </div>
       <div class="br-plan-table-wrap"><table class="br-plan-table">
-        <colgroup><col style="width:110px"><col style="width:32%"><col style="width:30%"><col style="width:120px"><col style="width:170px"></colgroup>
-        <thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th style="text-align:center">Vai para DRE?</th><th style="text-align:right">Ações</th></tr></thead>
+        <colgroup><col style="width:43%"><col style="width:30%"><col style="width:120px"><col style="width:170px"></colgroup>
+        <thead><tr><th>Conta</th><th>Grupo</th><th style="text-align:center">Vai para DRE?</th><th style="text-align:right">Ações</th></tr></thead>
         <tbody>${rows(list)}</tbody>
       </table></div>
     </div>`;
@@ -120,6 +128,44 @@
         ${card('Entradas / Receitas',entries,'entradas')}
         ${card('Saídas / Despesas',exits,'saidas')}
       </div>`;
+  };
+
+  window.openChartAccount=function(id=null){
+    const x=id?chartAccounts.find(a=>Number(a.id)===Number(id)):{name:'',type:'saida',group:'',dre:true};
+    if(!x)return;
+    openModal(id?'Editar conta':'Nova conta do plano',`
+      <div class="modal-grid">
+        ${field('Tipo',`<select id="pc_type"><option value="entrada" ${x.type==='entrada'?'selected':''}>Entrada / Receita</option><option value="saida" ${x.type==='saida'?'selected':''}>Saída / Despesa</option></select>`)}
+        ${field('Nome da conta',`<input id="pc_name" value="${esc(x.name||'')}" placeholder="Ex.: Honorários jurídicos">`)}
+        ${field('Grupo',`<input id="pc_group" value="${esc(x.group||'')}" placeholder="Ex.: Despesas Administrativas">`)}
+        ${field('Vai para DRE?',`<select id="pc_dre" class="br-dre-toggle ${x.dre!==false?'br-dre-sim':'br-dre-nao'}" onchange="updateDreSelectStyle(this)"><option value="sim" ${x.dre!==false?'selected':''}>Sim</option><option value="nao" ${x.dre===false?'selected':''}>Não</option></select>`)}
+      </div>
+      <div class="notice" style="margin-top:14px">Se marcar <b>Não</b>, a conta continua sendo usada nos lançamentos, mas fica fora do resultado da DRE.</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="saveChartAccount(${id||'null'})">Salvar</button>
+      </div>`);
+    setTimeout(()=>{if(typeof updateDreSelectStyle==='function')updateDreSelectStyle(document.getElementById('pc_dre'));},0);
+  };
+
+  window.saveChartAccount=function(id){
+    const previous=id?chartAccounts.find(x=>Number(x.id)===Number(id)):null;
+    const obj={
+      id:id||Date.now(),
+      name:val('pc_name'),
+      type:val('pc_type'),
+      group:val('pc_group'),
+      dre:val('pc_dre')!=='nao'
+    };
+    if(!obj.name)return alert('Informe o nome da conta.');
+    const duplicate=chartAccounts.some(x=>Number(x.id)!==Number(id) && String(x.name||'').trim().toLowerCase()===obj.name.trim().toLowerCase());
+    if(duplicate)return alert('Já existe uma conta com esse nome.');
+    if(previous&&previous.defaultDescription)obj.defaultDescription=previous.defaultDescription;
+    if(previous&&previous.defaultCategory)obj.defaultCategory=previous.defaultCategory;
+    if(id)chartAccounts=chartAccounts.map(x=>Number(x.id)===Number(id)?obj:x);else chartAccounts.push(obj);
+    saveData('chartAccounts',chartAccounts);
+    closeModal();
+    renderAll();
   };
 
   ensurePlanStyles();
