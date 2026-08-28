@@ -45,6 +45,13 @@
   }
 
   function findDate(data){
+    if(!data||typeof data!=='object')return '';
+
+    // A API Sicredi devolve a data real da liquidação dentro de dadosLiquidacao.data.
+    // Esse campo tem prioridade absoluta para não usar vencimento/previsão por engano.
+    const directLiquidation=parseDateValue(data?.dadosLiquidacao?.data);
+    if(directLiquidation)return directLiquidation;
+
     const keys=[
       'dataLiquidacao','dataPagamento','dataBaixa','dataRecebimento','dataCredito',
       'dataMovimento','dataOcorrencia','dataEfetivacao'
@@ -53,6 +60,10 @@
     function walk(obj){
       if(!obj||typeof obj!=='object'||seen.has(obj))return '';
       seen.add(obj);
+
+      const nestedLiquidation=parseDateValue(obj?.dadosLiquidacao?.data);
+      if(nestedLiquidation)return nestedLiquidation;
+
       for(const key of keys){
         const parsed=parseDateValue(obj[key]);
         if(parsed)return parsed;
@@ -118,10 +129,11 @@
   function syncLiquidatedToFlow(boleto,data,statusText,{allowFallbackToday=true}={}){
     if(!boleto||!isLiquidated(statusText))return false;
 
-    const liquidationDate=findDate(data)||boleto.receiptDate||boleto.sicrediLiquidationDate||(allowFallbackToday?today():'');
+    const sourceData=data||boleto.sicrediResponse||null;
+    const liquidationDate=findDate(sourceData)||boleto.sicrediLiquidationDate||boleto.receiptDate||(allowFallbackToday?today():'');
     if(!liquidationDate)return false;
 
-    const kind=findSettlementKind(data,statusText||boleto.sicrediStatus||'');
+    const kind=findSettlementKind(sourceData,statusText||boleto.sicrediStatus||'');
     const flowDate=kind==='pix'?liquidationDate:addDaysIso(liquidationDate,1);
 
     boleto.status='recebido';
@@ -144,6 +156,7 @@
       tx.date=flowDate;
       tx.type='entrada';
       tx.status='pago';
+      tx.category='Receitas de serviços';
       tx.sourceBoletoId=boleto.id;
       tx.sicrediSettlementType=kind;
       boleto.flowId=tx.id;
@@ -154,7 +167,7 @@
         date:flowDate,
         type:'entrada',
         description:`Recebimento de boleto${boleto.docNumber?` ${boleto.docNumber}`:''}`,
-        category:'Recebimento de boletos',
+        category:'Receitas de serviços',
         party:boleto.client||'',
         value:Number(boleto.value||0),
         status:'pago',
@@ -187,6 +200,7 @@
           if(sicrediStatus){
             boleto.sicrediStatus=sicrediStatus;
             boleto.sicrediStatusUpdatedAt=new Date().toISOString();
+            boleto.sicrediResponse=data;
             if(isLiquidated(sicrediStatus)){
               syncLiquidatedToFlow(boleto,data,sicrediStatus);
             }else if(typeof saveData==='function'){
@@ -229,11 +243,11 @@
     }
   };
 
-  // Completa o fluxo de boletos já consultados antes deste ajuste, sem inventar data.
+  // Corrige/atualiza boletos já consultados, usando o retorno Sicredi salvo.
   let backfilled=false;
   (boletos||[]).forEach(b=>{
-    if(isLiquidated(b?.sicrediStatus||'')&&(b.receiptDate||b.sicrediLiquidationDate)){
-      if(syncLiquidatedToFlow(b,null,b.sicrediStatus,{allowFallbackToday:false}))backfilled=true;
+    if(isLiquidated(b?.sicrediStatus||'')&&(b.sicrediResponse||b.receiptDate||b.sicrediLiquidationDate)){
+      if(syncLiquidatedToFlow(b,b.sicrediResponse||null,b.sicrediStatus,{allowFallbackToday:false}))backfilled=true;
     }
   });
   if(backfilled&&typeof renderAll==='function')renderAll();
