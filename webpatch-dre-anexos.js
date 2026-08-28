@@ -50,6 +50,87 @@
     )||null;
   }
 
+  function downloadPayableAttachment(payable){
+    if(!payable)return;
+    const a=document.createElement('a');
+    if(payable.attachmentRef){
+      a.href=`/api/payables/attachments/${encodeURIComponent(payable.attachmentRef)}`;
+    }else if(payable.attachmentData){
+      a.href=payable.attachmentData;
+    }else return;
+    a.download=payable.attachmentName||'anexo';
+    document.body.appendChild(a);a.click();a.remove();
+  }
+
+  function closeAttachmentViewer(){
+    document.getElementById('brAttachmentViewerOverlay')?.remove();
+  }
+
+  function openAttachmentViewer(payable){
+    if(!payable)return;
+    closeAttachmentViewer();
+
+    const src=payable.attachmentRef
+      ?`/api/payables/attachments/${encodeURIComponent(payable.attachmentRef)}?inline=1`
+      :(payable.attachmentData||'');
+    if(!src)return alert('Esta conta não possui anexo.');
+
+    const overlay=document.createElement('div');
+    overlay.id='brAttachmentViewerOverlay';
+    Object.assign(overlay.style,{
+      position:'fixed',inset:'0',zIndex:'999999',background:'rgba(15,23,42,.72)',
+      display:'flex',alignItems:'center',justifyContent:'center',padding:'18px'
+    });
+
+    const panel=document.createElement('div');
+    Object.assign(panel.style,{
+      width:'min(1220px,97vw)',height:'min(860px,94vh)',background:'#fff',borderRadius:'16px',
+      boxShadow:'0 24px 80px rgba(0,0,0,.35)',display:'flex',flexDirection:'column',overflow:'hidden'
+    });
+
+    const header=document.createElement('div');
+    Object.assign(header.style,{
+      display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',padding:'14px 16px',
+      borderBottom:'1px solid #e5e7eb',background:'#fff'
+    });
+
+    const title=document.createElement('div');
+    title.textContent=payable.attachmentName||'Anexo';
+    Object.assign(title.style,{fontWeight:'800',fontSize:'16px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'});
+
+    const actions=document.createElement('div');
+    Object.assign(actions.style,{display:'flex',alignItems:'center',gap:'8px',flexShrink:'0'});
+
+    const download=document.createElement('button');
+    download.type='button';download.className='btn primary';download.textContent='⬇ Baixar arquivo';
+    download.addEventListener('click',()=>downloadPayableAttachment(payable));
+
+    const close=document.createElement('button');
+    close.type='button';close.className='btn';close.textContent='Fechar';
+    close.addEventListener('click',closeAttachmentViewer);
+
+    actions.append(download,close);
+    header.append(title,actions);
+
+    const frameWrap=document.createElement('div');
+    Object.assign(frameWrap.style,{flex:'1',minHeight:'0',background:'#f3f4f6',padding:'10px'});
+    const frame=document.createElement('iframe');
+    frame.src=src;
+    frame.title=payable.attachmentName||'Visualização do anexo';
+    Object.assign(frame.style,{width:'100%',height:'100%',border:'0',borderRadius:'10px',background:'#fff'});
+    frameWrap.appendChild(frame);
+
+    panel.append(header,frameWrap);
+    overlay.appendChild(panel);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)closeAttachmentViewer();});
+    document.addEventListener('keydown',function escClose(e){
+      if(e.key==='Escape'&&document.getElementById('brAttachmentViewerOverlay')){
+        closeAttachmentViewer();document.removeEventListener('keydown',escClose);
+      }
+    });
+    document.body.appendChild(overlay);
+  }
+
   function decorateDreDetailsAttachments(){
     const modal=document.getElementById('modal')||document.getElementById('modalRoot');
     const table=modal?.querySelector('.table-wrap table');
@@ -80,11 +161,11 @@
         btn.type='button';
         btn.className='btn small';
         btn.textContent='📎 Anexo';
-        btn.title=payable.attachmentName||'Baixar anexo';
+        btn.title=payable.attachmentName||'Visualizar anexo';
         btn.addEventListener('click',e=>{
           e.preventDefault();
           e.stopPropagation();
-          if(typeof openAttachment==='function')openAttachment(payable.id);
+          openAttachmentViewer(payable);
         });
         td.appendChild(btn);
       }else{
