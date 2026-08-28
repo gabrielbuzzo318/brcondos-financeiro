@@ -39,6 +39,7 @@
       #view-plano .br-plan-group-block.comerciais .br-plan-group-head{background:#fff8f3}
       #view-plano .br-plan-group-block.financeiras .br-plan-group-head{background:#f8f6fb}
       #view-plano .br-plan-group-block.estrutura .br-plan-group-head{background:#f5f9f7}
+      #view-plano .br-plan-group-block.investimentos .br-plan-group-head{background:#f2f7fa}
       #view-plano .br-plan-group-block.socios .br-plan-group-head{background:#faf7f2}
       #view-plano .br-plan-group-block.deducoes .br-plan-group-head{background:#fff8ed}
       #view-plano .br-plan-group-block.fora .br-plan-group-head{background:#f4f5f6}
@@ -91,6 +92,7 @@
     'Despesas Comerciais',
     'Despesas Financeiras',
     'Despesas com Estrutura',
+    'Investimentos – Imobilizados',
     'Movimentações dos Sócios',
     'Outras Despesas',
     'Contas fora da DRE',
@@ -104,6 +106,7 @@
     if(n.includes('comerc'))return'comerciais';
     if(n.includes('financeir'))return'financeiras';
     if(n.includes('estrutura'))return'estrutura';
+    if(n.includes('investimento')||n.includes('imobilizado'))return'investimentos';
     if(n.includes('socio'))return'socios';
     if(n.includes('deduc'))return'deducoes';
     if(n.includes('fora da dre'))return'fora';
@@ -125,7 +128,14 @@
     if(n.includes('distribuicao de lucros')&&n.includes('outros'))return{group:'Despesas com Pessoal',dre:true};
     if(n.includes('distribuicao de lucros'))return{group:'Movimentações dos Sócios',dre:false};
 
-    if(n.includes('salario')||n.includes('pro-labore')||n.includes('pro labore')||n.includes('ferias')||n.includes('13')||n.includes('fgts')||n.includes('inss')||n.includes('beneficio')||n.includes('vale-transporte')||n.includes('vale transporte'))return{group:'Despesas com Pessoal'};
+    if(
+      n.includes('salario')||n.includes('pro-labore')||n.includes('pro labore')||n.includes('ferias')||
+      n.includes('13')||n.includes('fgts')||n.includes('inss')||n.includes('beneficio')||
+      n.includes('vale-transporte')||n.includes('vale transporte')||n.includes('vale alimentacao')||
+      n.includes('plano de saude')||n.includes('sindicato patronal')||(n.includes('assoc')&&n.includes('classe'))
+    )return{group:'Despesas com Pessoal'};
+
+    if(n==='imovel'||n.includes('imobilizado'))return{group:'Investimentos – Imobilizados'};
 
     if(n.includes('patrocin')||n.includes('publicidade')||n.includes('marketing')||n.includes('evento')||n.includes('brinde')||n.includes('comissao'))return{group:'Despesas Comerciais'};
 
