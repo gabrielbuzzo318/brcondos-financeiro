@@ -8,14 +8,19 @@
     if(!row)return;
 
     const idInterno=String(row.gissInternalId||'').trim();
+    const numero=String(row.nfseNumber||'').trim();
     if(!idInterno){
       return alert('O ID interno da NFS-e ainda não foi carregado. Clique em Atualizar Giss primeiro.');
+    }
+    if(!numero){
+      return alert('O número da NFS-e ainda não foi carregado. Clique em Atualizar Giss primeiro.');
     }
 
     closeNfsePdfViewer();
 
-    const src=`/api/nfse/pdf/${encodeURIComponent(idInterno)}`;
-    const downloadUrl=`${src}?download=1`;
+    const base=`/api/nfse/pdf/${encodeURIComponent(idInterno)}?numero=${encodeURIComponent(numero)}`;
+    const src=base;
+    const downloadUrl=`${base}&download=1`;
 
     const overlay=document.createElement('div');
     overlay.id='brNfsePdfViewerOverlay';
