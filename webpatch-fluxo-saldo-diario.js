@@ -6,31 +6,42 @@
     return /^\d{4}-\d{2}-\d{2}$/.test(String(v||''));
   }
 
+  function selectedMonth(){
+    const explicit=String(window.__brFluxSelectedMonth||'');
+    if(/^\d{4}-\d{2}$/.test(explicit))return explicit;
+    const d=String(typeof today==='function'?today():'');
+    if(validDate(d))return d.slice(0,7);
+    const now=new Date();
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+
+  function sourceTransactions(){
+    return Array.isArray(window.__brAllTransactions)
+      ? window.__brAllTransactions
+      : (Array.isArray(transactions)?transactions:[]);
+  }
+
   function buildDailyBalances(){
-    const byMonth=new Map();
-    (Array.isArray(transactions)?transactions:[]).forEach(t=>{
+    const byDay=new Map();
+    sourceTransactions().forEach(t=>{
       if(t?.status!=='pago'||!validDate(t?.date))return;
-      const month=String(t.date).slice(0,7);
-      if(!byMonth.has(month))byMonth.set(month,new Map());
-      const days=byMonth.get(month);
-      if(!days.has(t.date))days.set(t.date,{date:t.date,entradas:0,saidas:0});
-      const day=days.get(t.date);
+      if(!byDay.has(t.date))byDay.set(t.date,{date:t.date,entradas:0,saidas:0});
+      const day=byDay.get(t.date);
       const value=Number(t.value||0);
       if(t.type==='entrada')day.entradas+=value;
       else if(t.type==='saida')day.saidas+=value;
     });
 
-    const output=[];
-    [...byMonth.keys()].sort().forEach(month=>{
-      let saldo=0;
-      const days=[...byMonth.get(month).values()].sort((a,b)=>a.date.localeCompare(b.date));
-      days.forEach(day=>{
-        const movimento=day.entradas-day.saidas;
-        saldo+=movimento;
-        output.push({...day,movimento,saldo,month});
-      });
+    let saldo=0;
+    const allRows=[];
+    [...byDay.values()].sort((a,b)=>a.date.localeCompare(b.date)).forEach(day=>{
+      const movimento=day.entradas-day.saidas;
+      saldo+=movimento;
+      allRows.push({...day,movimento,saldo,month:day.date.slice(0,7)});
     });
-    return output.sort((a,b)=>b.date.localeCompare(a.date));
+
+    const month=selectedMonth();
+    return allRows.filter(x=>x.month===month).sort((a,b)=>b.date.localeCompare(a.date));
   }
 
   function renderDailyBalanceBlock(){
@@ -45,13 +56,13 @@
     block.style.marginBottom='18px';
 
     if(!rows.length){
-      block.innerHTML='<div class="panel-title">Saldo diário</div><div class="empty">Ainda não há movimentações pagas/recebidas para calcular o saldo diário.</div>';
+      block.innerHTML='<div class="panel-title">Saldo diário</div><div class="empty">Ainda não há movimentações pagas/recebidas neste período para calcular o saldo diário.</div>';
     }else{
       block.innerHTML=`
         <div class="section-title" style="margin-bottom:12px">
           <div>
             <h2 style="font-size:16px">Saldo diário</h2>
-            <span>Fechamento de cada dia • considera somente valores pagos/recebidos • o acumulado reinicia a cada mês</span>
+            <span>Fechamento de cada dia • considera somente valores pagos/recebidos • o saldo acumulado continua de um mês para o outro</span>
           </div>
         </div>
         <div class="table-wrap" style="max-height:360px;overflow:auto">
