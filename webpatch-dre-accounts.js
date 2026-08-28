@@ -1,6 +1,45 @@
 (function(){
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 
+  function ensureDreToggleStyles(){
+    if(document.getElementById('br-dre-toggle-styles'))return;
+    const style=document.createElement('style');
+    style.id='br-dre-toggle-styles';
+    style.textContent=`
+      .br-dre-toggle{
+        min-width:104px!important;
+        height:36px;
+        padding:0 34px 0 12px!important;
+        border-radius:10px!important;
+        font-weight:800!important;
+        font-size:13px!important;
+        cursor:pointer;
+        outline:none;
+        transition:background .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease;
+      }
+      .br-dre-toggle:focus{box-shadow:0 0 0 3px rgba(15,23,42,.08)}
+      .br-dre-toggle.br-dre-sim{
+        background:#eaf8ef!important;
+        border-color:#82c994!important;
+        color:#1e7b39!important;
+      }
+      .br-dre-toggle.br-dre-nao{
+        background:#fdeeee!important;
+        border-color:#e7a0a0!important;
+        color:#b42323!important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  window.updateDreSelectStyle=function(el){
+    if(!el)return;
+    ensureDreToggleStyles();
+    el.classList.add('br-dre-toggle');
+    el.classList.toggle('br-dre-sim',String(el.value)==='sim');
+    el.classList.toggle('br-dre-nao',String(el.value)!=='sim');
+  };
+
   function accountForTransaction(t){
     const cat=norm(t?.category);
     if(!cat)return null;
@@ -103,6 +142,7 @@
   };
 
   window.renderChartAccounts=function(){
+    ensureDreToggleStyles();
     const entries=chartAccounts.filter(x=>x.type==='entrada').sort((a,b)=>(a.code||'').localeCompare(b.code||''));
     const exits=chartAccounts.filter(x=>x.type==='saida').sort((a,b)=>(a.code||'').localeCompare(b.code||''));
     const row=x=>`<tr>
@@ -110,7 +150,7 @@
       <td>${esc(x.name)}</td>
       <td>${esc(x.group||'-')}</td>
       <td style="min-width:125px">
-        <select onchange="setChartAccountDre(${x.id},this.value)" style="min-width:95px;font-weight:700">
+        <select class="br-dre-toggle ${x.dre!==false?'br-dre-sim':'br-dre-nao'}" onchange="setChartAccountDre(${x.id},this.value);updateDreSelectStyle(this)">
           <option value="sim" ${x.dre!==false?'selected':''}>Sim</option>
           <option value="nao" ${x.dre===false?'selected':''}>Não</option>
         </select>
@@ -150,13 +190,14 @@
         ${field('Tipo',`<select id="pc_type"><option value="entrada" ${x.type==='entrada'?'selected':''}>Entrada / Receita</option><option value="saida" ${x.type==='saida'?'selected':''}>Saída / Despesa</option></select>`)}
         ${field('Nome da conta',`<input id="pc_name" value="${esc(x.name||'')}" placeholder="Ex.: Honorários jurídicos">`)}
         ${field('Grupo',`<input id="pc_group" value="${esc(x.group||'')}" placeholder="Ex.: Despesas Administrativas">`)}
-        ${field('Vai para DRE?',`<select id="pc_dre"><option value="sim" ${x.dre!==false?'selected':''}>Sim</option><option value="nao" ${x.dre===false?'selected':''}>Não</option></select>`)}
+        ${field('Vai para DRE?',`<select id="pc_dre" class="br-dre-toggle ${x.dre!==false?'br-dre-sim':'br-dre-nao'}" onchange="updateDreSelectStyle(this)"><option value="sim" ${x.dre!==false?'selected':''}>Sim</option><option value="nao" ${x.dre===false?'selected':''}>Não</option></select>`)}
       </div>
       <div class="notice" style="margin-top:14px">Se marcar <b>Não</b>, a conta continua sendo usada nos lançamentos, mas fica fora do resultado da DRE.</div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
         <button class="btn" onclick="closeModal()">Cancelar</button>
         <button class="btn primary" onclick="saveChartAccount(${id||'null'})">Salvar</button>
       </div>`);
+    setTimeout(()=>updateDreSelectStyle(document.getElementById('pc_dre')),0);
   };
 
   window.saveChartAccount=function(id){
@@ -177,5 +218,6 @@
     renderAll();
   };
 
+  ensureDreToggleStyles();
   setTimeout(()=>{try{renderDRE();renderDashboard()}catch(_){ }},0);
 })();
