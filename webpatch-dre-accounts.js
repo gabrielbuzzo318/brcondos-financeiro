@@ -166,7 +166,7 @@
         <button class="btn primary" onclick="openChartAccount()">+ Nova conta</button>
       </div>
       <div class="notice"><b>Vai para DRE?</b> Escolha <b>Sim</b> ou <b>Não</b> diretamente em cada conta. Se marcar <b>Não</b>, a conta continua disponível no Fluxo de Caixa e no Contas a Pagar, mas seus lançamentos ficam fora da DRE.</div>
-      <div class="grid two-cols">
+      <div class="grid" style="grid-template-columns:1fr">
         <div class="card">
           <div class="panel-title">Entradas / Receitas</div>
           <div class="table-wrap"><table style="min-width:0"><thead><tr><th>Código</th><th>Conta</th><th>Grupo</th><th>Vai para DRE?</th><th></th></tr></thead><tbody>
