@@ -102,6 +102,7 @@
   window.setFluxMonth=function(prefix){
     if(!validMonth(prefix))return;
     selectedFluxMonth=String(prefix);
+    window.__brFluxSelectedMonth=selectedFluxMonth;
     if(typeof window.renderFluxo==='function')window.renderFluxo();
   };
 
@@ -120,6 +121,8 @@
       ensureStyles();
       const allTransactions=Array.isArray(transactions)?transactions:[];
       if(!availableMonths(allTransactions).includes(selectedFluxMonth))selectedFluxMonth=currentMonth();
+      window.__brAllTransactions=allTransactions;
+      window.__brFluxSelectedMonth=selectedFluxMonth;
       const filtered=allTransactions.filter(t=>String(t?.date||'').startsWith(selectedFluxMonth));
       let result;
       try{
@@ -140,6 +143,7 @@
     };
   }
 
+  window.__brFluxSelectedMonth=selectedFluxMonth;
   setTimeout(()=>{
     try{ensureStyles();cleanDashboard();}catch(_){ }
   },0);
