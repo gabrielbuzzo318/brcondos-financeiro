@@ -10,6 +10,19 @@
     return `${names[(m||1)-1]||''}/${y||''}`;
   }
 
+  function monthLabel(prefix){
+    const [,m]=String(prefix||'').split('-').map(Number);
+    const names=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    return names[(m||1)-1]||'';
+  }
+
+  function previousPrefix(prefix){
+    const [y,m]=String(prefix||'').split('-').map(Number);
+    if(!y||!m)return '';
+    const d=new Date(Date.UTC(y,m-2,1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  }
+
   function accountFor(type,category){
     const cat=norm(category);
     return chartAccounts.find(a=>a.type===type&&norm(a.name)===cat)||null;
@@ -89,36 +102,121 @@
     return {receita,simples,receitaLiquida,cats,despesas,resultado:receitaLiquida-despesas};
   }
 
-  function clickableRow(label,value,kind,category='',bold=false,extraClass=''){
+  function ensureCompareStyles(){
+    if(document.getElementById('dre-compare-styles'))return;
+    const style=document.createElement('style');
+    style.id='dre-compare-styles';
+    style.textContent=`
+      #view-dre .dre-compare-head,
+      #view-dre .dre-compare-row{
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) minmax(105px,130px) minmax(105px,130px);
+        align-items:center;
+        gap:12px;
+      }
+      #view-dre .dre-compare-head{
+        padding:5px 2px 8px;
+        color:#75808b;
+        font-size:11px;
+        font-weight:800;
+        text-transform:uppercase;
+        letter-spacing:.04em;
+        border-bottom:1px solid #edf0f2;
+      }
+      #view-dre .dre-compare-head span:nth-child(2),
+      #view-dre .dre-compare-head span:nth-child(3),
+      #view-dre .dre-compare-prev,
+      #view-dre .dre-compare-current{
+        text-align:right;
+      }
+      #view-dre .dre-compare-prev{
+        color:#7a858f;
+        font-weight:700;
+        white-space:nowrap;
+      }
+      #view-dre .dre-compare-current{
+        justify-self:end;
+        border:0;
+        background:transparent;
+        padding:5px 7px;
+        margin:-5px -7px -5px 0;
+        border-radius:7px;
+        color:inherit;
+        font:inherit;
+        font-weight:800;
+        white-space:nowrap;
+      }
+      #view-dre button.dre-compare-current{
+        cursor:pointer;
+      }
+      #view-dre button.dre-compare-current:hover,
+      #view-dre button.dre-compare-current:focus-visible{
+        background:#f3f6f8;
+        outline:none;
+        text-decoration:underline;
+        text-underline-offset:2px;
+      }
+      #view-dre .dre-compare-row.result .dre-compare-current{
+        padding:0;
+        margin:0;
+      }
+      @media (max-width:720px){
+        #view-dre .dre-compare-head,
+        #view-dre .dre-compare-row{
+          grid-template-columns:minmax(150px,1fr) 105px 105px;
+          gap:8px;
+          min-width:390px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function comparisonRow(label,previousValue,currentValue,kind,category='',bold=false,extraClass='',clickable=true){
     const encoded=encodeURIComponent(category);
-    return `<div class="dre-row ${extraClass}" role="button" tabindex="0" title="Clique para ver os lançamentos que formam este valor" style="cursor:pointer" onclick="openDreDetails('${kind}','${encoded}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDreDetails('${kind}','${encoded}')}" onmouseenter="this.style.background='#f8fafb'" onmouseleave="this.style.background=''">
-      <span style="${bold?'font-weight:800':''}">${escHtml(label)}</span><b>${money(value)}</b>
+    const current=clickable
+      ?`<button type="button" class="dre-compare-current" title="Clique para ver os lançamentos deste mês" onclick="openDreDetails('${kind}','${encoded}')">${money(currentValue)}</button>`
+      :`<span class="dre-compare-current">${money(currentValue)}</span>`;
+    return `<div class="dre-row dre-compare-row ${extraClass}">
+      <span style="${bold?'font-weight:800':''}">${escHtml(label)}</span>
+      <span class="dre-compare-prev">${money(previousValue)}</span>
+      ${current}
     </div>`;
   }
 
   function rebuildDre(){
     const prefix=String(document.getElementById('dre_month')?.value||'').trim();
     if(!/^\d{4}-\d{2}$/.test(prefix))return;
+    const prevPrefix=previousPrefix(prefix);
     const view=document.getElementById('view-dre');
     const cards=view?.querySelectorAll('.grid.two-cols > .card');
     const demo=cards?.[0], indicators=cards?.[1];
     if(!demo)return;
 
-    const {receita,simples,receitaLiquida,cats,despesas,resultado}=buildSummary(prefix);
+    ensureCompareStyles();
+
+    const current=buildSummary(prefix);
+    const previous=buildSummary(prevPrefix);
+    const catKeys=[...Object.keys(current.cats)];
+    Object.keys(previous.cats).forEach(k=>{
+      if(!catKeys.some(existing=>norm(existing)===norm(k)))catKeys.push(k);
+    });
+
     demo.innerHTML=`
       <div class="panel-title">Demonstrativo — ${periodLabel(prefix)}</div>
-      ${clickableRow('(+) Receita operacional',receita,'revenue','',true)}
-      ${clickableRow('(-) Simples Nacional',simples,'deduction',TAX_ACCOUNT)}
-      ${clickableRow('(=) Receita líquida',receitaLiquida,'net-revenue','',true)}
-      ${Object.entries(cats).map(([k,v])=>clickableRow(`(-) ${k}`,v,'expense',k)).join('')}
-      ${clickableRow('Total de despesas',despesas,'all-expenses','',false,'total')}
-      <div class="dre-row result"><span>RESULTADO DO PERÍODO</span><span>${money(resultado)}</span></div>`;
+      <div class="dre-compare-head"><span>Conta</span><span>${escHtml(monthLabel(prevPrefix))}</span><span>${escHtml(monthLabel(prefix))}</span></div>
+      ${comparisonRow('(+) Receita operacional',previous.receita,current.receita,'revenue','',true)}
+      ${comparisonRow('(-) Simples Nacional',previous.simples,current.simples,'deduction',TAX_ACCOUNT)}
+      ${comparisonRow('(=) Receita líquida',previous.receitaLiquida,current.receitaLiquida,'net-revenue','',true)}
+      ${catKeys.map(k=>comparisonRow(`(-) ${k}`,previous.cats[k]||0,current.cats[k]||0,'expense',k)).join('')}
+      ${comparisonRow('Total de despesas',previous.despesas,current.despesas,'all-expenses','',false,'total')}
+      ${comparisonRow('RESULTADO DO PERÍODO',previous.resultado,current.resultado,'result','',true,'result',false)}`;
 
     if(indicators){
       const metricRows=[...indicators.querySelectorAll(':scope > .dre-row')];
-      if(metricRows[0])metricRows[0].innerHTML=`<span>Margem operacional</span><b>${receita?((resultado/receita)*100).toFixed(1):'0.0'}%</b>`;
-      if(metricRows[1])metricRows[1].innerHTML=`<span>Despesas / Receita</span><b>${receita?((despesas/receita)*100).toFixed(1):'0.0'}%</b>`;
-      if(metricRows[2])metricRows[2].innerHTML=`<span>Resultado</span><b style="color:${resultado>=0?'#278c3a':'#c94848'}">${money(resultado)}</b>`;
+      if(metricRows[0])metricRows[0].innerHTML=`<span>Margem operacional</span><b>${current.receita?((current.resultado/current.receita)*100).toFixed(1):'0.0'}%</b>`;
+      if(metricRows[1])metricRows[1].innerHTML=`<span>Despesas / Receita</span><b>${current.receita?((current.despesas/current.receita)*100).toFixed(1):'0.0'}%</b>`;
+      if(metricRows[2])metricRows[2].innerHTML=`<span>Resultado</span><b style="color:${current.resultado>=0?'#278c3a':'#c94848'}">${money(current.resultado)}</b>`;
     }
   }
 
