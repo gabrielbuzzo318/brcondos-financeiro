@@ -3,6 +3,29 @@
     return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   }
 
+  function reimbursementParty(r){
+    const reimbursed=String(r?.reimbursedBy||'').trim();
+    if(reimbursed && reimbursed!=='-')return reimbursed;
+    return String(r?.paidBy||'').trim();
+  }
+
+  function flowObject(r,d,flowId){
+    const value=Number(r?.value||0);
+    return {
+      id:flowId,
+      date:d,
+      type:'entrada',
+      status:'pago',
+      description:`Reembolso recebido - ${r?.description||'Reembolso'}`,
+      category:r?.category||'Reembolsos',
+      party:reimbursementParty(r),
+      baseValue:value,
+      fine:0,
+      interest:0,
+      value
+    };
+  }
+
   window.receiveReimbursement=function(id){
     const r=reimbursements.find(x=>Number(x.id)===Number(id));
     if(!r)return;
@@ -28,29 +51,30 @@
     let r=reimbursements.find(x=>Number(x.id)===Number(id));
     if(!r)return;
 
+    const existingFlowId=r.flowId?Number(r.flowId):null;
+    const existingIndex=existingFlowId!==null
+      ? transactions.findIndex(t=>Number(t.id)===existingFlowId)
+      : -1;
+    const flowId=existingIndex>=0?existingFlowId:(existingFlowId||Date.now()+1);
+    const flow=flowObject(r,d,flowId);
+
+    if(existingIndex>=0){
+      transactions=transactions.map(t=>Number(t.id)===flowId?{...t,...flow}:t);
+    }else{
+      // Se o reembolso tinha flowId, mas o lançamento sumiu do Fluxo,
+      // recria usando o mesmo id em vez de considerar a sincronização concluída.
+      transactions.push(flow);
+    }
+
     reimbursements=reimbursements.map(x=>Number(x.id)===Number(id)?{
       ...x,
       status:'recebido',
-      receivedDate:d
+      receivedDate:d,
+      flowId
     }:x);
-    saveData('reimbursements',reimbursements);
 
-    r=reimbursements.find(x=>Number(x.id)===Number(id));
-    if(r?.flowId && transactions.some(t=>Number(t.id)===Number(r.flowId))){
-      transactions=transactions.map(t=>Number(t.id)===Number(r.flowId)?{
-        ...t,
-        date:d,
-        type:'entrada',
-        status:'pago',
-        description:`Reembolso recebido - ${r.description}`,
-        category:r.category||'Reembolsos',
-        party:r.reimbursedBy||'',
-        value:Number(r.value||0)
-      }:t);
-      saveData('transactions',transactions);
-    }else{
-      syncReimbursementToFlow(id);
-    }
+    saveData('transactions',transactions);
+    saveData('reimbursements',reimbursements);
 
     closeModal();
     renderAll();
