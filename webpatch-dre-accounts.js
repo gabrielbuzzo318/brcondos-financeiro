@@ -7,10 +7,11 @@
     style.id='br-dre-toggle-styles';
     style.textContent=`
       .br-dre-toggle{
-        min-width:104px!important;
-        height:36px;
-        padding:0 34px 0 12px!important;
-        border-radius:10px!important;
+        min-width:72px!important;
+        width:72px!important;
+        height:32px;
+        padding:0 24px 0 10px!important;
+        border-radius:8px!important;
         font-weight:800!important;
         font-size:13px!important;
         cursor:pointer;
@@ -149,7 +150,7 @@
       <td><b>${esc(x.code||'-')}</b></td>
       <td>${esc(x.name)}</td>
       <td>${esc(x.group||'-')}</td>
-      <td style="min-width:125px">
+      <td style="min-width:88px">
         <select class="br-dre-toggle ${x.dre!==false?'br-dre-sim':'br-dre-nao'}" onchange="setChartAccountDre(${x.id},this.value);updateDreSelectStyle(this)">
           <option value="sim" ${x.dre!==false?'selected':''}>Sim</option>
           <option value="nao" ${x.dre===false?'selected':''}>Não</option>
