@@ -60,6 +60,47 @@
     el.value=wanted;
   }
 
+  function sortSupplierPicker(){
+    const el=document.getElementById('ap_supplier');
+    if(!el)return;
+    const compare=(a,b)=>String(a||'').localeCompare(String(b||''),'pt-BR',{sensitivity:'base',numeric:true});
+
+    if(el.tagName==='SELECT'){
+      const selected=el.value;
+      const options=[...el.options];
+      const fixed=options.filter(o=>!String(o.value||'').trim());
+      const sortable=options
+        .filter(o=>String(o.value||'').trim())
+        .sort((a,b)=>compare(a.textContent||a.value,b.textContent||b.value));
+      el.replaceChildren(...fixed,...sortable);
+      el.value=selected;
+      return;
+    }
+
+    let list=null;
+    const listId=el.getAttribute('list');
+    if(listId)list=document.getElementById(listId);
+    if(!list){
+      list=document.createElement('datalist');
+      list.id='br_supplier_options_payable';
+      el.insertAdjacentElement('afterend',list);
+      el.setAttribute('list',list.id);
+    }
+
+    const existing=[...list.querySelectorAll('option')]
+      .map(o=>String(o.value||o.textContent||'').trim())
+      .filter(Boolean);
+    const registered=(suppliers||[])
+      .map(s=>String(s.name||'').trim())
+      .filter(Boolean);
+    const names=[...new Set([...existing,...registered])].sort(compare);
+    list.replaceChildren(...names.map(name=>{
+      const opt=document.createElement('option');
+      opt.value=name;
+      return opt;
+    }));
+  }
+
   window.brApplySupplierDefaults=function(name,descId,catId){
     const d=supplierDefaults(name);
     if(!d)return false;
@@ -76,6 +117,7 @@
       setTimeout(()=>{
         const supplier=document.getElementById('ap_supplier');
         if(!supplier)return;
+        sortSupplierPicker();
         supplier.addEventListener('change',()=>brApplySupplierDefaults(supplier.value,'ap_desc','ap_cat'));
       },0);
       return out;
