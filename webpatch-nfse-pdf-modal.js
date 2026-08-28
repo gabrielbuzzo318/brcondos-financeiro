@@ -10,6 +10,7 @@
     const idInterno=String(row.gissInternalId||'').trim();
     const numero=String(row.nfseNumber||'').trim();
     const rps=String(row.gissRpsNumber||row.rpsNumber||'').trim();
+    const verificacao=String(row.verificationCode||'').trim();
     if(!numero){
       return alert('O número da NFS-e ainda não foi carregado. Clique em Atualizar Giss primeiro.');
     }
@@ -19,7 +20,9 @@
 
     closeNfsePdfViewer();
 
-    const base=`/api/nfse/pdf/${encodeURIComponent(idInterno||'0')}?numero=${encodeURIComponent(numero)}&rps=${encodeURIComponent(rps)}`;
+    const params=new URLSearchParams({numero,rps});
+    if(verificacao)params.set('verificacao',verificacao);
+    const base=`/api/nfse/pdf/${encodeURIComponent(idInterno||'0')}?${params.toString()}`;
     const src=base;
     const downloadUrl=`${base}&download=1`;
 
