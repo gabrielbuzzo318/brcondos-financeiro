@@ -27,6 +27,11 @@
     return `${names[(m||1)-1]||''}/${y||''}`;
   }
 
+  function canManageClosing(){
+    if(typeof window.brcondosIsReadOnly==='function')return !window.brcondosIsReadOnly();
+    return false;
+  }
+
   function ensureStyles(){
     if(document.getElementById('dre-closing-styles'))return;
     const style=document.createElement('style');
@@ -74,6 +79,7 @@
     const state=readState();
     const closed=state[prefix]?.closed===true;
     const baseTitle=`Demonstrativo — ${periodLabel(prefix)}`;
+    const canManage=canManageClosing();
 
     demo.classList.toggle('dre-period-closed',closed);
     demo.classList.toggle('dre-period-open',!closed);
@@ -82,13 +88,13 @@
       <span>${escHtml(baseTitle)}</span>
       <span class="dre-closing-actions">
         <span class="dre-closing-badge ${closed?'closed':'open'}">${closed?'Concluída':'Em fechamento'}</span>
-        <button type="button" class="dre-closing-btn ${closed?'reopen':'finish'}" onclick="toggleDreClosing()">${closed?'Reabrir':'Concluir'}</button>
+        ${canManage?`<button type="button" class="dre-closing-btn ${closed?'reopen':'finish'}" onclick="toggleDreClosing()">${closed?'Reabrir':'Concluir'}</button>`:''}
       </span>`;
   }
 
   window.toggleDreClosing=function(){
-    if(typeof window.brcondosIsReadOnly==='function'&&window.brcondosIsReadOnly()){
-      return alert('Acesso somente para consulta.');
+    if(!canManageClosing()){
+      return alert('Você não tem permissão para concluir ou reabrir a DRE.');
     }
     const prefix=currentPrefix();
     if(!/^\d{4}-\d{2}$/.test(prefix))return;
