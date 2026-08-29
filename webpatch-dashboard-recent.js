@@ -1,5 +1,22 @@
 (function(){
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const isoLocal=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+  function currentWindow(){
+    const raw=String(typeof today==='function'?today():'');
+    let end;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
+      const [y,m,d]=raw.split('-').map(Number);
+      end=new Date(y,m-1,d);
+    }else{
+      end=new Date();
+    }
+    const monthStart=new Date(end.getFullYear(),end.getMonth(),1);
+    const start=new Date(end);
+    start.setDate(start.getDate()-14);
+    if(start<monthStart)start.setTime(monthStart.getTime());
+    return {start:isoLocal(start),end:isoLocal(end)};
+  }
 
   function ensureStyles(){
     if(document.getElementById('br-dashboard-recent-style'))return;
@@ -10,8 +27,9 @@
       #view-dashboard .br-recent-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
       #view-dashboard .br-recent-head h3{margin:0;font-size:15px;color:var(--text)}
       #view-dashboard .br-recent-head span{display:block;margin-top:4px;font-size:11px;color:var(--muted)}
-      #view-dashboard .br-recent-card .table-wrap{box-shadow:none}
+      #view-dashboard .br-recent-card .table-wrap{box-shadow:none;max-height:390px;overflow:auto}
       #view-dashboard .br-recent-card table{min-width:760px}
+      #view-dashboard .br-recent-card thead th{position:sticky;top:0;z-index:2}
       @media(max-width:650px){#view-dashboard .br-recent-head{align-items:center}}
     `;
     document.head.appendChild(s);
@@ -23,16 +41,20 @@
     ensureStyles();
     root.querySelector('.br-recent-card')?.remove();
 
+    const period=currentWindow();
     const rows=(Array.isArray(window.transactions)?window.transactions:[])
+      .filter(x=>{
+        const date=String(x?.date||'');
+        return /^\d{4}-\d{2}-\d{2}$/.test(date)&&date>=period.start&&date<=period.end;
+      })
       .slice()
-      .sort((a,b)=>String(b?.date||'').localeCompare(String(a?.date||''))||Number(b?.id||0)-Number(a?.id||0))
-      .slice(0,6);
+      .sort((a,b)=>String(b?.date||'').localeCompare(String(a?.date||''))||Number(b?.id||0)-Number(a?.id||0));
 
     const card=document.createElement('div');
     card.className='br-recent-card';
     card.innerHTML=`
       <div class="br-recent-head">
-        <div><h3>Movimentações recentes</h3><span>Últimos lançamentos registrados no Fluxo de Caixa</span></div>
+        <div><h3>Movimentações recentes</h3><span>Movimentações dos últimos 15 dias do mês atual • ${typeof formatDate==='function'?formatDate(period.start):esc(period.start)} a ${typeof formatDate==='function'?formatDate(period.end):esc(period.end)}</span></div>
         <button type="button" class="btn small primary" onclick="brDashOpen('fluxo')">Ver fluxo</button>
       </div>
       <div class="table-wrap">
@@ -45,7 +67,7 @@
               <td>${esc(x.party||'-')}</td>
               <td>${typeof statusBadge==='function'?statusBadge(x.status):esc(x.status||'-')}</td>
               <td class="amount ${x.type==='entrada'?'pos':'neg'}">${x.type==='saida'?'- ':''}${typeof money==='function'?money(x.value):esc(x.value||0)}</td>
-            </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhuma movimentação registrada.</td></tr>`}
+            </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhuma movimentação nos últimos 15 dias deste mês.</td></tr>`}
           </tbody>
         </table>
       </div>`;
