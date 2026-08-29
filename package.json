@@ -6,10 +6,11 @@
   "engines": {"node": ">=20"},
   "scripts": {
     "build:frontend": "node build-html.js",
-    "start": "node build-html.js && node patch-giss.js && node patch-server-history.js && node patch-server-cnpj.js && node patch-server-dre-notes.js && node patch-server-dre-pdf.js && node patch-server-payable-attachments.js && node patch-boleto-layout.js && node patch-server-nfse-password.js && node patch-server-nfse-pdf.js && node debug-giss-signatures.js && node server.js"
+    "start": "node build-html.js && node patch-giss.js && node patch-server-history.js && node patch-server-cnpj.js && node patch-server-dre-notes.js && node patch-server-dre-pdf.js && node patch-server-payable-attachments.js && node patch-server-payable-zip.js && node patch-boleto-layout.js && node patch-server-nfse-password.js && node patch-server-nfse-pdf.js && node debug-giss-signatures.js && node server.js"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.8.11",
+    "archiver": "^7.0.1",
     "bwip-js": "^4.6.0",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
