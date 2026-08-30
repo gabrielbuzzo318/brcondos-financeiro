@@ -44,17 +44,43 @@
     });
   }
 
+  function isRoyaltyCategory(category){
+    const n=norm(category);
+    if(n.includes('royalt'))return true;
+    try{
+      return (chartAccounts||[]).some(a=>a?.type==='saida'&&norm(a?.name)===n&&norm(a?.group)===norm(GROUP));
+    }catch(_){return false;}
+  }
+
   function reorderDreGroups(){
     const demo=document.querySelector('#view-dre .grid.two-cols > .card');
     if(!demo)return;
-    const rows=[...demo.querySelectorAll(':scope > .dre-group-row')];
-    const royalties=rows.find(r=>norm(r.querySelector('.dre-group-name')?.textContent)===norm(GROUP));
+    const headers=[...demo.querySelectorAll(':scope > .dre-group-row')];
+    const royalties=headers.find(r=>norm(r.querySelector('.dre-group-name')?.textContent)===norm(GROUP));
     if(!royalties)return;
-    const target=rows.find(r=>{
+
+    const royaltyRows=[...demo.querySelectorAll(':scope > .dre-compare-row')].filter(row=>{
+      if(row.classList.contains('total')||row.classList.contains('result'))return false;
+      const label=clean(row.firstElementChild?.textContent).replace(/^\(-\)\s*/,'').trim();
+      return isRoyaltyCategory(label);
+    });
+
+    const target=headers.find(r=>{
+      if(r===royalties)return false;
       const name=clean(r.querySelector('.dre-group-name')?.textContent);
       return name==='Outras Despesas'||name==='Movimentações dos Sócios'||name==='Contas fora da DRE'||name==='Sem grupo';
     });
-    if(target&&target!==royalties)demo.insertBefore(royalties,target);
+
+    if(target){
+      demo.insertBefore(royalties,target);
+      royaltyRows.forEach(row=>demo.insertBefore(row,target));
+    }else{
+      const total=[...demo.querySelectorAll(':scope > .dre-compare-row')].find(r=>r.classList.contains('total'));
+      if(total){
+        demo.insertBefore(royalties,total);
+        royaltyRows.forEach(row=>demo.insertBefore(row,total));
+      }
+    }
   }
 
   const oldOpen=window.openChartAccount;
@@ -81,11 +107,11 @@
     window.renderDRE=function(){
       ensureRoyaltyAccounts();
       const out=oldDre.apply(this,arguments);
-      setTimeout(reorderDreGroups,80);
+      setTimeout(reorderDreGroups,120);
       return out;
     };
   }
 
   ensureRoyaltyAccounts();
-  setTimeout(()=>{addGroupOption();reorderPlanGroups();reorderDreGroups();},300);
+  setTimeout(()=>{addGroupOption();reorderPlanGroups();reorderDreGroups();},500);
 })();
