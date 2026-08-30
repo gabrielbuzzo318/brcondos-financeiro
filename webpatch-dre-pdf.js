@@ -62,7 +62,7 @@
     [...demo.children].forEach(el=>{
       if(el.classList.contains('dre-group-row')){
         const parts=[...el.children];
-        rows.push({kind:'group',label:clean(parts[0]?.textContent),previous:clean(parts[1]?.textContent),current:clean(parts[2]?.textContent)});
+        rows.push({kind:'group',label:clean(parts[0]?.textContent),previous:clean(parts[1]?.textContent),current:clean(parts[2]?.textContent),percentage:clean(el.querySelector('.dre-percent-group')?.textContent||parts[3]?.textContent)});
         return;
       }
       if(!el.classList.contains('dre-compare-row'))return;
@@ -71,7 +71,8 @@
       const current=clean(el.querySelector('.dre-compare-current')?.textContent);
       rows.push({
         kind:el.classList.contains('result')?'result':el.classList.contains('total')?'total':'row',
-        label,previous,current
+        label,previous,current,
+        percentage:clean(el.querySelector('.dre-percent-current')?.textContent)
       });
     });
 
