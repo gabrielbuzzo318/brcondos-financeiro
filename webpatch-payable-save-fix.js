@@ -17,6 +17,46 @@
     return await uploadAttachmentData(payload.name,payload.data);
   }
 
+  function syncEditedPaidPayableToFlow(obj){
+    if(!obj||obj.status!=='pago'||typeof transactions==='undefined'||!Array.isArray(transactions))return false;
+
+    const payableId=String(obj.id||'');
+    let flow=null;
+
+    if(obj.flowId!==undefined&&obj.flowId!==null&&String(obj.flowId)!==''){
+      flow=transactions.find(t=>String(t?.id||'')===String(obj.flowId));
+    }
+    if(!flow){
+      flow=transactions.find(t=>String(t?.sourcePayableId||t?.payableId||'')===payableId);
+    }
+
+    if(!flow)return false;
+
+    const fine=Math.max(0,Number(obj.paymentFine||0));
+    const interest=Math.max(0,Number(obj.paymentInterest||0));
+    const base=Number(obj.value||0);
+    const total=base+fine+interest;
+
+    flow.type='saida';
+    flow.date=obj.paymentDate||flow.date||obj.due||'';
+    flow.description=obj.description||flow.description||'Conta a pagar';
+    flow.category=obj.category||flow.category||'Contas a pagar';
+    flow.party=obj.supplier||flow.party||'';
+    flow.value=total;
+    flow.baseValue=base;
+    flow.fine=fine;
+    flow.interest=interest;
+    flow.status='pago';
+    flow.sourceType='payable';
+    flow.sourcePayableId=obj.id;
+
+    obj.flowId=flow.id;
+    obj.paidTotal=total;
+
+    saveData('transactions',transactions);
+    return true;
+  }
+
   window.openAttachment=function(id){
     const p=payables.find(x=>x.id===id);
     if(!p)return alert('Conta não encontrada.');
@@ -50,14 +90,12 @@
       let attachmentName=old?.attachmentName||'';
       let attachmentRef=old?.attachmentRef||'';
 
-      // Migra, se necessário, um anexo legado que ainda esteja em base64 no navegador.
       if(!attachmentRef&&old?.attachmentData){
         const migrated=await uploadAttachmentData(attachmentName||'anexo',old.attachmentData);
         attachmentRef=migrated.id;
         attachmentName=migrated.fileName||attachmentName||'anexo';
       }
 
-      // Novo arquivo nunca entra no localStorage: vai direto para o backend.
       if(attachmentEl?.files?.[0]){
         const uploaded=await uploadAttachmentFile(attachmentEl.files[0]);
         if(uploaded){
@@ -96,6 +134,12 @@
         return alert('Preencha vencimento, descrição e valor.');
       }
 
+      if(obj.status==='pago'){
+        const fine=Math.max(0,Number(obj.paymentFine||0));
+        const interest=Math.max(0,Number(obj.paymentInterest||0));
+        obj.paidTotal=Number(obj.value||0)+fine+interest;
+      }
+
       if(id){
         payables=payables.map(x=>x.id===id?obj:x);
       }else if(recurring){
@@ -122,8 +166,16 @@
 
       saveData('payables',payables);
 
-      if(obj.status==='pago'&&id&&!obj.flowId&&typeof syncPayableToFlow==='function'){
-        syncPayableToFlow(obj.id);
+      if(obj.status==='pago'&&id){
+        let synced=syncEditedPaidPayableToFlow(obj);
+        if(!synced&&typeof syncPayableToFlow==='function'){
+          syncPayableToFlow(obj.id);
+          synced=syncEditedPaidPayableToFlow(obj);
+        }
+        if(synced){
+          payables=payables.map(x=>x.id===obj.id?{...x,flowId:obj.flowId,paidTotal:obj.paidTotal}:x);
+          saveData('payables',payables);
+        }
       }
 
       closeModal();
