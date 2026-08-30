@@ -14,10 +14,7 @@
     if(document.getElementById('br-payable-plan-search-style'))return;
     const s=document.createElement('style');
     s.id='br-payable-plan-search-style';
-    s.textContent=`
-      #ap_cat{width:100%;min-width:0}
-      .br-payable-plan-hint{margin-top:4px;font-size:10px;color:#83909a}
-    `;
+    s.textContent=`#ap_cat{width:100%;min-width:0}`;
     document.head.appendChild(s);
   }
 
@@ -64,14 +61,6 @@
     input.className=old.className||'';
     input.style.cssText=old.style.cssText||'';
     old.replaceWith(input);
-
-    const holder=input.parentElement;
-    if(holder&&!holder.querySelector('.br-payable-plan-hint')){
-      const hint=document.createElement('div');
-      hint.className='br-payable-plan-hint';
-      hint.textContent='Digite parte do nome ou selecione uma conta da lista.';
-      holder.appendChild(hint);
-    }
   }
 
   window.refreshPayableAccountOptions=function(){
