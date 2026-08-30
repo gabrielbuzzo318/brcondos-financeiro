@@ -25,8 +25,15 @@ function safeRows(rows){
     kind:['group','total','result','row'].includes(row?.kind)?row.kind:'row',
     label:clean(row?.label).slice(0,180),
     previous:clean(row?.previous).slice(0,60),
-    current:clean(row?.current).slice(0,60)
+    current:clean(row?.current).slice(0,60),
+    percentage:clean(row?.percentage).slice(0,30)
   })).filter(row=>row.label):[];
+}
+function emissionInfo(payload){
+  const date=new Date(payload?.emittedAt||Date.now());
+  const dateText=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'}).format(date);
+  const timeText=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(date);
+  return {dateText,timeText,by:clean(payload?.emittedBy)||'Usuário não identificado'};
 }
 
 export function gerarDrePdf(payload={}){
@@ -39,6 +46,7 @@ export function gerarDrePdf(payload={}){
       const closed=/conclu/i.test(status);
       const rows=safeRows(payload.rows);
       const indicators=Array.isArray(payload.indicators)?payload.indicators.slice(0,6):[];
+      const emission=emissionInfo(payload);
 
       const doc=new PDFDocument({size:'A4',margins:{top:PAGE.margin,bottom:PAGE.margin,left:PAGE.margin,right:PAGE.margin},bufferPages:true,info:{Title:`DRE Gerencial - ${period}`,Author:'BRCONDOS'}});
       const chunks=[];
@@ -47,9 +55,11 @@ export function gerarDrePdf(payload={}){
       doc.on('end',()=>resolve(Buffer.concat(chunks)));
 
       const pageWidth=doc.page.width-PAGE.margin*2;
-      const colLabel=pageWidth-196;
-      const colPrev=98;
-      const colCur=98;
+      const colPct=68;
+      const colPrev=90;
+      const colCur=90;
+      const colLabel=pageWidth-colPrev-colCur-colPct;
+      const safeBottom=doc.page.height-PAGE.margin-30;
 
       function header(repeat=false){
         doc.fillColor(COLORS.ink).font('Helvetica-Bold').fontSize(repeat?12:18).text('BRCONDOS',PAGE.margin,repeat?32:42);
@@ -78,11 +88,12 @@ export function gerarDrePdf(payload={}){
         doc.text('CONTA',PAGE.margin+8,y+8,{width:colLabel-16});
         doc.text(previousLabel.toUpperCase(),PAGE.margin+colLabel,y+8,{width:colPrev-8,align:'right'});
         doc.text(currentLabel.toUpperCase(),PAGE.margin+colLabel+colPrev,y+8,{width:colCur-8,align:'right'});
+        doc.text('% RECEITA',PAGE.margin+colLabel+colPrev+colCur,y+8,{width:colPct-8,align:'right'});
         doc.y=y+24;
       }
 
       function ensureSpace(height=28){
-        if(doc.y+height<=doc.page.height-PAGE.margin-22)return;
+        if(doc.y+height<=safeBottom)return;
         doc.addPage();
         header(true);
         tableHeader();
@@ -111,6 +122,7 @@ export function gerarDrePdf(payload={}){
         doc.font(kind==='group'||kind==='total'||kind==='result'?'Helvetica-Bold':'Helvetica').fontSize(9.2);
         doc.text(row.previous||'R$ 0,00',PAGE.margin+colLabel,y+7,{width:colPrev-8,align:'right'});
         doc.text(row.current||'R$ 0,00',PAGE.margin+colLabel+colPrev,y+7,{width:colCur-8,align:'right'});
+        doc.fontSize(8.2).fillColor(kind==='result'?textColor:COLORS.muted).text(row.percentage||'0,00%',PAGE.margin+colLabel+colPrev+colCur,y+8,{width:colPct-8,align:'right'});
         doc.moveTo(PAGE.margin,y+h).lineTo(PAGE.margin+pageWidth,y+h).strokeColor(COLORS.line).lineWidth(.5).stroke();
         doc.y=y+h;
       }
@@ -136,13 +148,16 @@ export function gerarDrePdf(payload={}){
         });
       }
 
-      doc.moveDown(.7);
-      doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5).text(`Gerado em ${new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}`,PAGE.margin,doc.y,{width:pageWidth,align:'right'});
-
       const range=doc.bufferedPageRange();
       for(let i=0;i<range.count;i++){
         doc.switchToPage(range.start+i);
-        doc.fillColor('#8a949b').font('Helvetica').fontSize(7.5).text(`Página ${i+1} de ${range.count}`,PAGE.margin,doc.page.height-28,{width:pageWidth,align:'center',lineBreak:false});
+        const footerY=doc.page.height-PAGE.margin-18;
+        doc.save();
+        doc.moveTo(PAGE.margin,footerY-7).lineTo(PAGE.margin+pageWidth,footerY-7).strokeColor(COLORS.line).lineWidth(.5).stroke();
+        doc.fillColor('#7d878e').font('Helvetica').fontSize(7.2)
+          .text(`Emitido em ${emission.dateText} às ${emission.timeText} • Emitido por: ${emission.by}`,PAGE.margin,footerY,{width:pageWidth-100,lineBreak:false});
+        doc.text(`Página ${i+1} de ${range.count}`,PAGE.margin+pageWidth-95,footerY,{width:95,align:'right',lineBreak:false});
+        doc.restore();
       }
 
       doc.end();
