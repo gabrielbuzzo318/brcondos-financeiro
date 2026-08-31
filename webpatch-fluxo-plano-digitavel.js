@@ -14,15 +14,13 @@
     if(document.getElementById('br-flux-cat-input-style'))return;
     const s=document.createElement('style');
     s.id='br-flux-cat-input-style';
-    s.textContent=`
-      #m_cat{width:100%}
-      .br-flux-cat-hint{margin-top:4px;font-size:10px;color:#83909a}
-    `;
+    s.textContent=`#m_cat{width:100%;min-width:0}`;
     document.head.appendChild(s);
   }
 
   function enhanceCategory(transactionId=null){
     ensureStyle();
+    document.querySelectorAll('.br-flux-cat-hint').forEach(el=>el.remove());
     const old=document.getElementById('m_cat');
     const type=document.getElementById('m_type')?.value||'';
     if(!old)return;
@@ -43,6 +41,8 @@
 
     if(old.tagName==='INPUT'){
       old.setAttribute('list','m_cat_list');
+      old.placeholder='Digite ou selecione uma conta';
+      old.autocomplete='off';
       if(current)old.value=current;
       return;
     }
@@ -56,14 +56,6 @@
     input.className=old.className||'';
     input.style.cssText=old.style.cssText||'';
     old.replaceWith(input);
-
-    const holder=input.parentElement;
-    if(holder&&!holder.querySelector('.br-flux-cat-hint')){
-      const hint=document.createElement('div');
-      hint.className='br-flux-cat-hint';
-      hint.textContent='Você pode selecionar uma conta existente ou digitar outra.';
-      holder.appendChild(hint);
-    }
   }
 
   const originalOpen=window.openTransaction;
@@ -76,6 +68,7 @@
   }
 
   window.refreshTransactionAccountOptions=function(){
+    document.querySelectorAll('.br-flux-cat-hint').forEach(el=>el.remove());
     const type=document.getElementById('m_type')?.value||'';
     const input=document.getElementById('m_cat');
     const current=String(input?.value||'');
