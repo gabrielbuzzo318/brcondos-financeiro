@@ -19,16 +19,14 @@
   }
 
   function refreshStatusOptions(){
-    const view=document.getElementById('view-reembolsos');
     const select=document.getElementById('reimb_status');
-    if(!view||!select)return;
-    const {status}=columnIndexes(view);
-    if(status<0)return;
+    if(!select)return;
     const current=select.value;
-    const values=[...new Set(reimbursementRows(view).map(tr=>String(tr.children[status]?.textContent||'').trim()).filter(Boolean))]
-      .sort((a,b)=>a.localeCompare(b,'pt-BR',{sensitivity:'base'}));
-    select.innerHTML='<option value="">Todos</option>'+values.map(v=>`<option value="${String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('');
-    if(values.includes(current))select.value=current;
+    select.innerHTML=`
+      <option value="">Todos</option>
+      <option value="Recebido">Recebido</option>
+      <option value="A receber">A receber</option>`;
+    if(['Recebido','A receber'].includes(current))select.value=current;
   }
 
   function mountReimbursementFilter(){
@@ -61,12 +59,15 @@
       </div>
       <div class="field">
         <label>Status</label>
-        <select id="reimb_status" onchange="filterReimbursementsTable()"><option value="">Todos</option></select>
+        <select id="reimb_status" onchange="filterReimbursementsTable()">
+          <option value="">Todos</option>
+          <option value="Recebido">Recebido</option>
+          <option value="A receber">A receber</option>
+        </select>
       </div>
       <button class="btn" type="button" onclick="clearReimbursementsFilter()">Limpar filtros</button>
       <div id="reimb_filter_result" class="filter-result"></div>`;
     tableWrap.parentNode.insertBefore(bar,tableWrap);
-    refreshStatusOptions();
     filterReimbursementsTable();
   }
 
