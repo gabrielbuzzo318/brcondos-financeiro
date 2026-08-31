@@ -77,14 +77,14 @@
 
   function addPeriodSelector(root, allTransactions){
     const months=availableMonths(allTransactions);
-    if(!months.includes(selectedFluxMonth))selectedFluxMonth=currentMonth();
+    if(selectedFluxMonth!=='all'&&!months.includes(selectedFluxMonth))selectedFluxMonth=currentMonth();
 
     const section=[...root.querySelectorAll('.section-title')].find(el=>el.querySelector('h2')&&String(el.querySelector('h2').textContent||'').trim().toLowerCase()==='fluxo de caixa');
     if(!section)return;
 
     const period=document.createElement('div');
     period.className='field br-flux-period';
-    period.innerHTML=`<label>Período</label><select onchange="setFluxMonth(this.value)">${months.map(m=>`<option value="${m}" ${m===selectedFluxMonth?'selected':''}>${monthLabel(m)}</option>`).join('')}</select>`;
+    period.innerHTML=`<label>Período</label><select onchange="setFluxMonth(this.value)"><option value="all" ${selectedFluxMonth==='all'?'selected':''}>Todos</option>${months.map(m=>`<option value="${m}" ${m===selectedFluxMonth?'selected':''}>${monthLabel(m)}</option>`).join('')}</select>`;
 
     const actions=section.querySelector('.actions');
     if(actions){
@@ -100,7 +100,7 @@
   }
 
   window.setFluxMonth=function(prefix){
-    if(!validMonth(prefix))return;
+    if(prefix!=='all'&&!validMonth(prefix))return;
     selectedFluxMonth=String(prefix);
     window.__brFluxSelectedMonth=selectedFluxMonth;
     if(typeof window.renderFluxo==='function')window.renderFluxo();
@@ -120,10 +120,10 @@
     window.renderFluxo=function(){
       ensureStyles();
       const allTransactions=Array.isArray(transactions)?transactions:[];
-      if(!availableMonths(allTransactions).includes(selectedFluxMonth))selectedFluxMonth=currentMonth();
+      if(selectedFluxMonth!=='all'&&!availableMonths(allTransactions).includes(selectedFluxMonth))selectedFluxMonth=currentMonth();
       window.__brAllTransactions=allTransactions;
       window.__brFluxSelectedMonth=selectedFluxMonth;
-      const filtered=allTransactions.filter(t=>String(t?.date||'').startsWith(selectedFluxMonth));
+      const filtered=selectedFluxMonth==='all'?allTransactions:allTransactions.filter(t=>String(t?.date||'').startsWith(selectedFluxMonth));
       let result;
       try{
         transactions=filtered;
