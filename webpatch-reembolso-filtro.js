@@ -18,6 +18,27 @@
     return [...view.querySelectorAll('.table-wrap tbody tr')].filter(tr=>!tr.querySelector('.empty'));
   }
 
+  function reimbursementForRow(tr){
+    try{
+      const btn=[...tr.querySelectorAll('button')].find(b=>/openReimbursement\(/.test(String(b.getAttribute('onclick')||'')));
+      const m=String(btn?.getAttribute('onclick')||'').match(/openReimbursement\((\d+)\)/);
+      if(!m)return null;
+      const id=Number(m[1]);
+      return (Array.isArray(reimbursements)?reimbursements:[]).find(r=>Number(r?.id)===id)||null;
+    }catch(_){return null;}
+  }
+
+  function businessStatus(tr,statusIndex){
+    const r=reimbursementForRow(tr);
+    if(r){
+      const st=normalize(r.status);
+      if(st==='recebido'||r.receivedDate||r.flowId)return 'recebido';
+      return 'a receber';
+    }
+    const visual=statusIndex>=0?normalize(tr.children[statusIndex]?.textContent||''):'';
+    return visual.startsWith('recebido')?'recebido':'a receber';
+  }
+
   function refreshStatusOptions(){
     const select=document.getElementById('reimb_status');
     if(!select)return;
@@ -85,7 +106,7 @@
     rows.forEach(tr=>{
       const hay=normalize(tr.textContent||'');
       const rowDate=paid>=0?isoFromBr(tr.children[paid]?.textContent||''):'';
-      const rowStatus=status>=0?normalize(tr.children[status]?.textContent||''):'';
+      const rowStatus=businessStatus(tr,status);
       const matchesSearch=!q||hay.includes(q);
       const matchesFrom=!from||!!rowDate&&rowDate>=from;
       const matchesTo=!to||!!rowDate&&rowDate<=to;
