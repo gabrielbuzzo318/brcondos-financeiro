@@ -1,111 +1,175 @@
 (function(){
   const STORAGE_KEY='brcondos_reimbursementsV2';
+  const LOGO_URL='https://upload.wikimedia.org/wikipedia/commons/c/cf/Logo_BRCondos_svg.svg';
   const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtDate=v=>{const s=String(v||'');const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:s};
   const fmtMoney=v=>{const n=Number(v||0);try{if(typeof money==='function')return money(n)}catch(_){ }return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})};
-  function list(){try{const raw=localStorage.getItem(STORAGE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[]}catch(_){return []}}
-  function statusValue(item){const s=norm(item?.status);if(s==='recebido')return'recebido';if(s.includes('nao recebido')||s==='nao_recebido')return'nao_recebido';return'analise'}
-  function statusText(item){const s=statusValue(item);if(s==='recebido')return item?.receivedDate?fmtDate(item.receivedDate):'Recebido';if(s==='nao_recebido')return'Não recebido';return'Em análise'}
+
+  function list(){
+    try{const raw=localStorage.getItem(STORAGE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[]}
+    catch(_){return []}
+  }
+
+  function statusValue(item){
+    const s=norm(item?.status);
+    if(s==='recebido')return'recebido';
+    if(s.includes('nao recebido')||s==='nao_recebido')return'nao_recebido';
+    return'analise';
+  }
+
+  function statusText(item){
+    const s=statusValue(item);
+    if(s==='recebido')return item?.receivedDate?fmtDate(item.receivedDate):'Recebido';
+    if(s==='nao_recebido')return'Não recebido';
+    return'Em análise';
+  }
+
   function reportItems(){
     const status=String(document.getElementById('br_r2_rep_status')?.value||'');
     const client=norm(document.getElementById('br_r2_rep_client')?.value||'');
     const from=String(document.getElementById('br_r2_rep_from')?.value||'');
     const to=String(document.getElementById('br_r2_rep_to')?.value||'');
-    return list().filter(item=>{const d=String(item?.date||'');return(!status||statusValue(item)===status)&&(!client||norm(item?.reimbursableBy)===client)&&(!from||d>=from)&&(!to||d<=to)}).sort((a,b)=>String(a?.date||'').localeCompare(String(b?.date||''))||Number(a?.id||0)-Number(b?.id||0));
+    return list().filter(item=>{
+      const d=String(item?.date||'');
+      return(!status||statusValue(item)===status)&&(!client||norm(item?.reimbursableBy)===client)&&(!from||d>=from)&&(!to||d<=to);
+    }).sort((a,b)=>String(a?.date||'').localeCompare(String(b?.date||''))||Number(a?.id||0)-Number(b?.id||0));
   }
+
   function filterDescription(){
     const st=String(document.getElementById('br_r2_rep_status')?.value||'');
     const client=String(document.getElementById('br_r2_rep_client')?.value||'');
     const from=String(document.getElementById('br_r2_rep_from')?.value||'');
     const to=String(document.getElementById('br_r2_rep_to')?.value||'');
-    return{status:{analise:'Em análise',nao_recebido:'Não recebido',recebido:'Recebido'}[st]||'Todos',client:client||'Todos',period:from||to?`${from?fmtDate(from):'início'} a ${to?fmtDate(to):'hoje'}`:'Todos'};
+    return{
+      status:{analise:'Em análise',nao_recebido:'Não recebido',recebido:'Recebido'}[st]||'Todos',
+      client:client||'Todos',
+      period:from||to?`${from?fmtDate(from):'início'} a ${to?fmtDate(to):'hoje'}`:'Todos'
+    };
   }
-  function loadLibrary(src,key,ready){
-    if(ready())return Promise.resolve();
-    const old=document.querySelector(`script[data-br-r2-pdf-fix="${key}"]`);
-    if(old)old.remove();
-    return new Promise((resolve,reject)=>{
-      const s=document.createElement('script');
-      s.src=src;s.async=true;s.dataset.brR2PdfFix=key;
-      s.onload=()=>ready()?resolve():reject(new Error(`${key} carregou sem inicializar`));
-      s.onerror=()=>reject(new Error(`Falha ao carregar ${key}`));
-      document.head.appendChild(s);
-    });
+
+  function summary(items){
+    return items.reduce((o,x)=>{
+      const v=Number(x?.value||0),s=statusValue(x);
+      o.total+=v;
+      if(s==='recebido')o.received+=v;
+      else if(s==='nao_recebido')o.pending+=v;
+      else o.analysis+=v;
+      return o;
+    },{total:0,pending:0,received:0,analysis:0});
   }
-  function drawKpi(doc,x,y,w,label,value,accent){
-    doc.setDrawColor(226,231,234);doc.setFillColor(250,251,252);doc.roundedRect(x,y,w,16,2,2,'FD');
-    doc.setFillColor(...accent);doc.roundedRect(x,y,2.2,16,1,1,'F');
-    doc.setTextColor(112,126,135);doc.setFont('helvetica','bold');doc.setFontSize(6.7);doc.text(label.toUpperCase(),x+5,y+5.2);
-    doc.setTextColor(38,54,63);doc.setFontSize(11);doc.text(value,x+5,y+11.9);
+
+  function filterStripText(f){
+    if(f.status==='Todos'&&f.client==='Todos'&&f.period==='Todos')return'Todos os períodos';
+    return `Status: ${f.status}  •  Cliente / Reembolsável por: ${f.client}  •  Período: ${f.period}`;
   }
-  window.brR2PdfReport=async function(){
+
+  window.brR2PdfReport=function(){
     const items=reportItems();
     if(!items.length)return alert('Nenhum registro encontrado para os filtros selecionados.');
-    try{
-      await loadLibrary('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','jspdf',()=>!!window.jspdf?.jsPDF);
-      await loadLibrary('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js','autotable',()=>typeof window.jspdf?.jsPDF?.API?.autoTable==='function');
-      const {jsPDF}=window.jspdf;
-      const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-      if(typeof doc.autoTable!=='function')throw new Error('AutoTable não foi inicializado no documento');
-      const f=filterDescription();
-      const sums=items.reduce((o,x)=>{const v=Number(x?.value||0),s=statusValue(x);o.total+=v;if(s==='recebido')o.received+=v;else if(s==='nao_recebido')o.pending+=v;else o.analysis+=v;return o},{total:0,pending:0,received:0,analysis:0});
-      const W=doc.internal.pageSize.getWidth();
-      const H=doc.internal.pageSize.getHeight();
-      const left=14,right=14,contentW=W-left-right;
-      const navy=[38,54,63],orange=[242,112,46],red=[190,54,48],green=[54,143,75],amber=[210,147,28];
 
-      doc.setFillColor(...navy);doc.rect(0,0,W,24,'F');
-      doc.setFillColor(...orange);doc.rect(0,24,W,2.2,'F');
-      doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text('BRCONDOS',left,10.5);
-      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text('Financeiro',left,16.2);
-      doc.setFont('helvetica','bold');doc.setFontSize(14);doc.text('RELATÓRIO DE REEMBOLSOS',W-right,11,{align:'right'});
-      doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`,W-right,16.5,{align:'right'});
+    const f=filterDescription();
+    const sums=summary(items);
+    const reportWindow=window.open('','_blank');
+    if(!reportWindow)return alert('O navegador bloqueou a abertura do relatório. Libere pop-ups para este site e tente novamente.');
 
-      doc.setFillColor(247,249,250);doc.setDrawColor(225,230,233);doc.roundedRect(left,31,contentW,15,2,2,'FD');
-      const fw=contentW/3;
-      [['STATUS',f.status],['CLIENTE / REEMBOLSÁVEL POR',f.client],['PERÍODO',f.period]].forEach((pair,i)=>{
-        const x=left+i*fw+5;
-        doc.setTextColor(116,129,137);doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.text(pair[0],x,36);
-        doc.setTextColor(...navy);doc.setFontSize(8.5);doc.text(String(pair[1]||'-'),x,41.3,{maxWidth:fw-10});
-      });
+    const rows=items.map(item=>`
+      <tr>
+        <td class="date">${esc(fmtDate(item?.date||''))}</td>
+        <td>${esc(item?.description||'')}</td>
+        <td class="received">${esc(statusText(item))}</td>
+        <td>${esc(item?.reimbursableBy||'')}</td>
+        <td>${esc(item?.supplier||'')}</td>
+        <td class="amount">${esc(fmtMoney(item?.value||0))}</td>
+      </tr>`).join('');
 
-      const gap=4,cardW=(contentW-gap*3)/4,cardY=51;
-      drawKpi(doc,left,cardY,cardW,'Total',fmtMoney(sums.total),navy);
-      drawKpi(doc,left+(cardW+gap),cardY,cardW,'A receber',fmtMoney(sums.pending),red);
-      drawKpi(doc,left+(cardW+gap)*2,cardY,cardW,'Recebido',fmtMoney(sums.received),green);
-      drawKpi(doc,left+(cardW+gap)*3,cardY,cardW,'Em análise',fmtMoney(sums.analysis),amber);
+    const html=`<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório de Reembolsos</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#fff;color:#1b303b;font-family:Arial,Helvetica,sans-serif}
+  body{font-size:12px}
+  .report{width:100%;max-width:1240px;margin:0 auto;padding:42px 22px 30px}
+  .header{display:flex;align-items:flex-start;justify-content:space-between;gap:28px;min-height:112px}
+  .header-copy{padding-top:13px}
+  h1{margin:0 0 6px;font-size:25px;line-height:1.15;font-weight:700;color:#172f3b}
+  .subtitle{font-size:11px;color:#60727d}
+  .logo{display:block;width:132px;height:108px;object-fit:contain;object-position:right top}
+  .orange-line{height:3px;background:#f36f32;margin:5px 0 18px}
+  .filter-strip{border:1px solid #d8e0e4;background:#f5f7f8;border-radius:7px;padding:10px 13px;margin-bottom:16px;color:#41535e;font-size:11px;line-height:1.3}
+  .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
+  .card{min-height:62px;background:#fff;border:1px solid #d5dde1;border-radius:9px;padding:12px 14px}
+  .card-label{font-size:10px;line-height:1;text-transform:uppercase;color:#657883;margin-bottom:6px}
+  .card-value{font-size:18px;line-height:1.1;font-weight:700;color:#152d39;white-space:nowrap}
+  .table-wrap{width:100%;overflow:visible}
+  table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9.6px;color:#213640}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  th{background:#e8edf0;color:#334852;font-weight:700;text-align:left;border:1px solid #d3dce0;padding:8px 9px;line-height:1.2}
+  td{border:1px solid #dfe5e8;padding:7px 9px;vertical-align:top;line-height:1.28;overflow-wrap:anywhere}
+  tbody tr:nth-child(even) td{background:#fbfcfc}
+  th:nth-child(1),td:nth-child(1){width:10%}
+  th:nth-child(2),td:nth-child(2){width:24%}
+  th:nth-child(3),td:nth-child(3){width:13%}
+  th:nth-child(4),td:nth-child(4){width:18%}
+  th:nth-child(5),td:nth-child(5){width:25%}
+  th:nth-child(6),td:nth-child(6){width:10%}
+  .date,.received{white-space:nowrap}
+  .amount{text-align:right;white-space:nowrap;font-weight:700}
+  .footer-note{margin-top:10px;font-size:9px;color:#788992;text-align:right}
+  @media print{
+    @page{size:A4 landscape;margin:10mm}
+    html,body{width:auto}
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .report{max-width:none;padding:0}
+    .header{min-height:88px}
+    .header-copy{padding-top:8px}
+    .logo{width:112px;height:82px}
+    h1{font-size:21px}
+    .cards{gap:8px;margin-bottom:15px}
+    .card{min-height:54px;padding:10px 12px}
+    .card-value{font-size:16px}
+    table{font-size:8.7px}
+    th{padding:6px 7px}
+    td{padding:5px 7px}
+  }
+</style>
+</head>
+<body>
+  <main class="report">
+    <header class="header">
+      <div class="header-copy">
+        <h1>Relatório de Reembolsos</h1>
+        <div class="subtitle">BRCONDOS • Financeiro - Sjrp</div>
+      </div>
+      <img class="logo" src="${LOGO_URL}" alt="BRCONDOS">
+    </header>
+    <div class="orange-line"></div>
+    <div class="filter-strip">${esc(filterStripText(f))}</div>
+    <section class="cards">
+      <div class="card"><div class="card-label">Total</div><div class="card-value">${esc(fmtMoney(sums.total))}</div></div>
+      <div class="card"><div class="card-label">A receber</div><div class="card-value">${esc(fmtMoney(sums.pending))}</div></div>
+      <div class="card"><div class="card-label">Recebido</div><div class="card-value">${esc(fmtMoney(sums.received))}</div></div>
+      <div class="card"><div class="card-label">Em análise</div><div class="card-value">${esc(fmtMoney(sums.analysis))}</div></div>
+    </section>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Descrição</th><th>Recebido em</th><th>Reembolsável por</th><th>Fornecedor</th><th>Valor</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="footer-note">${items.length} registro(s)</div>
+  </main>
+</body>
+</html>`;
 
-      doc.setTextColor(112,126,135);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(`${items.length} registro(s) encontrado(s)`,left,72);
-
-      doc.autoTable({
-        startY:76,
-        margin:{left,right,bottom:16},
-        head:[['Data','Descrição','Recebido em','Reembolsável por','Fornecedor','Valor']],
-        body:items.map(x=>[fmtDate(x?.date||''),x?.description||'',statusText(x),x?.reimbursableBy||'',x?.supplier||'',fmtMoney(x?.value||0)]),
-        theme:'plain',
-        styles:{font:'helvetica',fontSize:7.2,cellPadding:{top:3,bottom:3,left:2.5,right:2.5},textColor:[50,64,72],lineColor:[228,232,235],lineWidth:{bottom:.15},overflow:'linebreak',valign:'middle'},
-        headStyles:{fillColor:navy,textColor:[255,255,255],fontStyle:'bold',fontSize:7.3,cellPadding:{top:3.2,bottom:3.2,left:2.5,right:2.5}},
-        alternateRowStyles:{fillColor:[248,249,250]},
-        columnStyles:{0:{cellWidth:22},1:{cellWidth:60},2:{cellWidth:30},3:{cellWidth:45},4:{cellWidth:80},5:{cellWidth:32,halign:'right',fontStyle:'bold'}},
-        didParseCell:function(data){
-          if(data.section==='body'&&data.column.index===2){
-            const item=items[data.row.index],st=statusValue(item);
-            if(st==='recebido')data.cell.styles.textColor=green;
-            else if(st==='nao_recebido')data.cell.styles.textColor=red;
-            else data.cell.styles.textColor=amber;
-            data.cell.styles.fontStyle='bold';
-          }
-        },
-        didDrawPage:function(){
-          doc.setDrawColor(...orange);doc.setLineWidth(.5);doc.line(left,H-10,W-right,H-10);
-          doc.setTextColor(132,143,150);doc.setFont('helvetica','normal');doc.setFontSize(6.5);
-          doc.text('BRCONDOS • Relatório de Reembolsos',left,H-6);
-          doc.text(`Página ${doc.internal.getNumberOfPages()}`,W-right,H-6,{align:'right'});
-        }
-      });
-
-      doc.save(`BRCONDOS_Reembolsos_${new Date().toISOString().slice(0,10)}.pdf`);
-      if(typeof closeModal==='function')closeModal();
-    }catch(err){console.error('BRCONDOS REEMBOLSOS PDF FIX:',err);alert('Não foi possível gerar o PDF agora.');}
+    reportWindow.onload=()=>setTimeout(()=>{try{reportWindow.focus();reportWindow.print()}catch(_){}},450);
+    reportWindow.document.open();
+    reportWindow.document.write(html);
+    reportWindow.document.close();
+    if(typeof closeModal==='function')closeModal();
   };
 })();
