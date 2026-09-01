@@ -1,6 +1,13 @@
 (function(){
   let isAccounting=false;
 
+  const norm=v=>String(v||'')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase()
+    .replace(/\s+/g,' ')
+    .trim();
+
   window.brContabDownloadAllDocs=function(){
     if(typeof window.brDownloadAllPayablesDocs==='function'){
       return window.brDownloadAllPayablesDocs();
@@ -30,8 +37,33 @@
     btn.setAttribute('onclick','brContabDownloadAllDocs()');
   }
 
+  function revealAuthorizedTabs(){
+    if(!isAccounting)return;
+
+    document.querySelectorAll('#app button,#app a,#app [role="button"]').forEach(el=>{
+      const text=norm(el.textContent);
+      if(!text)return;
+
+      const allowed=
+        text==='reembolsos' ||
+        text.includes('reembols') ||
+        text==='inadimplencias' ||
+        text.includes('inadimpl');
+
+      if(!allowed)return;
+
+      el.style.display='';
+      el.dataset.brContabilidadeAllowed='1';
+    });
+  }
+
+  function refreshAccountingAccess(){
+    unlock();
+    revealAuthorizedTabs();
+  }
+
   function scheduleUnlocks(){
-    [0,80,250,700,1500].forEach(ms=>setTimeout(unlock,ms));
+    [0,80,250,700,1500].forEach(ms=>setTimeout(refreshAccountingAccess,ms));
   }
 
   async function boot(){
@@ -46,13 +78,14 @@
 
     scheduleUnlocks();
 
-    // Sem MutationObserver permanente: reaplica apenas após interação do usuário,
-    // quando a tela de Contas a Pagar pode ter sido redesenhada.
     document.addEventListener('click',()=>{
-      setTimeout(unlock,0);
-      setTimeout(unlock,120);
+      setTimeout(refreshAccountingAccess,0);
+      setTimeout(refreshAccountingAccess,120);
     },true);
-    document.addEventListener('change',()=>setTimeout(unlock,0),true);
+    document.addEventListener('change',()=>setTimeout(refreshAccountingAccess,0),true);
+
+    const observer=new MutationObserver(()=>setTimeout(revealAuthorizedTabs,0));
+    observer.observe(document.getElementById('app')||document.documentElement,{childList:true,subtree:true});
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
