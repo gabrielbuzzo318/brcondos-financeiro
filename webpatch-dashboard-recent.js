@@ -42,6 +42,12 @@
     </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhuma movimentação nos últimos 15 dias.</td></tr>`;
   }
 
+  function rowsSignature(rows){
+    return rows.map(x=>[
+      x?.id??'',x?.date??'',x?.description??'',x?.party??'',x?.status??'',x?.type??'',Number(x?.value||0)
+    ].join('|')).join('||');
+  }
+
   function ensureStyles(){
     if(document.getElementById('br-dashboard-recent-style'))return;
     const s=document.createElement('style');
@@ -62,6 +68,7 @@
   function buildCard(period,rows){
     const card=document.createElement('div');
     card.className='br-recent-card';
+    const signature=rowsSignature(rows);
     card.innerHTML=`
       <div class="br-recent-head">
         <div><h3>Movimentações recentes</h3><span>Movimentações dos últimos 15 dias • ${displayDate(period.start)} a ${displayDate(period.end)}</span></div>
@@ -70,7 +77,7 @@
       <div class="table-wrap">
         <table>
           <thead><tr><th>Data</th><th>Descrição</th><th>Cliente / Fornecedor</th><th>Status</th><th>Valor</th></tr></thead>
-          <tbody data-br-recent-period="${period.start}|${period.end}">${rowsHtml(rows)}</tbody>
+          <tbody data-br-recent-period="${period.start}|${period.end}" data-br-recent-signature="${esc(signature)}">${rowsHtml(rows)}</tbody>
         </table>
       </div>`;
     return card;
@@ -82,7 +89,8 @@
     ensureStyles();
     root.querySelector('.br-recent-card')?.remove();
     const period=currentWindow();
-    const card=buildCard(period,recentRows(period));
+    const rows=recentRows(period);
+    const card=buildCard(period,rows);
     const dashboardPanel=root.querySelector('.br-dash-bottom');
     if(dashboardPanel)dashboardPanel.insertAdjacentElement('afterend',card);else root.appendChild(card);
   }
@@ -96,10 +104,18 @@
     const span=card.querySelector('.br-recent-head span');
     const desired=`Movimentações dos últimos 15 dias • ${displayDate(period.start)} a ${displayDate(period.end)}`;
     if(span&&span.textContent!==desired)span.textContent=desired;
+
+    const rows=recentRows(period);
+    const signature=rowsSignature(rows);
     const body=card.querySelector('tbody');
-    if(body&&body.dataset.brRecentPeriod!==periodKey){
-      body.innerHTML=rowsHtml(recentRows(period));
-      body.dataset.brRecentPeriod=periodKey;
+    if(body){
+      const expectedHtml=rowsHtml(rows);
+      const bodyWasOverwritten=body.dataset.brRecentPeriod!==periodKey||body.dataset.brRecentSignature!==signature||body.innerHTML.trim()!==expectedHtml.trim();
+      if(bodyWasOverwritten){
+        body.innerHTML=expectedHtml;
+        body.dataset.brRecentPeriod=periodKey;
+        body.dataset.brRecentSignature=signature;
+      }
     }
   }
 
