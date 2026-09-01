@@ -11,6 +11,15 @@
     if(!isAccounting)return;
     const btn=document.getElementById('ap_download_all_btn');
     if(!btn)return;
+
+    const alreadyReady=
+      btn.disabled===false &&
+      btn.getAttribute('onclick')==='brContabDownloadAllDocs()' &&
+      !btn.hasAttribute('data-br-read-only') &&
+      !btn.dataset.brReadOnly;
+
+    if(alreadyReady)return;
+
     btn.disabled=false;
     btn.removeAttribute('disabled');
     btn.style.opacity='';
@@ -30,11 +39,15 @@
       isAccounting=false;
     }
     if(!isAccounting)return;
+
     unlock();
     setTimeout(unlock,100);
     setTimeout(unlock,500);
-    const obs=new MutationObserver(unlock);
-    obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','onclick','style']});
+
+    // Observa apenas criação/remoção de elementos. Não observa atributos,
+    // pois unlock() altera atributos do próprio botão e isso gerava loop infinito.
+    const obs=new MutationObserver(()=>unlock());
+    obs.observe(document.documentElement,{childList:true,subtree:true});
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
