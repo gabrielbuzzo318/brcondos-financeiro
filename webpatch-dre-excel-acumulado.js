@@ -1,11 +1,15 @@
 (function(){
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
-  const XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  const XLSX_SRC='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
   const INVESTMENTS=['Imóvel','Capital Social - Sicredi','Aplicações Financeiras'];
 
   function txList(){
     try{if(typeof transactions!=='undefined'&&Array.isArray(transactions))return transactions;}catch(_){ }
     return Array.isArray(window.transactions)?window.transactions:[];
+  }
+  function chartAccountList(){
+    try{if(typeof chartAccounts!=='undefined'&&Array.isArray(chartAccounts))return chartAccounts;}catch(_){ }
+    return Array.isArray(window.chartAccounts)?window.chartAccounts:[];
   }
   function investmentName(category){
     const n=norm(category);
@@ -140,13 +144,35 @@
     cols[accumulatedCol]={wch:16};cols[percentageCol]={wch:15};ws['!cols']=cols;
   }
 
+  function boldGroupRows(XLSX,workbook){
+    const groups=new Set(['investimentos']);
+    chartAccountList().forEach(a=>{const group=norm(a?.group);if(group)groups.add(group);});
+    ['DRE Consolidada','% Receita'].forEach(sheetName=>{
+      const ws=workbook?.Sheets?.[sheetName];
+      if(!ws?.['!ref'])return;
+      const range=XLSX.utils.decode_range(ws['!ref']);
+      for(let r=0;r<=range.e.r;r++){
+        const label=String(ws[XLSX.utils.encode_cell({r,c:0})]?.v||'').trim();
+        if(!groups.has(norm(label)))continue;
+        for(let c=0;c<=range.e.c;c++){
+          const cell=ws[XLSX.utils.encode_cell({r,c})];
+          if(!cell)continue;
+          const style=cell.s&&typeof cell.s==='object'?cell.s:{};
+          const font=style.font&&typeof style.font==='object'?style.font:{};
+          cell.s={...style,font:{...font,bold:true}};
+        }
+      }
+    });
+  }
+
   function enhanceWorkbook(XLSX,workbook,filename){
     appendInvestments(XLSX,workbook,filename);
     addAccumulatedColumns(XLSX,workbook,filename);
+    boldGroupRows(XLSX,workbook);
   }
   function wrapXlsx(){
     const XLSX=window.XLSX;
-    if(!XLSX||typeof XLSX.writeFile!=='function')return false;
+    if(!XLSX||!XLSX.style_version||typeof XLSX.writeFile!=='function')return false;
     if(XLSX.writeFile.__brDreAccumulated===true)return true;
     const original=XLSX.writeFile;
     const wrapped=function(workbook,filename){
@@ -158,14 +184,14 @@
   function ensureXlsxWrapped(){
     if(wrapXlsx())return Promise.resolve(window.XLSX);
     return new Promise((resolve,reject)=>{
-      let script=document.querySelector('script[data-br-xlsx="1"]');
-      const finish=()=>wrapXlsx()?resolve(window.XLSX):reject(new Error('XLSX indisponível'));
+      let script=document.querySelector('script[data-br-xlsx-style="1"]');
+      const finish=()=>wrapXlsx()?resolve(window.XLSX):reject(new Error('XLSX com estilos indisponível'));
       if(script){
-        if(window.XLSX)return finish();
-        script.addEventListener('load',finish,{once:true});script.addEventListener('error',()=>reject(new Error('Falha ao carregar XLSX')),{once:true});return;
+        if(window.XLSX?.style_version)return finish();
+        script.addEventListener('load',finish,{once:true});script.addEventListener('error',()=>reject(new Error('Falha ao carregar XLSX com estilos')),{once:true});return;
       }
-      script=document.createElement('script');script.src=XLSX_SRC;script.async=true;script.dataset.brXlsx='1';
-      script.addEventListener('load',finish,{once:true});script.addEventListener('error',()=>reject(new Error('Falha ao carregar XLSX')),{once:true});document.head.appendChild(script);
+      script=document.createElement('script');script.src=XLSX_SRC;script.async=true;script.dataset.brXlsx='1';script.dataset.brXlsxStyle='1';
+      script.addEventListener('load',finish,{once:true});script.addEventListener('error',()=>reject(new Error('Falha ao carregar XLSX com estilos')),{once:true});document.head.appendChild(script);
     });
   }
   function protectExportFunctions(){
@@ -181,5 +207,6 @@
     }
   }
   wrapXlsx();protectExportFunctions();
+  ensureXlsxWrapped().catch(()=>{});
   new MutationObserver(()=>{wrapXlsx();protectExportFunctions();}).observe(document.documentElement,{childList:true,subtree:true});
 })();
