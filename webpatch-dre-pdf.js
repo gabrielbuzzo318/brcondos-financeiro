@@ -1,6 +1,7 @@
 (function(){
   const CLOSING_KEY='brcondos_dre_closures_v1';
   const monthNames=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 
   function periodLabel(prefix){
     const [y,m]=String(prefix||'').split('-').map(Number);
@@ -19,6 +20,15 @@
     }catch(_){return false;}
   }
   function clean(v){return String(v||'').replace(/\s+/g,' ').trim();}
+  function accountGroups(){
+    const set=new Set(['investimentos']);
+    try{
+      const list=typeof chartAccounts!=='undefined'&&Array.isArray(chartAccounts)?chartAccounts:(Array.isArray(window.chartAccounts)?window.chartAccounts:[]);
+      list.forEach(a=>{const g=norm(a?.group);if(g)set.add(g);});
+    }catch(_){ }
+    return set;
+  }
+  function isGroupLabel(label){return accountGroups().has(norm(label));}
 
   function ensureStyle(){
     if(document.getElementById('dre-pdf-style'))return;
@@ -70,7 +80,7 @@
       const previous=clean(el.querySelector('.dre-compare-prev')?.textContent);
       const current=clean(el.querySelector('.dre-compare-current')?.textContent);
       rows.push({
-        kind:el.classList.contains('result')?'result':el.classList.contains('total')?'total':'row',
+        kind:el.classList.contains('result')?'result':el.classList.contains('total')?'total':isGroupLabel(label)?'group':'row',
         label,previous,current,
         percentage:clean(el.querySelector('.dre-percent-current')?.textContent)
       });
