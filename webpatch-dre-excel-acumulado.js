@@ -1,5 +1,6 @@
 (function(){
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
   function addAccumulatedColumns(XLSX,workbook,filename){
     if(!/^DRE_BRCONDOS_/i.test(String(filename||'')))return;
@@ -40,7 +41,7 @@
       rowTotals.set(r,total);
 
       const n=norm(label);
-      if(revenueRow<0&&n.includes('receita operacional'))revenueRow=r;
+      if(revenueRow<0&&(n==='(+) receita operacional'||n.includes('receita operacional')))revenueRow=r;
     }
 
     const revenueAccumulated=revenueRow>=0?Number(rowTotals.get(revenueRow)||0):0;
@@ -68,27 +69,72 @@
     if(!XLSX||typeof XLSX.writeFile!=='function')return false;
     if(XLSX.writeFile.__brDreAccumulated===true)return true;
 
-    const original=XLSX.writeFile.bind(XLSX);
+    const original=XLSX.writeFile;
     const wrapped=function(workbook,filename){
       try{addAccumulatedColumns(XLSX,workbook,filename);}catch(err){console.error('DRE EXCEL ACUMULADO:',err);}
-      return original.apply(null,arguments);
+      return original.apply(XLSX,arguments);
     };
     wrapped.__brDreAccumulated=true;
+    wrapped.__brDreAccumulatedOriginal=original;
     XLSX.writeFile=wrapped;
     return true;
   }
 
-  function hookXlsxScript(){
-    const script=document.querySelector('script[data-br-xlsx="1"]');
-    if(!script||script.dataset.brDreAccumulatedHook==='1')return;
-    script.dataset.brDreAccumulatedHook='1';
-    script.addEventListener('load',()=>setTimeout(wrapXlsx,0),{once:true});
+  function ensureXlsxWrapped(){
+    if(wrapXlsx())return Promise.resolve(window.XLSX);
+
+    return new Promise((resolve,reject)=>{
+      let script=document.querySelector('script[data-br-xlsx="1"]');
+      const finish=()=>{
+        if(wrapXlsx())resolve(window.XLSX);
+        else reject(new Error('XLSX indisponível'));
+      };
+
+      if(script){
+        if(window.XLSX)return finish();
+        script.addEventListener('load',finish,{once:true});
+        script.addEventListener('error',()=>reject(new Error('Falha ao carregar XLSX')),{once:true});
+        return;
+      }
+
+      script=document.createElement('script');
+      script.src=XLSX_SRC;
+      script.async=true;
+      script.dataset.brXlsx='1';
+      script.addEventListener('load',finish,{once:true});
+      script.addEventListener('error',()=>reject(new Error('Falha ao carregar XLSX')),{once:true});
+      document.head.appendChild(script);
+    });
+  }
+
+  function protectExportFunctions(){
+    const oldLast12=window.brExportDreExcelLast12;
+    if(typeof oldLast12==='function'&&!oldLast12.__brAccumulatedProtected){
+      const wrappedLast12=function(){
+        const args=arguments;
+        return ensureXlsxWrapped().then(()=>oldLast12.apply(this,args)).catch(e=>alert(e?.message||'Não foi possível gerar o Excel da DRE.'));
+      };
+      wrappedLast12.__brAccumulatedProtected=true;
+      window.brExportDreExcelLast12=wrappedLast12;
+    }
+
+    const oldYear=window.brExportDreExcelYear;
+    if(typeof oldYear==='function'&&!oldYear.__brAccumulatedProtected){
+      const wrappedYear=function(){
+        const args=arguments;
+        return ensureXlsxWrapped().then(()=>oldYear.apply(this,args)).catch(e=>alert(e?.message||'Não foi possível gerar o Excel da DRE.'));
+      };
+      wrappedYear.__brAccumulatedProtected=true;
+      window.brExportDreExcelYear=wrappedYear;
+    }
   }
 
   wrapXlsx();
-  hookXlsxScript();
+  protectExportFunctions();
+
   const observer=new MutationObserver(()=>{
-    if(!wrapXlsx())hookXlsxScript();
+    wrapXlsx();
+    protectExportFunctions();
   });
   observer.observe(document.documentElement,{childList:true,subtree:true});
 })();
