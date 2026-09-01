@@ -1,17 +1,147 @@
 (function(){
-const n=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
-const e=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const list=()=>{try{if(typeof reimbursements!=='undefined'&&Array.isArray(reimbursements))return reimbursements}catch(_){ }return Array.isArray(window.reimbursements)?window.reimbursements:[]};
-function idOf(tr){const b=[...tr.querySelectorAll('button')].find(x=>/openReimbursement\(/.test(x.getAttribute('onclick')||''));const m=(b?.getAttribute('onclick')||'').match(/openReimbursement\((\d+)\)/);return m?+m[1]:null}
-function idx(h,tests){for(const t of tests){const i=h.findIndex(t);if(i>=0)return i}return-1}
-function isoTxt(v){const s=String(v||'').trim();let m=s.match(/(\d{2})\/(\d{2})\/(\d{4})/);return m?`${m[3]}-${m[2]}-${m[1]}`:/^\d{4}-\d{2}-\d{2}$/.test(s)?s:''}
-function br(v){const s=String(v||'');if(typeof formatDate==='function'&&/^\d{4}-\d{2}-\d{2}$/.test(s))return formatDate(s);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:s}
-function recv(r,visual){if(r?.receivedDate)return br(r.receivedDate);const s=n(r?.status||visual);if(s.includes('analise'))return'Em análise';if(s.startsWith('recebido'))return'Recebido';return'Não recebido'}
-function cls(t){const s=n(t);if(/^\d{2}\/\d{2}\/\d{4}$/.test(t)||s==='recebido')return'received';if(s.includes('analise'))return'analysis';return'pending'}
-function val(r,old){const x=Number(r?.value);if(Number.isFinite(x)){const f=typeof money==='function'?money(Math.abs(x)):Math.abs(x).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});return`- ${f}`}return String(old||'').trim()}
-function css(){if(document.getElementById('br-rs'))return;const s=document.createElement('style');s.id='br-rs';s.textContent=`#view-reembolsos .filter-bar:has(#reimb_search){display:none!important}#view-reembolsos .br-rwrap{overflow:auto;max-height:68vh;border:1px solid #d9e1e5;border-radius:10px;background:#fff}#view-reembolsos .br-rtable{width:100%;min-width:1180px;border-collapse:separate;border-spacing:0;font-size:12px}#view-reembolsos .br-rtable th{position:sticky;z-index:4;background:#f6f8f9;border-bottom:1px solid #dde4e8;padding:7px;text-align:left;white-space:nowrap}#view-reembolsos .br-rtable thead tr:first-child th{top:0;font-weight:800}#view-reembolsos .br-rfilters th{top:32px;background:#fff;padding:4px 6px}#view-reembolsos .br-rf{width:100%;height:25px;border:1px solid #d8e0e4;border-radius:5px;padding:2px 5px;font-size:10px;background:#fff}#view-reembolsos .br-rsort{border:0;background:transparent;font:inherit;font-weight:800;color:inherit;cursor:pointer;width:100%;text-align:left}#view-reembolsos .br-rsort:after{content:' ↕';font-size:9px;color:#8a969d}#view-reembolsos .br-rtable td{padding:7px 8px;border-bottom:1px solid #edf0f2;vertical-align:middle}#view-reembolsos .br-rtable tbody tr:hover td{background:#f7fafb}#view-reembolsos .br-rtable tr.br-rec td{background:#f1f6e9}#view-reembolsos .br-rtable tr.br-ana td{background:#fffaf0}#view-reembolsos .br-rval{text-align:right!important;color:#b42318;font-weight:700;white-space:nowrap}#view-reembolsos .br-rstatus{font-weight:700}#view-reembolsos .br-rec .br-rstatus{color:#49642f}#view-reembolsos .br-ana .br-rstatus{color:#8a6500}#view-reembolsos .br-ract{min-width:150px;white-space:nowrap}#view-reembolsos .br-rcount{font-size:11px;color:#74818a;margin:7px 2px}`;document.head.appendChild(s)}
-function mount(){const v=document.getElementById('view-reembolsos');if(!v)return;css();const table=v.querySelector('.table-wrap table,table');if(!table||table.dataset.brSheet==='1')return;const heads=[...table.querySelectorAll('thead th')].map(x=>n(x.textContent));if(!heads.length)return;const I={d:idx(heads,[x=>x.includes('data paga'),x=>x==='data']),ds:idx(heads,[x=>x.includes('descricao')]),rb:idx(heads,[x=>x.includes('reembolsado por'),x=>x.includes('reembolsavel por'),x=>x.includes('quem reembolsa')]),cl:idx(heads,[x=>x.includes('favorecido'),x=>x.includes('cliente')||x.includes('fornecedor'),x=>x.includes('pago por')]),vl:idx(heads,[x=>x.includes('valor')]),st:idx(heads,[x=>x.includes('status')]),ac:idx(heads,[x=>x.includes('acoes')||x.includes('acao')])};const rows=[];[...table.querySelectorAll('tbody tr')].forEach(tr=>{if(tr.querySelector('.empty'))return;const id=idOf(tr);if(id==null)return;const c=[...tr.children],r=list().find(x=>+x?.id===id)||{},rt=recv(r,I.st>=0?c[I.st]?.textContent:''),rc=cls(rt),dt=I.d>=0?(c[I.d]?.textContent||'').trim():br(r?.date||r?.paidDate||''),dh=I.ds>=0?c[I.ds]?.innerHTML:e(r?.description||'-'),rh=I.rb>=0?c[I.rb]?.innerHTML:e(r?.reimbursedBy||'-'),ch=I.cl>=0?c[I.cl]?.innerHTML:e(r?.supplier||r?.party||r?.paidBy||'-'),vh=val(r,I.vl>=0?c[I.vl]?.textContent:''),ah=I.ac>=0?c[I.ac]?.innerHTML:(tr.querySelector('.actions')?.outerHTML||`<div class="actions"><button class="btn small" onclick="openReimbursement(${id})">Editar</button></div>`);rows.push({id,r,rt,rc,dt,dh,rh,ch,vh,ah,v:+r?.value||0})});const w=table.closest('.table-wrap');if(w){w.classList.remove('table-wrap');w.classList.add('br-rwrap')}table.dataset.brSheet='1';table.className='br-rtable';table.innerHTML=`<thead><tr><th><button class="br-rsort" onclick="brRSort(0)">Data</button></th><th><button class="br-rsort" onclick="brRSort(1)">Tipo</button></th><th><button class="br-rsort" onclick="brRSort(2)">Descrição</button></th><th><button class="br-rsort" onclick="brRSort(3)">Recebido em</button></th><th><button class="br-rsort" onclick="brRSort(4)">Reembolsável por</button></th><th><button class="br-rsort" onclick="brRSort(5)">Cliente / Fornecedor</button></th><th><button class="br-rsort" onclick="brRSort(6)">Valor</button></th><th>Ações</th></tr><tr class="br-rfilters"><th><input class="br-rf" data-c="0" placeholder="Data" oninput="brRFilter()"></th><th><select class="br-rf" data-c="1" onchange="brRFilter()"><option value="">Todos</option><option>Saída</option></select></th><th><input class="br-rf" data-c="2" placeholder="Descrição" oninput="brRFilter()"></th><th><select class="br-rf" data-c="3" onchange="brRFilter()"><option value="">Todos</option><option value="recebido">Recebido</option><option value="em analise">Em análise</option><option value="nao recebido">Não recebido</option></select></th><th><input class="br-rf" data-c="4" placeholder="Reembolsável por" oninput="brRFilter()"></th><th><input class="br-rf" data-c="5" placeholder="Cliente / Fornecedor" oninput="brRFilter()"></th><th><input class="br-rf" data-c="6" placeholder="Valor" oninput="brRFilter()"></th><th></th></tr></thead><tbody>${rows.map(x=>`<tr data-rid="${x.id}" data-d="${isoTxt(x.dt)}" data-v="${x.v}" class="${x.rc==='received'?'br-rec':x.rc==='analysis'?'br-ana':''}"><td>${e(x.dt||'-')}</td><td>Saída</td><td>${x.dh}</td><td class="br-rstatus">${e(x.rt)}</td><td>${x.rh}</td><td>${x.ch}</td><td class="br-rval">${e(x.vh)}</td><td class="br-ract">${x.ah}</td></tr>`).join('')}</tbody>`;let ct=v.querySelector('.br-rcount');if(!ct){ct=document.createElement('div');ct.className='br-rcount';table.parentElement?.insertAdjacentElement('beforebegin',ct)}brRFilter()}
-window.brRFilter=function(){const v=document.getElementById('view-reembolsos'),t=v?.querySelector('.br-rtable');if(!t)return;const f=[...t.querySelectorAll('.br-rf')].map(x=>({c:+x.dataset.c,q:n(x.value)})),rs=[...t.querySelectorAll('tbody tr[data-rid]')];let k=0;rs.forEach(r=>{let ok=true;for(const x of f){if(!x.q)continue;if(x.c===3&&x.q==='recebido'){ok=r.classList.contains('br-rec')}else ok=n(r.children[x.c]?.textContent).includes(x.q);if(!ok)break}r.style.display=ok?'':'none';if(ok)k++});const c=v.querySelector('.br-rcount');if(c)c.textContent=`${k} de ${rs.length} reembolso(s)`};
-let S={c:-1,d:1};window.brRSort=function(c){const t=document.querySelector('#view-reembolsos .br-rtable');if(!t)return;S.d=S.c===c?-S.d:1;S.c=c;const b=t.tBodies[0],rs=[...b.querySelectorAll('tr[data-rid]')];rs.sort((a,z)=>{let x,y;if(c===0){x=a.dataset.d;y=z.dataset.d}else if(c===6){x=+a.dataset.v;y=+z.dataset.v}else{x=n(a.children[c]?.textContent);y=n(z.children[c]?.textContent)}return(x>y?1:x<y?-1:0)*S.d}).forEach(r=>b.appendChild(r))};
-const old=window.renderReimbursements;if(typeof old==='function')window.renderReimbursements=function(){const o=old.apply(this,arguments);setTimeout(mount,30);return o};const sh=window.showView;if(typeof sh==='function')window.showView=function(v,b){const o=sh.apply(this,arguments);if(v==='reembolsos')setTimeout(mount,60);return o};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(mount,250),{once:true});else setTimeout(mount,250);
+  const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const brDate=v=>{const s=String(v||'').trim();const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:s};
+  const todayIso=()=>{try{return typeof today==='function'?today():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const list=()=>{try{if(typeof reimbursements!=='undefined'&&Array.isArray(reimbursements))return reimbursements}catch(_){ }return Array.isArray(window.reimbursements)?window.reimbursements:[]};
+  const txList=()=>{try{if(typeof transactions!=='undefined'&&Array.isArray(transactions))return transactions}catch(_){ }return Array.isArray(window.transactions)?window.transactions:[]};
+  const moneyText=v=>{const n=Math.abs(Number(v||0));try{return typeof money==='function'?money(n):n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}catch(_){return`R$ ${n.toFixed(2).replace('.',',')}`}};
+  const statusKey=r=>{if(String(r?.receivedDate||'').trim()||norm(r?.status)==='recebido')return'recebido';const s=norm(r?.status);if(s.includes('analise'))return'analise';return'nao_recebido'};
+  const statusLabel=k=>k==='analise'?'Em análise':k==='recebido'?'Recebido':'Não recebido';
+
+  function ensureStyle(){
+    if(document.getElementById('br-reimb-clean-style'))return;
+    const s=document.createElement('style');s.id='br-reimb-clean-style';s.textContent=`
+      #view-reembolsos .br-reimb-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px;padding:10px 12px;border:1px solid #e3e8eb;border-radius:10px;background:#fff}
+      #view-reembolsos .br-reimb-search{flex:1;min-width:260px;max-width:560px;height:36px;border:1px solid #d8e0e5;border-radius:8px;padding:0 11px;font-size:12px;outline:none;background:#fff}
+      #view-reembolsos .br-reimb-filter{height:36px;border:1px solid #d8e0e5;border-radius:8px;padding:0 30px 0 10px;font-size:12px;background:#fff;color:#33424c}
+      #view-reembolsos .br-reimb-count{margin-left:auto;font-size:11px;color:#77858e;white-space:nowrap}
+      #view-reembolsos .br-reimb-wrap{overflow:auto;max-height:68vh;border:1px solid #e1e6e9;border-radius:10px;background:#fff}
+      #view-reembolsos .br-reimb-table{width:100%;min-width:1120px;border-collapse:separate;border-spacing:0;font-size:12px}
+      #view-reembolsos .br-reimb-table thead th{position:sticky;top:0;z-index:3;background:#f7f9fa;color:#52616b;border-bottom:1px solid #e1e6e9;padding:10px 10px;text-align:left;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+      #view-reembolsos .br-reimb-table tbody td{padding:10px;border-bottom:1px solid #edf0f2;vertical-align:middle;color:#25343c;background:#fff}
+      #view-reembolsos .br-reimb-table tbody tr:last-child td{border-bottom:0}
+      #view-reembolsos .br-reimb-table tbody tr:hover td{background:#fafbfc}
+      #view-reembolsos .br-reimb-type{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;background:#f1f3f5;color:#5b6770;font-size:10px;font-weight:700}
+      #view-reembolsos .br-reimb-status-select{height:30px;min-width:126px;border:1px solid transparent;border-radius:7px;padding:0 26px 0 7px;background:#fff;font-size:11px;font-weight:700;outline:none;cursor:pointer}
+      #view-reembolsos .br-reimb-status-select.st-nao{color:#c62828;border-color:#f1caca;background:#fffafa}
+      #view-reembolsos .br-reimb-status-select.st-analise{color:#946200;border-color:#f1dfb5;background:#fffdf6}
+      #view-reembolsos .br-reimb-status-select.st-recebido{color:#33424c;border-color:#dfe5e8;background:#fff}
+      #view-reembolsos .br-reimb-value{text-align:right;color:#c62828;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+      #view-reembolsos .br-reimb-actions{white-space:nowrap;width:138px}
+      #view-reembolsos .br-reimb-actions .btn{margin-right:5px}
+      #view-reembolsos .br-reimb-empty{text-align:center!important;color:#84929b!important;padding:28px!important}
+      #view-reembolsos .filter-bar:has(#reimb_search){display:none!important}
+      @media(max-width:900px){#view-reembolsos .br-reimb-count{margin-left:0;width:100%}}
+    `;document.head.appendChild(s);
+  }
+
+  function hideOldNotice(view){
+    [...view.querySelectorAll('.notice')].forEach(el=>{if(norm(el.textContent).includes('agora esta no fluxo certo'))el.style.display='none'});
+  }
+
+  function statusSelect(r){
+    const k=statusKey(r);const date=brDate(r?.receivedDate||'');
+    const currentText=k==='recebido'?(date||'Recebido'):statusLabel(k);
+    const cls=k==='recebido'?'st-recebido':k==='analise'?'st-analise':'st-nao';
+    const opts=[
+      `<option value="${k}" selected>${esc(currentText)}</option>`,
+      ...(k!=='recebido'?[`<option value="recebido">Recebido</option>`]:[]),
+      ...(k!=='nao_recebido'?[`<option value="nao_recebido">Não recebido</option>`]:[]),
+      ...(k!=='analise'?[`<option value="analise">Em análise</option>`]:[])
+    ].join('');
+    return `<select class="br-reimb-status-select ${cls}" data-current="${k}" onchange="brReimbChangeStatus(${Number(r.id)},this)">${opts}</select>`;
+  }
+
+  function renderClean(){
+    const view=document.getElementById('view-reembolsos');if(!view)return;
+    ensureStyle();hideOldNotice(view);
+    const oldTable=view.querySelector('.br-reimb-table, .br-rtable, .table-wrap table, table');if(!oldTable)return;
+    const oldWrap=oldTable.closest('.br-reimb-wrap,.br-rwrap,.table-wrap')||oldTable.parentElement;
+    let toolbar=view.querySelector('.br-reimb-toolbar');
+    if(!toolbar){
+      toolbar=document.createElement('div');toolbar.className='br-reimb-toolbar';toolbar.innerHTML=`
+        <input id="br_reimb_search" class="br-reimb-search" placeholder="Buscar descrição, reembolsável por ou cliente / fornecedor" oninput="brReimbApplyFilters()">
+        <select id="br_reimb_status_filter" class="br-reimb-filter" onchange="brReimbApplyFilters()">
+          <option value="">Todos os status</option><option value="analise">Em análise</option><option value="nao_recebido">Não recebido</option><option value="recebido">Recebido</option>
+        </select>
+        <div class="br-reimb-count"></div>`;
+      oldWrap.insertAdjacentElement('beforebegin',toolbar);
+    }
+    let wrap=oldWrap;
+    if(!wrap.classList.contains('br-reimb-wrap')){wrap.className='br-reimb-wrap'}
+    const data=list();
+    oldTable.className='br-reimb-table';oldTable.dataset.brClean='1';
+    oldTable.innerHTML=`<thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Recebido em</th><th>Reembolsável por</th><th>Cliente / Fornecedor</th><th style="text-align:right">Valor</th><th>Ações</th></tr></thead><tbody>${data.length?data.map(r=>{
+      const k=statusKey(r);return `<tr data-id="${Number(r.id)}" data-status="${k}" data-search="${esc(norm([r.description,r.reimbursedBy,r.paidBy].join(' ')))}"><td>${esc(brDate(r.date)||'-')}</td><td><span class="br-reimb-type">Saída</span></td><td>${esc(r.description||'-')}</td><td>${statusSelect(r)}</td><td>${esc(r.reimbursedBy||'-')}</td><td>${esc(r.paidBy||r.party||'-')}</td><td class="br-reimb-value">- ${esc(moneyText(r.value))}</td><td class="br-reimb-actions"><button class="btn small" type="button" onclick="openReimbursement(${Number(r.id)})">Editar</button><button class="btn small danger" type="button" onclick="brReimbDelete(${Number(r.id)})">Excluir</button></td></tr>`
+    }).join(''):`<tr><td colspan="8" class="br-reimb-empty">Nenhum reembolso cadastrado.</td></tr>`}</tbody>`;
+    brReimbApplyFilters();
+  }
+
+  window.brReimbApplyFilters=function(){
+    const view=document.getElementById('view-reembolsos');if(!view)return;
+    const q=norm(view.querySelector('#br_reimb_search')?.value||'');
+    const st=String(view.querySelector('#br_reimb_status_filter')?.value||'');
+    const rows=[...view.querySelectorAll('.br-reimb-table tbody tr[data-id]')];let visible=0;
+    rows.forEach(tr=>{const okQ=!q||String(tr.dataset.search||'').includes(q);const okS=!st||tr.dataset.status===st;const show=okQ&&okS;tr.style.display=show?'':'none';if(show)visible++});
+    const count=view.querySelector('.br-reimb-count');if(count)count.textContent=`${visible} de ${rows.length} reembolso(s)`;
+  };
+
+  function saveReimbursements(next){
+    try{reimbursements=next}catch(_){window.reimbursements=next}
+    if(typeof saveData==='function')saveData('reimbursements',next);
+  }
+  function saveTransactions(next){
+    try{transactions=next}catch(_){window.transactions=next}
+    if(typeof saveData==='function')saveData('transactions',next);
+  }
+
+  window.brReimbChangeStatus=function(id,sel){
+    const r=list().find(x=>Number(x.id)===Number(id));if(!r)return;
+    const next=String(sel.value||'');const current=String(sel.dataset.current||statusKey(r));
+    if(next===current)return;
+    if(next==='recebido'){
+      sel.value=current;
+      const body=`<div class="modal-grid">${typeof field==='function'?field('Data do recebimento',`<input id="br_reimb_received_date" type="date" value="${esc(r.receivedDate||todayIso())}">`):`<label>Data do recebimento<input id="br_reimb_received_date" type="date" value="${esc(r.receivedDate||todayIso())}"></label>`}</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px"><button class="btn" onclick="closeModal();renderAll()">Cancelar</button><button class="btn primary" onclick="brReimbConfirmReceived(${Number(id)})">Confirmar</button></div>`;
+      if(typeof openModal==='function')openModal('Confirmar recebimento',body);else{const d=prompt('Data do recebimento (AAAA-MM-DD):',r.receivedDate||todayIso());if(d)brReimbConfirmReceived(id,d)}
+      return;
+    }
+    let tx=txList();
+    if(r.flowId){tx=tx.filter(t=>Number(t.id)!==Number(r.flowId));saveTransactions(tx)}
+    const nextStatus=next==='analise'?'em_analise':'solicitado';
+    const updated=list().map(x=>Number(x.id)===Number(id)?{...x,status:nextStatus,receivedDate:'',flowId:null}:x);
+    saveReimbursements(updated);
+    if(typeof renderAll==='function')renderAll();else setTimeout(renderClean,30);
+  };
+
+  window.brReimbConfirmReceived=function(id,forcedDate){
+    const r=list().find(x=>Number(x.id)===Number(id));if(!r)return;
+    const d=String(forcedDate||(typeof val==='function'?val('br_reimb_received_date'):document.getElementById('br_reimb_received_date')?.value)||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return alert('Informe a data do recebimento.');
+    let tx=txList();
+    const existingId=r.flowId?Number(r.flowId):null;
+    let flowId=existingId||Date.now()+1;
+    const flow={id:flowId,date:d,type:'entrada',status:'pago',description:`Reembolso recebido - ${r.description||'Reembolso'}`,category:'Reembolsos recebidos',party:String(r.reimbursedBy||r.paidBy||'').trim(),baseValue:Number(r.value||0),fine:0,interest:0,value:Number(r.value||0)};
+    const idx=existingId!==null?tx.findIndex(t=>Number(t.id)===existingId):-1;
+    if(idx>=0)tx=tx.map((t,i)=>i===idx?{...t,...flow}:t);else tx.push(flow);
+    saveTransactions(tx);
+    const updated=list().map(x=>Number(x.id)===Number(id)?{...x,status:'recebido',receivedDate:d,flowId}:x);
+    saveReimbursements(updated);
+    if(typeof closeModal==='function')closeModal();
+    if(typeof renderAll==='function')renderAll();else setTimeout(renderClean,30);
+  };
+
+  window.brReimbDelete=function(id){
+    const r=list().find(x=>Number(x.id)===Number(id));if(!r)return;
+    if(!confirm(`Excluir o reembolso "${r.description||''}"?`))return;
+    let tx=txList();if(r.flowId){tx=tx.filter(t=>Number(t.id)!==Number(r.flowId));saveTransactions(tx)}
+    saveReimbursements(list().filter(x=>Number(x.id)!==Number(id)));
+    if(typeof renderAll==='function')renderAll();else setTimeout(renderClean,30);
+  };
+
+  const oldRender=window.renderReimbursements;
+  if(typeof oldRender==='function')window.renderReimbursements=function(){const out=oldRender.apply(this,arguments);setTimeout(renderClean,25);return out};
+  const oldShow=window.showView;
+  if(typeof oldShow==='function')window.showView=function(v,b){const out=oldShow.apply(this,arguments);if(v==='reembolsos')setTimeout(renderClean,60);return out};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(renderClean,250),{once:true});else setTimeout(renderClean,250);
 })();
