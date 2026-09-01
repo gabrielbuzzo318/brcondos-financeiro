@@ -30,6 +30,10 @@
     btn.setAttribute('onclick','brContabDownloadAllDocs()');
   }
 
+  function scheduleUnlocks(){
+    [0,80,250,700,1500].forEach(ms=>setTimeout(unlock,ms));
+  }
+
   async function boot(){
     try{
       const r=await fetch('/api/auth/me',{cache:'no-store'});
@@ -40,14 +44,15 @@
     }
     if(!isAccounting)return;
 
-    unlock();
-    setTimeout(unlock,100);
-    setTimeout(unlock,500);
+    scheduleUnlocks();
 
-    // Observa apenas criação/remoção de elementos. Não observa atributos,
-    // pois unlock() altera atributos do próprio botão e isso gerava loop infinito.
-    const obs=new MutationObserver(()=>unlock());
-    obs.observe(document.documentElement,{childList:true,subtree:true});
+    // Sem MutationObserver permanente: reaplica apenas após interação do usuário,
+    // quando a tela de Contas a Pagar pode ter sido redesenhada.
+    document.addEventListener('click',()=>{
+      setTimeout(unlock,0);
+      setTimeout(unlock,120);
+    },true);
+    document.addEventListener('change',()=>setTimeout(unlock,0),true);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
