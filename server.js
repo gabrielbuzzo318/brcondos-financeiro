@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import {
   buildGissPreview,
+  cancelarNfseGiss,
   consultarLoteRpsGiss,
   consultarNfsePorNumeroGiss,
   consultarNfsePorRpsGiss,
@@ -22,6 +23,7 @@ import {
   testSicredi
 } from './sicredi.js';
 import { gerarBoletoPdf } from './boleto-pdf.js';
+import { gerarReceiptPdf } from './receipt-pdf.js';
 import {
   adoptSession,
   authConfig,
@@ -96,6 +98,7 @@ app.get('/api/nfse/health', route(() => getGissConfigStatus()));
 app.get('/api/nfse/wsdl-test', route(() => testGissWsdl()));
 app.post('/api/nfse/preview', route(req => buildGissPreview(req.body, { sign: String(req.query.assinar || '') === '1' })));
 app.post('/api/nfse/emitir', requireWriteAccess, route(req => emitirNfseGiss(req.body)));
+app.post('/api/nfse/cancelar', requireWriteAccess, route(req => cancelarNfseGiss({numero:req.body?.numero,codigo:req.body?.codigo})));
 app.get('/api/nfse/consultar-lote', route(req => consultarLoteRpsGiss(req.query.protocolo)));
 app.get('/api/nfse/consultar-numero', route(req => consultarNfsePorNumeroGiss({ numero: req.query.numero, pagina: req.query.pagina })));
 app.get('/api/nfse/consultar-rps', route(req => consultarNfsePorRpsGiss({ numero: req.query.numero, serie: req.query.serie, tipo: req.query.tipo })));
@@ -105,6 +108,26 @@ app.get('/api/nfse/consultar-rps-historico', route(req => consultarNfsePorRpsEnd
   tipo: req.query.tipo || 1,
   serviceUrl: GISS_HISTORY_SERVICE_URL
 })));
+
+app.post('/api/receipts/pdf', requireAuth, async (req, res) => {
+  try {
+    const payload=req.body?.payload||req.body||{};
+    const pdf=await gerarReceiptPdf(payload);
+    const client=String(payload.client||'CLIENTE').replace(/[\\/:*?"<>|\r\n\t]+/g,'-').replace(/\s+/g,' ').trim().slice(0,90)||'CLIENTE';
+    const nr=String(payload.receiptNumber||'SEM NUMERO').replace(/[\\/:*?"<>|\r\n\t]+/g,'-').replace(/\s+/g,' ').trim();
+    const valor=Number(payload.value||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fileName=`${client} - RECIBO ${nr.replace('/','-')} - R$ ${valor}.pdf`;
+    res.set({
+      'Content-Type':'application/pdf',
+      'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      'Content-Length':String(pdf.length),
+      'Cache-Control':'private, no-store'
+    });
+    res.send(pdf);
+  } catch (err) {
+    res.status(Number(err?.status||500)).json({error:err?.message||'Erro ao gerar PDF do recibo.'});
+  }
+});
 
 app.get('/api/boletos/health', route(() => getSicrediConfigStatus()));
 app.get('/api/boletos/test', route(() => testSicredi()));
