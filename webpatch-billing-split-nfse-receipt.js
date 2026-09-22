@@ -10,6 +10,11 @@
     add('Módulo cobrança',d.moduloCobranca);
     add('Módulo manutenção',d.moduloManutencao);
     add('Assemb. Extra',d.assembleiaExtra);
+    const dbe=num(d.dbe);
+    if(dbe>0){
+      const details=String(d.detalhes||'').trim();
+      lines.push('DBE - '+(details||money(dbe)));
+    }
     const rpa=num(d.rpa);
     if(rpa>0){
       let line='RPA - '+money(rpa);
@@ -22,7 +27,7 @@
 
   function extrasTotal(b){
     const d=b?.billingBreakdown||{};
-    return num(d.moduloCobranca)+num(d.moduloManutencao)+num(d.assembleiaExtra)+num(d.rpa);
+    return num(d.dbe)+num(d.moduloCobranca)+num(d.moduloManutencao)+num(d.assembleiaExtra)+num(d.rpa);
   }
 
   function syncSplitBilling(){
@@ -37,10 +42,10 @@
 
     source.forEach((b,i)=>{
       const c=clients.find(x=>x.id===b.clientId)||findClientByLooseName(b.client);
-      if(!c){missingClient++;missingClientNames.push(b.client||'Cliente sem nome');return;}
-
       const split=!!(b.billingBreakdown && typeof b.billingBreakdown==='object');
+      if(!c){missingClient++;missingClientNames.push(b.client||'Cliente sem nome');}
       if(!split){
+        if(!c)return;
         // Mantém a lógica antiga para boletos históricos/PDF que não vieram da nova planilha.
         const nfExisting=nfse.find(x=>String(x.sourceBoletoId)===String(b.id));
         const recExisting=receipts.find(x=>String(x.sourceBoletoId)===String(b.id));
@@ -55,7 +60,7 @@
           const year=String(b.competence||issueDate).slice(0,4);
           receipts.push(normalizeReceipt({
             id:Date.now()+i+Math.floor(Math.random()*100),
-            sourceBoletoId:b.id,clientId:c.id,client:c.name||b.client,
+            sourceBoletoId:b.id,clientId:c?.id||Number(b.clientId||0),client:c?.name||b.client,
             competence:b.competence,issueDate,value:Number(b.value||0),
             description:'Honorários administrativos',receiptNumber:nextReceiptNumber(year),status:'pendente'
           }));
@@ -99,8 +104,8 @@
             if(isLockedReceipt(recExisting)){
               if(Math.abs(num(recExisting.value)-receiptValue)>0.005)locked++;
             }else{
-              recExisting.clientId=c.id;
-              recExisting.client=c.name||b.client;
+              recExisting.clientId=c?.id||Number(b.clientId||0);
+              recExisting.client=c?.name||b.client;
               recExisting.competence=b.competence;
               recExisting.issueDate=issueDate;
               recExisting.value=receiptValue;
@@ -113,7 +118,7 @@
             const year=String(b.competence||issueDate).slice(0,4);
             receipts.push(normalizeReceipt({
               id:Date.now()+i+7000+Math.floor(Math.random()*100),
-              sourceBoletoId:b.id,clientId:c.id,client:c.name||b.client,
+              sourceBoletoId:b.id,clientId:c?.id||Number(b.clientId||0),client:c?.name||b.client,
               competence:b.competence,issueDate,value:receiptValue,
               description:receiptDescription,details:'',
               receiptNumber:nextReceiptNumber(year),status:'pendente',billingSplitType:'honorario_cont'
@@ -125,7 +130,7 @@
       }
 
       // NFS-e = SOMENTE HONORÁRIO ADM do quadro administrativo.
-      if(honorario>0){
+      if(honorario>0 && c){
         if(nfExisting){
           if(isLockedNf(nfExisting)){
             if(Math.abs(num(nfExisting.value)-honorario)>0.005)locked++;
@@ -149,7 +154,7 @@
           });
           nfCreated++;
         }
-      }else if(nfExisting && !isLockedNf(nfExisting)){
+      }else if(honorario<=0 && nfExisting && !isLockedNf(nfExisting)){
         nfse=nfse.filter(x=>x.id!==nfExisting.id);
         nfUpdated++;
       }
@@ -162,8 +167,8 @@
           if(isLockedReceipt(recExisting)){
             if(Math.abs(num(recExisting.value)-receiptValue)>0.005)locked++;
           }else{
-            recExisting.clientId=c.id;
-            recExisting.client=c.name||b.client;
+            recExisting.clientId=c?.id||Number(b.clientId||0);
+            recExisting.client=c?.name||b.client;
             recExisting.competence=b.competence;
             recExisting.issueDate=issueDate;
             recExisting.value=receiptValue;
@@ -242,7 +247,7 @@
     const view=document.getElementById('view-recibos');
     if(!view)return;
     const subtitle=view.querySelector('.section-title span');
-    if(subtitle)subtitle.textContent='Recibos dos módulos, assembleias extras, RPAs e honorários contábeis das associações';
+    if(subtitle)subtitle.textContent='Recibos de DBE, módulos, assembleias extras, RPAs e honorários contábeis das associações';
     const notice=view.querySelector('.notice');
     if(notice)notice.innerHTML='<b>Regra da planilha nova:</b> no quadro ADM, a NFS-e recebe somente <b>Honorário Adm</b> e os demais itens viram Recibo. No quadro <b>Honorários Contábeis - Associações</b>, <b>não é criada NFS-e</b>: o Honorário Cont é emitido somente por Recibo.';
   }
