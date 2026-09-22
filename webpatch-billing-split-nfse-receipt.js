@@ -26,7 +26,12 @@
   }
 
   function syncSplitBilling(){
-    const source=boletos.filter(b=>b.competence && b.section!=='CONTABIL' && !/CONTABIL/i.test(String(b.description||'')));
+    const source=boletos.filter(b=>{
+      if(!b.competence)return false;
+      const d=b.billingBreakdown||{};
+      const isNewCont=String(b.section||'').toUpperCase()==='CONTABIL' && num(d.honorarioCont)>0;
+      return isNewCont || (b.section!=='CONTABIL' && !/CONTABIL/i.test(String(b.description||'')));
+    });
     let nfCreated=0,nfUpdated=0,recCreated=0,recUpdated=0,ignored=0,missingClient=0,locked=0,legacy=0;
 
     source.forEach((b,i)=>{
@@ -70,13 +75,55 @@
         nfCreated++;legacy++;return;
       }
 
+      const isCont=String(b.section||'').toUpperCase()==='CONTABIL' && num(b.billingBreakdown.honorarioCont)>0;
       const honorario=num(b.billingBreakdown.honorarioAdm);
-      const receiptValue=extrasTotal(b);
-      const receiptLines=receiptLinesFromBreakdown(b);
+      const honorarioCont=num(b.billingBreakdown.honorarioCont);
+      const receiptValue=isCont?honorarioCont:extrasTotal(b);
+      const receiptLines=isCont
+        ? ['Honorário Cont - '+money(honorarioCont)]
+        : receiptLinesFromBreakdown(b);
       let nfExisting=nfse.find(x=>String(x.sourceBoletoId)===String(b.id));
       let recExisting=receipts.find(x=>String(x.sourceBoletoId)===String(b.id));
 
-      // NFS-e = SOMENTE HONORÁRIO ADM.
+      // Quadro HONORÁRIOS CONTÁBEIS - ASSOCIAÇÕES: nunca gera NFS-e.
+      if(isCont){
+        if(nfExisting){
+          if(isLockedNf(nfExisting)){locked++;}
+          else{nfse=nfse.filter(x=>x.id!==nfExisting.id);nfUpdated++;}
+        }
+        if(receiptValue>0){
+          const issueDate=receiptDefaultIssueDate(b.competence,b.due||'');
+          const receiptDescription=receiptLines.join('\n');
+          if(recExisting){
+            if(isLockedReceipt(recExisting)){
+              if(Math.abs(num(recExisting.value)-receiptValue)>0.005)locked++;
+            }else{
+              recExisting.clientId=c.id;
+              recExisting.client=c.name||b.client;
+              recExisting.competence=b.competence;
+              recExisting.issueDate=issueDate;
+              recExisting.value=receiptValue;
+              recExisting.description=receiptDescription;
+              recExisting.details='';
+              recExisting.billingSplitType='honorario_cont';
+              recUpdated++;
+            }
+          }else{
+            const year=String(b.competence||issueDate).slice(0,4);
+            receipts.push(normalizeReceipt({
+              id:Date.now()+i+7000+Math.floor(Math.random()*100),
+              sourceBoletoId:b.id,clientId:c.id,client:c.name||b.client,
+              competence:b.competence,issueDate,value:receiptValue,
+              description:receiptDescription,details:'',
+              receiptNumber:nextReceiptNumber(year),status:'pendente',billingSplitType:'honorario_cont'
+            }));
+            recCreated++;
+          }
+        }
+        return;
+      }
+
+      // NFS-e = SOMENTE HONORÁRIO ADM do quadro administrativo.
       if(honorario>0){
         if(nfExisting){
           if(isLockedNf(nfExisting)){
@@ -148,7 +195,7 @@
     alert(
       'SINCRONIZAÇÃO CONCLUÍDA ✅\n\n'+
       'NFS-e (somente Honorário Adm): '+(nfCreated+nfUpdated)+'\n'+
-      'Recibos (demais valores): '+(recCreated+recUpdated)+'\n'+
+      'Recibos (demais valores + Honorário Cont): '+(recCreated+recUpdated)+'\n'+
       'Já sincronizados: '+ignored+'\n'+
       'Cliente não encontrado: '+missingClient+'\n'+
       'Documentos já emitidos/gerados e preservados: '+locked+
@@ -161,7 +208,7 @@
 
   const originalReceiptPage=window.receiptPageHtml;
   window.receiptPageHtml=function(row){
-    if(String(row?.billingSplitType||'')!=='extras'){
+    if(!['extras','honorario_cont'].includes(String(row?.billingSplitType||''))){
       return originalReceiptPage(row);
     }
     const c=receiptClient(row);
@@ -194,9 +241,9 @@
     const view=document.getElementById('view-recibos');
     if(!view)return;
     const subtitle=view.querySelector('.section-title span');
-    if(subtitle)subtitle.textContent='Recibos dos módulos, assembleias extras e RPAs do faturamento';
+    if(subtitle)subtitle.textContent='Recibos dos módulos, assembleias extras, RPAs e honorários contábeis das associações';
     const notice=view.querySelector('.notice');
-    if(notice)notice.innerHTML='<b>Regra da planilha nova:</b> a NFS-e recebe somente <b>Honorário Adm</b>. Os valores de <b>Módulo cobrança, Módulo manutenção, Assemb. Extra e RPA</b> são somados em um Recibo separado. Os códigos dos RPAs vêm de <b>DETALHES</b>.';
+    if(notice)notice.innerHTML='<b>Regra da planilha nova:</b> no quadro ADM, a NFS-e recebe somente <b>Honorário Adm</b> e os demais itens viram Recibo. No quadro <b>Honorários Contábeis - Associações</b>, <b>não é criada NFS-e</b>: o Honorário Cont é emitido somente por Recibo.';
   }
 
   const oldRenderReceipts=window.renderReceipts;
