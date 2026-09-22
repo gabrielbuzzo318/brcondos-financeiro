@@ -33,10 +33,11 @@
       return isNewCont || (b.section!=='CONTABIL' && !/CONTABIL/i.test(String(b.description||'')));
     });
     let nfCreated=0,nfUpdated=0,recCreated=0,recUpdated=0,ignored=0,missingClient=0,locked=0,legacy=0;
+    const missingClientNames=[];
 
     source.forEach((b,i)=>{
       const c=clients.find(x=>x.id===b.clientId)||findClientByLooseName(b.client);
-      if(!c){missingClient++;return;}
+      if(!c){missingClient++;missingClientNames.push(b.client||'Cliente sem nome');return;}
 
       const split=!!(b.billingBreakdown && typeof b.billingBreakdown==='object');
       if(!split){
@@ -197,7 +198,7 @@
       'NFS-e (somente Honorário Adm): '+(nfCreated+nfUpdated)+'\n'+
       'Recibos (demais valores + Honorário Cont): '+(recCreated+recUpdated)+'\n'+
       'Já sincronizados: '+ignored+'\n'+
-      'Cliente não encontrado: '+missingClient+'\n'+
+      'Cliente não encontrado: '+missingClient+(missingClientNames.length?' ('+[...new Set(missingClientNames)].join(', ')+')':'')+'\n'+
       'Documentos já emitidos/gerados e preservados: '+locked+
       (legacy?'\n\n'+legacy+' boleto(s) antigo(s) mantiveram a regra anterior.':'')
     );
