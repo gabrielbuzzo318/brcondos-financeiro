@@ -1,5 +1,6 @@
 import archiver from 'archiver';
 import { gerarBoletoPdf } from './boleto-pdf.js';
+import { consultarBoletoSicredi } from './sicredi.js';
 import { consultarNfsePorNumeroGiss, consultarNfsePorRpsGiss } from './giss.js';
 import { gerarNfsePdf } from './nfse-pdf.js';
 
@@ -21,6 +22,48 @@ function uniqueName(name,used){
   const count=used.get(key)||0;
   used.set(key,count+1);
   return count?`${base} (${count+1})${ext}`:clean;
+}
+
+function onlyDigits(v){return String(v??'').replace(/\D/g,'');}
+function normalizeKey(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function deepPickBilling(value,names){
+  const wanted=new Set(names.map(normalizeKey));
+  const seen=new Set();
+  function walk(node){
+    if(node===null||node===undefined)return '';
+    if(typeof node!=='object')return '';
+    if(seen.has(node))return '';
+    seen.add(node);
+    if(Array.isArray(node)){
+      for(const item of node){const hit=walk(item);if(hit!==''&&hit!==null&&hit!==undefined)return hit;}
+      return '';
+    }
+    for(const [k,v] of Object.entries(node)){
+      if(wanted.has(normalizeKey(k)) && v!==null && v!==undefined && String(v).trim()!=='')return v;
+    }
+    for(const v of Object.values(node)){const hit=walk(v);if(hit!==''&&hit!==null&&hit!==undefined)return hit;}
+    return '';
+  }
+  return walk(value);
+}
+async function enrichBoletoPayload(payload){
+  const p={...(payload||{})};
+  let linha=onlyDigits(p.linhaDigitavel);
+  let barcode=onlyDigits(p.codigoBarras);
+  if(linha.length===47 || barcode.length===44)return p;
+
+  const nn=onlyDigits(p.nossoNumero);
+  if(nn.length!==9)return p;
+
+  const consulta=await consultarBoletoSicredi(nn);
+  const remoteLinha=deepPickBilling(consulta,['linhaDigitavel','linha_digitavel','linhaDigitavelBoleto','linha']);
+  const remoteBarcode=deepPickBilling(consulta,['codigoBarras','codigo_barras','codigoDeBarras','barra']);
+  const remoteQr=deepPickBilling(consulta,['qrCode','qrcode','qrCodePix','pixCopiaECola','codigoQrCode']);
+
+  if(onlyDigits(remoteLinha).length===47)p.linhaDigitavel=String(remoteLinha);
+  if(onlyDigits(remoteBarcode).length===44)p.codigoBarras=String(remoteBarcode);
+  if(!String(p.qrCode||'').trim() && String(remoteQr||'').trim())p.qrCode=String(remoteQr);
+  return p;
 }
 
 function asciiFallback(name){
@@ -87,7 +130,10 @@ export async function sendBillingDocumentsZip(req,res,body={}){
   for(const item of items){
     try{
       let buffer;
-      if(type==='boletos')buffer=await gerarBoletoPdf(item?.payload||{});
+      if(type==='boletos'){
+        const payload=await enrichBoletoPayload(item?.payload||{});
+        buffer=await gerarBoletoPdf(payload);
+      }
       else buffer=await officialNfsePdf(item);
       const fileName=uniqueName(item?.name||`${type==='boletos'?'Boleto':'NF'}.pdf`,used);
       files.push({name:/\.pdf$/i.test(fileName)?fileName:`${fileName}.pdf`,buffer});
