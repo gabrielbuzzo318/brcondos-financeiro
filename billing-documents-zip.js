@@ -128,7 +128,7 @@ export async function sendBillingDocumentsZip(req,res,body={}){
   const failures=[];
   const used=new Map();
 
-  for(const item of items){
+  async function processItem(item){
     try{
       let buffer;
       if(type==='boletos'){
@@ -137,10 +137,25 @@ export async function sendBillingDocumentsZip(req,res,body={}){
       }
       else if(type==='nfse') buffer=await officialNfsePdf(item);
       else buffer=await gerarReceiptPdf(item?.payload||{});
-      const fileName=uniqueName(item?.name||`${type==='boletos'?'Boleto':type==='nfse'?'NF':'Recibo'}.pdf`,used);
-      files.push({name:/\.pdf$/i.test(fileName)?fileName:`${fileName}.pdf`,buffer});
+      return {ok:true,item,buffer};
     }catch(err){
-      failures.push(`${safeName(item?.name||'documento')}: ${err?.message||'não foi possível gerar'}`);
+      return {ok:false,item,error:err?.message||'não foi possível gerar'};
+    }
+  }
+
+  // Boletos antigos podem exigir consulta ao Sicredi. Rodamos em pequenos
+  // lotes paralelos para não estourar o timeout do ZIP, sem sobrecarregar a API.
+  const concurrency=type==='boletos'?8:6;
+  for(let i=0;i<items.length;i+=concurrency){
+    const batch=items.slice(i,i+concurrency);
+    const results=await Promise.all(batch.map(processItem));
+    for(const result of results){
+      if(result.ok){
+        const fileName=uniqueName(result.item?.name||`${type==='boletos'?'Boleto':type==='nfse'?'NF':'Recibo'}.pdf`,used);
+        files.push({name:/\.pdf$/i.test(fileName)?fileName:`${fileName}.pdf`,buffer:result.buffer});
+      }else{
+        failures.push(`${safeName(result.item?.name||'documento')}: ${result.error}`);
+      }
     }
   }
 
