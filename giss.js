@@ -34,3 +34,37 @@ function prestador(){return `<giss:Prestador><tipos:CpfCnpj><tipos:Cnpj>${digits
 export async function consultarLoteRpsGiss(protocolo){assertCfg();const p=String(protocolo||'').trim();if(!p)throw err('Informe o protocolo do lote.');let d=`<giss:ConsultarLoteRpsEnvio xmlns:giss="http://www.giss.com.br/consultar-lote-rps-envio-v2_04.xsd" xmlns:tipos="${NS.tipos}">${prestador()}<giss:Protocolo>${x(p)}</giss:Protocolo></giss:ConsultarLoteRpsEnvio>`;d=sign(d,'/*',true);return{...(await post('ConsultarLoteRps',d)),consulta:{protocolo:p}};}
 export async function consultarNfsePorNumeroGiss({numero,pagina=1}){assertCfg();const n=String(numero||'').trim();if(!n)throw err('Informe o número da NFS-e.');const d=`<giss:ConsultarNfseServicoPrestadoEnvio xmlns:giss="http://www.giss.com.br/consultar-nfse-servico-prestado-envio-v2_04.xsd" xmlns:tipos="${NS.tipos}">${prestador()}<giss:NumeroNfse>${x(n)}</giss:NumeroNfse><giss:Pagina>${x(pagina)}</giss:Pagina></giss:ConsultarNfseServicoPrestadoEnvio>`;return{...(await post('ConsultarNfseServicoPrestado',d)),consulta:{numeroNfse:n,pagina:String(pagina)}};}
 export async function consultarNfsePorRpsGiss({numero,serie='RPS',tipo=1}){assertCfg();const n=String(numero||'').trim();if(!n)throw err('Informe o número do RPS.');const d=`<giss:ConsultarNfseRpsEnvio xmlns:giss="http://www.giss.com.br/consultar-nfse-rps-envio-v2_04.xsd" xmlns:tipos="${NS.tipos}"><giss:IdentificacaoRps><tipos:Numero>${x(n)}</tipos:Numero><tipos:Serie>${x(serie)}</tipos:Serie><tipos:Tipo>${x(tipo)}</tipos:Tipo></giss:IdentificacaoRps>${prestador()}</giss:ConsultarNfseRpsEnvio>`;return{...(await post('ConsultarNfsePorRps',d)),consulta:{numero:n,serie,tipo:String(tipo)}};}
+
+
+export async function cancelarNfseGiss({numero,codigo=1}={}){
+  assertCfg();
+  const n=String(numero||'').trim();
+  const cod=String(codigo||'').trim();
+  if(!n)throw err('Informe o número da NFS-e.');
+  if(!['1','2','4'].includes(cod))throw err('Motivo de cancelamento inválido. Use 1, 2 ou 4.');
+
+  const id='CANCEL'+digits(n);
+  let d=`<giss:CancelarNfseEnvio xmlns:giss="http://www.giss.com.br/cancelar-nfse-envio-v2_04.xsd" xmlns:tipos="${NS.tipos}" xmlns:ds="${NS.ds}"><giss:Pedido><tipos:InfPedidoCancelamento Id="${id}"><tipos:IdentificacaoNfse><tipos:Numero>${x(n)}</tipos:Numero><tipos:CpfCnpj><tipos:Cnpj>${digits(config.giss.cnpj)}</tipos:Cnpj></tipos:CpfCnpj><tipos:InscricaoMunicipal>${x(config.giss.inscricaoMunicipal)}</tipos:InscricaoMunicipal><tipos:CodigoMunicipio>${x(config.giss.codigoMunicipio)}</tipos:CodigoMunicipio></tipos:IdentificacaoNfse><tipos:CodigoCancelamento>${x(cod)}</tipos:CodigoCancelamento></tipos:InfPedidoCancelamento></giss:Pedido></giss:CancelarNfseEnvio>`;
+  d=sign(d,`//*[@Id='${id}']`);
+
+  const result=await post('CancelarNfse',d);
+  if(Array.isArray(result?.erros)&&result.erros.length){
+    const msg=result.erros.map(e=>[e.codigo,e.mensagem,e.correcao].filter(Boolean).join(' - ')).join('; ');
+    throw err(msg||'A GISS recusou o cancelamento.',400,result);
+  }
+
+  let cancel=(Array.isArray(result?.cancelamentos)?result.cancelamentos:[]).find(c=>String(c.numero||'')===n)
+    || (Array.isArray(result?.cancelamentos)?result.cancelamentos[0]:null);
+
+  if(!cancel){
+    try{
+      const check=await consultarNfsePorNumeroGiss({numero:n,pagina:1});
+      cancel=(Array.isArray(check?.cancelamentos)?check.cancelamentos:[]).find(c=>String(c.numero||'')===n)
+        || (Array.isArray(check?.cancelamentos)?check.cancelamentos[0]:null);
+      if(cancel)return {...result,cancelamento:cancel,confirmacao:check};
+    }catch(_){}
+  }
+
+  if(!cancel)throw err('A GISS não confirmou o cancelamento da NFS-e.',502,result);
+  return {...result,cancelamento:cancel};
+}
