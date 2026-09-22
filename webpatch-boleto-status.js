@@ -79,7 +79,40 @@
 
   function isLiquidated(v){
     const s=normalize(v);
-    return /LIQUIDAD|PAGO|PAGA|BAIXAD/.test(s);
+    return /LIQUIDAD|PAGO|PAGA/.test(s) && !/BAIXAD/.test(s);
+  }
+
+  function isBankBaixado(v){
+    const s=normalize(v);
+    return /BAIXAD|CANCELAD/.test(s);
+  }
+
+  function syncBankBaixado(boleto,data,statusText){
+    if(!boleto||!isBankBaixado(statusText))return false;
+
+    const baixaDate=findDate(data||boleto.sicrediResponse||null)||'';
+    const boletoId=String(boleto.id);
+    const flowId=String(boleto.flowId||'');
+
+    transactions=(transactions||[]).filter(t=>{
+      const linked=String(t.sourceBoletoId||t.boletoId||'')===boletoId;
+      const sameFlow=flowId && String(t.id||'')===flowId;
+      return !(linked||sameFlow);
+    });
+
+    boleto.status='baixado';
+    boleto.receiptDate='';
+    boleto.flowId=null;
+    boleto.cashFlowDate='';
+    boleto.sicrediLiquidationDate='';
+    boleto.sicrediSettlementType='';
+    boleto.sicrediBaixaDate=baixaDate;
+
+    if(typeof saveData==='function'){
+      saveData('transactions',transactions);
+      saveData('boletos',boletos);
+    }
+    return true;
   }
 
   function findSettlementKind(data,statusText){
@@ -201,11 +234,14 @@
             boleto.sicrediStatus=sicrediStatus;
             boleto.sicrediStatusUpdatedAt=new Date().toISOString();
             boleto.sicrediResponse=data;
-            if(isLiquidated(sicrediStatus)){
+            if(isBankBaixado(sicrediStatus)){
+              syncBankBaixado(boleto,data,sicrediStatus);
+            }else if(isLiquidated(sicrediStatus)){
               syncLiquidatedToFlow(boleto,data,sicrediStatus);
             }else if(typeof saveData==='function'){
               saveData('boletos',boletos);
             }
+            if(typeof renderAll==='function')setTimeout(()=>renderAll(),0);
           }
         }
       }catch(_){ }
@@ -216,6 +252,7 @@
   function badge(text,color){return `<span class="badge ${color}">${text}</span>`;}
   function boletoVisualStatus(b){
     const real=normalize(b?.sicrediStatus||'');
+    if(isBankBaixado(real)||b?.status==='baixado')return {key:'baixado',html:badge('Baixado','gray')};
     if(isLiquidated(real)||b?.status==='liquidado')return {key:'liquidado',html:badge('Liquidado','green')};
     const closed=b?.status==='recebido';
     if(!closed&&b?.due&&String(b.due)<today())return {key:'vencido',html:badge('Vencido','red')};
@@ -239,6 +276,7 @@
     const statusSelect=document.getElementById('boleto_status');
     if(statusSelect){
       if(![...statusSelect.options].some(o=>o.value==='liquidado'))statusSelect.add(new Option('Liquidado','liquidado'));
+      if(![...statusSelect.options].some(o=>o.value==='baixado'))statusSelect.add(new Option('Baixado','baixado'));
       if(![...statusSelect.options].some(o=>o.value==='vencido'))statusSelect.add(new Option('Vencido','vencido'));
     }
   };
@@ -246,7 +284,9 @@
   // Corrige/atualiza boletos já consultados, usando o retorno Sicredi salvo.
   let backfilled=false;
   (boletos||[]).forEach(b=>{
-    if(isLiquidated(b?.sicrediStatus||'')&&(b.sicrediResponse||b.receiptDate||b.sicrediLiquidationDate)){
+    if(isBankBaixado(b?.sicrediStatus||'')){
+      if(syncBankBaixado(b,b.sicrediResponse||null,b.sicrediStatus))backfilled=true;
+    }else if(isLiquidated(b?.sicrediStatus||'')&&(b.sicrediResponse||b.receiptDate||b.sicrediLiquidationDate)){
       if(syncLiquidatedToFlow(b,b.sicrediResponse||null,b.sicrediStatus,{allowFallbackToday:false}))backfilled=true;
     }
   });
