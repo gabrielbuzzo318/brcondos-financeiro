@@ -353,8 +353,6 @@ function repairBillingState(data) {
     const details = String(b?.billingBreakdown?.detalhes || '');
     let rec = receipts.find(r => String(r?.sourceBoletoId ?? '') === String(b.id));
 
-    if (rec && String(rec.status || '') === 'gerado') continue;
-
     if (!rec) {
       const id = deterministicId(
         `receipt:2026-09:${b.sourceKey || b.id}:${target.client}:${total}`,
