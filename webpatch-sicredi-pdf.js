@@ -1,6 +1,17 @@
 (function(){
   const originalPrintBoleto = typeof printBoleto==='function' ? printBoleto : null;
 
+  function safeFileName(v){
+    return String(v||'CLIENTE').replace(/[<>:\"/\\\\|?*]+/g,' ').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'');
+  }
+  function fileDate(v){
+    const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}-${m[2]}-${m[1]}`:String(v||'SEM VENCIMENTO');
+  }
+  function fileValue(v){
+    return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+
   function pick(obj,names){
     for(const n of names){
       if(obj && obj[n]!==undefined && obj[n]!==null && String(obj[n]).trim()!=='') return obj[n];
@@ -63,8 +74,7 @@
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
-      a.target='_blank';
-      a.rel='noopener';
+      a.download=`${safeFileName(b.client||c?.name)} - R$ ${fileValue(b.value)} - ${fileDate(b.due)}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
