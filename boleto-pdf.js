@@ -13,6 +13,24 @@ function barcodeFromLinhaDigitavel(linha){
   const d=digits(linha); if(d.length!==47)return '';
   return d.slice(0,4)+d.slice(32,33)+d.slice(33,47)+d.slice(4,9)+d.slice(10,20)+d.slice(21,31);
 }
+function mod10Boleto(value){
+  const d=digits(value);
+  let sum=0,weight=2;
+  for(let i=d.length-1;i>=0;i--){
+    let p=Number(d[i])*weight;
+    if(p>9)p=(p%10)+Math.floor(p/10);
+    sum+=p;
+    weight=weight===2?1:2;
+  }
+  return String((10-(sum%10))%10);
+}
+function linhaDigitavelFromBarcode(barcode){
+  const d=digits(barcode); if(d.length!==44)return '';
+  const f1=d.slice(0,4)+d.slice(19,24);
+  const f2=d.slice(24,34);
+  const f3=d.slice(34,44);
+  return f1+mod10Boleto(f1)+f2+mod10Boleto(f2)+f3+mod10Boleto(f3)+d.slice(4,5)+d.slice(5,19);
+}
 function formatLinha(linha){
   const d=digits(linha); if(d.length!==47)return txt(linha);
   return `${d.slice(0,5)}.${d.slice(5,10)} ${d.slice(10,15)}.${d.slice(15,21)} ${d.slice(21,26)}.${d.slice(26,32)} ${d.slice(32,33)} ${d.slice(33)}`;
@@ -96,8 +114,9 @@ function commonGrid(doc,x,y,W,i,ben,{receipt=false}={}){
 }
 
 export async function gerarBoletoPdf(input={}){
-  const linha=txt(input.linhaDigitavel),nn=digits(input.nossoNumero),qr=txt(input.qrCode),barcode=digits(input.codigoBarras)||barcodeFromLinhaDigitavel(linha);
-  if(digits(linha).length!==47){const e=new Error('Linha digitável inválida para gerar o PDF.');e.status=400;throw e;}
+  let linha=txt(input.linhaDigitavel),nn=digits(input.nossoNumero),qr=txt(input.qrCode),barcode=digits(input.codigoBarras)||barcodeFromLinhaDigitavel(linha);
+  if(digits(linha).length!==47 && barcode.length===44)linha=linhaDigitavelFromBarcode(barcode);
+  if(digits(linha).length!==47){const e=new Error('Linha digitável/código de barras indisponível para gerar o PDF.');e.status=400;throw e;}
   if(nn.length!==9){const e=new Error('Nosso Número inválido para gerar o PDF.');e.status=400;throw e;}
   const qrPng=qr?await imageBuffer({bcid:'qrcode',text:qr,scale:4,padding:0}):null;
   const barPng=barcode.length===44?await imageBuffer({bcid:'interleaved2of5',text:barcode,scale:2.6,height:13,includetext:false,padding:0}):null;
