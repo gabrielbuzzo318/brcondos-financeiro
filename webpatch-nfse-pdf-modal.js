@@ -3,12 +3,13 @@
     document.getElementById('brNfsePdfViewerOverlay')?.remove();
   }
 
-  function safePdfName(client,numero){
+  function safePdfName(client,numero,value){
     const nome=String(client||'NFS-e')
       .replace(/[<>:"/\\|?*\u0000-\u001F]/g,' ')
       .replace(/\s+/g,' ')
       .trim()||'NFS-e';
-    return `${nome} - NF ${numero}.pdf`;
+    const valor=Number(value||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    return `${nome} - NF ${numero} - R$ ${valor}.pdf`;
   }
 
   window.abrirPdfGiss=function(id){
@@ -34,7 +35,7 @@
     const base=`/api/nfse/pdf/${encodeURIComponent(idInterno||'0')}?${params.toString()}`;
     const src=base;
     const downloadUrl=`${base}&download=1`;
-    const downloadName=safePdfName(cliente,numero);
+    const downloadName=safePdfName(cliente,numero,row.value);
 
     const overlay=document.createElement('div');
     overlay.id='brNfsePdfViewerOverlay';
