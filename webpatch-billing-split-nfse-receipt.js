@@ -13,7 +13,7 @@
     const dbe=num(d.dbe);
     if(dbe>0){
       const details=String(d.detalhes||'').trim();
-      lines.push('DBE - '+(details||money(dbe)));
+      lines.push('DBE - '+money(dbe)+(details?' - '+details:''));
     }
     const rpa=num(d.rpa);
     if(rpa>0){
