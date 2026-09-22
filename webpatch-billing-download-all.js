@@ -205,7 +205,7 @@
     });
     if(!rows.length)return alert('Não há recibos nos filtros atuais para baixar.');
     const items=rows.map(r=>({
-      name:`${safe(r.client,'CLIENTE')} - RECIBO ${safe(String(r.receiptNumber||'').replace('/','-'),'SEM NÚMERO')}.pdf`,
+      name:`${safe(r.client,'CLIENTE')} - RECIBO ${safe(String(r.receiptNumber||'').replace('/','-'),'SEM NÚMERO')} - R$ ${boletoFileValue(r.value)}.pdf`,
       payload:receiptPayload(r)
     }));
     const suffix=comp?zipLabel(comp):'FILTRADOS';
