@@ -407,6 +407,63 @@ function repairBillingState(data) {
   return data;
 }
 
+
+function ensureTimeClient(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const storage = data.storage;
+  if (!storage || typeof storage !== 'object' || Array.isArray(storage)) return data;
+
+  const clients = parseArrayValue(storage, 'brcondos_clients');
+  if (!clients) return data;
+
+  const targetDoc = '58266872000186';
+  let client = clients.find(c => String(c?.doc || '').replace(/\D/g, '') === targetDoc);
+  if (!client) {
+    client = {
+      id: 1031,
+      doc: '58.266.872/0001-86',
+      zip: '15093-397',
+      city: 'SAO JOSE DO RIO PRETO',
+      cnae: '8112500 - Condomínios prediais',
+      name: 'CONDOMINIO T:ME',
+      email: '',
+      phone: '(17) 4009-1732',
+      state: 'SP',
+      units: 0,
+      number: '740',
+      status: 'ATIVA',
+      street: 'RUA RODRIGO WILKER DOS SANTOS BELLEI',
+      cityIbge: '3549805',
+      district: 'JARDIM PAULISTANO',
+      tradeName: '',
+      complement: 'LOTE 1819 E PARTE DO 17 QUADRA02',
+      contractEnd: '',
+      dataUpdated: '22/09/2026',
+      contractStart: '',
+      billingDocument: 'nfse',
+      contractAttachmentData: '',
+      contractAttachmentName: ''
+    };
+    clients.push(client);
+    storage.brcondos_clients = JSON.stringify(clients);
+    return data;
+  }
+
+  let changed = false;
+  const defaults = {
+    name: 'CONDOMINIO T:ME',
+    cityIbge: '3549805'
+  };
+  for (const [k,v] of Object.entries(defaults)) {
+    if (!String(client[k] || '').trim()) {
+      client[k] = v;
+      changed = true;
+    }
+  }
+  if (changed) storage.brcondos_clients = JSON.stringify(clients);
+  return data;
+}
+
 export async function getSharedState(req) {
   const token = tokenFrom(req);
   const res = await supabaseFetch('/rest/v1/app_state?select=state_key,data,updated_at,updated_by&state_key=eq.main&limit=1', token, {
@@ -421,7 +478,10 @@ export async function getSharedState(req) {
   }
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row) return { ok: true, exists: false };
-  if (row.data) repairBillingState(row.data);
+  if (row.data) {
+    ensureTimeClient(row.data);
+    repairBillingState(row.data);
+  }
   return { ok: true, exists: true, ...row };
 }
 
@@ -441,6 +501,7 @@ export async function putSharedState(req, body = {}) {
   }
 
   repairFinancialState(data);
+  ensureTimeClient(data);
   repairBillingState(data);
 
   const res = await supabaseFetch('/rest/v1/app_state?on_conflict=state_key', token, {
