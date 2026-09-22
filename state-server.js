@@ -245,7 +245,7 @@ function receiptLinesForBilling(b) {
   add('Assemb. Extra', d.assembleiaExtra);
   if (num(d.dbe) > 0) {
     const details = String(d.detalhes || '').trim();
-    lines.push(`DBE - ${details || brMoney(d.dbe)}`);
+    lines.push(`DBE - ${brMoney(d.dbe)}${details ? ' - '+details : ''}`);
   }
   if (num(d.rpa) > 0) {
     let line = `RPA - ${brMoney(d.rpa)}`;
