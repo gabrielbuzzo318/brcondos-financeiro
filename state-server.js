@@ -231,6 +231,182 @@ function repairFinancialState(data) {
   return data;
 }
 
+
+function brMoney(v) {
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function receiptLinesForBilling(b) {
+  const d = b?.billingBreakdown || {};
+  const lines = [];
+  const add = (label, value) => { if (num(value) > 0) lines.push(`${label} - ${brMoney(value)}`); };
+  add('Módulo cobrança', d.moduloCobranca);
+  add('Módulo manutenção', d.moduloManutencao);
+  add('Assemb. Extra', d.assembleiaExtra);
+  if (num(d.dbe) > 0) {
+    const details = String(d.detalhes || '').trim();
+    lines.push(`DBE - ${details || brMoney(d.dbe)}`);
+  }
+  if (num(d.rpa) > 0) {
+    let line = `RPA - ${brMoney(d.rpa)}`;
+    const details = String(d.detalhes || '').trim();
+    if (details) line += ` - ${details}`;
+    lines.push(line);
+  }
+  return lines;
+}
+
+function receiptExtrasTotal(b) {
+  const d = b?.billingBreakdown || {};
+  return num(d.dbe) + num(d.moduloCobranca) + num(d.moduloManutencao) + num(d.assembleiaExtra) + num(d.rpa);
+}
+
+// Migração/guarda do faturamento 09/2026.
+// Corrige o ID duplicado do Nova Residence, lê os DBEs que ficaram fora da
+// primeira importação e garante que os recibos de extras não sejam perdidos
+// por sessões antigas do frontend.
+function repairBillingState(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const storage = data.storage;
+  if (!storage || typeof storage !== 'object' || Array.isArray(storage)) return data;
+
+  const boletos = parseArrayValue(storage, 'brcondos_boletos');
+  const receipts = parseArrayValue(storage, 'brcondos_receipts');
+  if (!boletos || !receipts) return data;
+
+  let changed = false;
+  const byClient = name => boletos.find(b =>
+    String(b?.competence || '') === '2026-09' &&
+    norm(b?.client) === norm(name)
+  );
+
+  const nova = boletos.find(b =>
+    String(b?.competence || '') === '2026-09' &&
+    norm(b?.client) === norm('NOVA RESIDENCE') &&
+    String(b?.docNumber || '') === 'FAT-092026-ADM-035'
+  );
+  if (nova) {
+    if (String(nova.id) === '1790090844307') {
+      nova.id = 1790090844307001;
+      changed = true;
+    }
+    if (String(nova.clientId || '') !== '1047') {
+      nova.clientId = 1047;
+      changed = true;
+    }
+  }
+
+  const dbeRules = [
+    ['PATIO PITANGUEIRAS', 1787860169521, 540],
+    ['PERSONA', 1787860157841, 540],
+    ['VILLE DES ALPES', 1051, 540]
+  ];
+  for (const [name, clientId, value] of dbeRules) {
+    const b = byClient(name);
+    if (!b) continue;
+    if (String(b.clientId || '') !== String(clientId)) {
+      b.clientId = clientId;
+      changed = true;
+    }
+    if (!b.billingBreakdown || typeof b.billingBreakdown !== 'object' || Array.isArray(b.billingBreakdown)) {
+      b.billingBreakdown = {};
+      changed = true;
+    }
+    if (!sameNumber(b.billingBreakdown.dbe, value)) {
+      b.billingBreakdown.dbe = value;
+      changed = true;
+    }
+  }
+
+  const usedReceiptIds = new Set(receipts.map(r => String(r?.id ?? '')).filter(Boolean));
+  const usedReceiptNumbers = new Set();
+  let maxReceipt = 0;
+  receipts.forEach(r => {
+    const m = String(r?.receiptNumber || '').match(/^(\d+)\/2026$/);
+    if (!m) return;
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) {
+      maxReceipt = Math.max(maxReceipt, n);
+      usedReceiptNumbers.add(n);
+    }
+  });
+  const nextReceiptNumber = () => {
+    do { maxReceipt++; } while (usedReceiptNumbers.has(maxReceipt));
+    usedReceiptNumbers.add(maxReceipt);
+    return `${String(maxReceipt).padStart(4, '0')}/2026`;
+  };
+
+  const targets = [
+    { boleto: nova, clientId: 1047, client: 'NOVA RESIDENCE QUINTA DAS PAINEIRAS' },
+    { boleto: byClient('PATIO PITANGUEIRAS'), clientId: 1787860169521, client: 'PATIO PITANGUEIRAS' },
+    { boleto: byClient('PERSONA'), clientId: 1787860157841, client: 'PERSONA RESIDENCE' },
+    { boleto: byClient('TIME'), clientId: 0, client: 'TIME' },
+    { boleto: byClient('VILLE DES ALPES'), clientId: 1051, client: 'VILLES DES ALPES RESIDENCE' }
+  ];
+
+  for (const target of targets) {
+    const b = target.boleto;
+    if (!b) continue;
+    const total = receiptExtrasTotal(b);
+    if (!(total > 0)) continue;
+    const description = receiptLinesForBilling(b).join('\n');
+    const details = String(b?.billingBreakdown?.detalhes || '');
+    let rec = receipts.find(r => String(r?.sourceBoletoId ?? '') === String(b.id));
+
+    if (rec && String(rec.status || '') === 'gerado') continue;
+
+    if (!rec) {
+      const id = deterministicId(
+        `receipt:2026-09:${b.sourceKey || b.id}:${target.client}:${total}`,
+        usedReceiptIds,
+        5000000000000
+      );
+      rec = {
+        id,
+        sourceBoletoId: b.id,
+        clientId: target.clientId,
+        client: target.client,
+        competence: '2026-09',
+        issueDate: b.due || '2026-10-10',
+        value: total,
+        description,
+        details,
+        receiptNumber: nextReceiptNumber(),
+        status: 'pendente',
+        billingSplitType: 'extras'
+      };
+      receipts.push(rec);
+      changed = true;
+      continue;
+    }
+
+    const desired = {
+      sourceBoletoId: b.id,
+      clientId: target.clientId,
+      client: target.client,
+      competence: '2026-09',
+      issueDate: b.due || rec.issueDate || '2026-10-10',
+      value: total,
+      description,
+      details,
+      billingSplitType: 'extras'
+    };
+    for (const [k, v] of Object.entries(desired)) {
+      const equal = k === 'value' ? sameNumber(rec[k], v) : String(rec[k] ?? '') === String(v ?? '');
+      if (!equal) {
+        rec[k] = v;
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    storage.brcondos_boletos = JSON.stringify(boletos);
+    storage.brcondos_receipts = JSON.stringify(receipts);
+  }
+  return data;
+}
+
 export async function getSharedState(req) {
   const token = tokenFrom(req);
   const res = await supabaseFetch('/rest/v1/app_state?select=state_key,data,updated_at,updated_by&state_key=eq.main&limit=1', token, {
@@ -245,6 +421,7 @@ export async function getSharedState(req) {
   }
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row) return { ok: true, exists: false };
+  if (row.data) repairBillingState(row.data);
   return { ok: true, exists: true, ...row };
 }
 
@@ -264,6 +441,7 @@ export async function putSharedState(req, body = {}) {
   }
 
   repairFinancialState(data);
+  repairBillingState(data);
 
   const res = await supabaseFetch('/rest/v1/app_state?on_conflict=state_key', token, {
     method: 'POST',
