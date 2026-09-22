@@ -154,6 +154,27 @@ function buildBoletoBody(input){
   };
   const idTitulo=String(input?.idTituloEmpresa||'').trim().slice(0,25);
   if(idTitulo)body.idTituloEmpresa=idTitulo;
+
+  // Observacoes do boleto: o frontend envia as linhas em `detalhes`.
+  // A API Sicredi aceita ate 5 informativos e 4 mensagens. Quebramos em blocos
+  // curtos para preservar inclusive listas grandes de codigos de RPA.
+  const rawNotes=Array.isArray(input?.informativos)
+    ? input.informativos.map(x=>String(x||'').trim()).filter(Boolean)
+    : String(input?.detalhes||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const noteChunks=[];
+  rawNotes.forEach(line=>{
+    let remaining=line;
+    while(remaining.length>80){
+      let cut=remaining.lastIndexOf(' ',80);
+      if(cut<35)cut=80;
+      noteChunks.push(remaining.slice(0,cut).trim());
+      remaining=remaining.slice(cut).trim();
+    }
+    if(remaining)noteChunks.push(remaining);
+  });
+  if(noteChunks.length>9)throw sicrediError('Observacao do boleto ficou longa demais para o limite do Sicredi.',400);
+  if(noteChunks.length)body.informativos=noteChunks.slice(0,5);
+  if(noteChunks.length>5)body.mensagens=noteChunks.slice(5,9);
   return body;
 }
 
