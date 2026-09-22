@@ -128,6 +128,7 @@
       const idx={
         cliente:headerIndex(headers,['CLIENTE']),
         honorario:headerIndex(headers,['HONO ADM COND','HONORARIO ADM','HONORÁRIO ADM']),
+        dbe:headerIndex(headers,['DBE']),
         cobranca:headerIndex(headers,['MODULO COBANCA','MODULO COBRANCA','MODULO COBANÇA','MOD. COB.','VALOR COBRADO DO CLIENTE']),
         manutencao:headerIndex(headers,['MODULO MANUT','MODULO MANUTENCAO','MODULO MANUTENÇÃO']),
         assembleia:headerIndex(headers,['ASSEM EXTRA','ASSEMB EXTRA','ASSEMBLEIA EXTRA']),
@@ -168,6 +169,7 @@
         parsed.push({rowNo:r+1,client,total,day,obs,section:isCont?'CONTABIL':'ADM',
           honorario:isCont?0:honorarioRaw,
           honorarioCont:isCont?honorarioRaw:0,
+          dbe:idx.dbe>=0?n(row[idx.dbe]):0,
           cobranca:idx.cobranca>=0?n(row[idx.cobranca]):0,
           manutencao:idx.manutencao>=0?n(row[idx.manutencao]):0,
           assembleia:idx.assembleia>=0?n(row[idx.assembleia]):0,
@@ -182,6 +184,7 @@
       const dueMonth=nextMonth(selected.year,selected.month);
       const existing=new Set((boletos||[]).map(b=>b.sourceKey).filter(Boolean));
       let added=0,dups=0,noDue=0,admSeq=0,contSeq=0;
+      const billingIdBase=Date.now()*1000;
       const historicoEmitidoNoBanco=selected.ym>='2026-01'&&selected.ym<='2026-07';
 
       parsed.forEach((r,i)=>{
@@ -193,7 +196,7 @@
         if(existing.has(sourceKey)){dups++;return;}
         const c=typeof findClientByLooseName==='function'?findClientByLooseName(r.client):null;
         boletos.push({
-          id:Date.now()+i+Math.floor(Math.random()*1000),
+          id:billingIdBase+i,
           clientId:c?.id||0,
           client:r.client,
           docNumber:`FAT-${pad2(selected.month)}${selected.year}-${sectionCode}-${String(sectionSeq).padStart(3,'0')}`,
@@ -210,6 +213,7 @@
           billingBreakdown:{
             honorarioAdm:r.honorario,
             honorarioCont:r.honorarioCont,
+            dbe:r.dbe,
             moduloCobranca:r.cobranca,
             moduloManutencao:r.manutencao,
             assembleiaExtra:r.assembleia,
