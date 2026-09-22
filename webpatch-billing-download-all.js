@@ -159,12 +159,13 @@
 
   window.brDownloadAllReceipts=async function(){
     const root=document.getElementById('view-recibos');
-    const visibleIds=new Set([...root.querySelectorAll('tbody tr[data-id]')]
+    const tableRows=[...root.querySelectorAll('tbody tr[data-id]')];
+    const visibleIds=new Set(tableRows
       .filter(tr=>tr.style.display!=='none')
       .map(tr=>String(tr.dataset.id||'')));
     const comp=String(document.getElementById('receipt_comp_filter')?.value||'');
     const rows=(Array.isArray(receipts)?receipts:[]).filter(r=>{
-      if(visibleIds.size && !visibleIds.has(String(r.id)))return false;
+      if(!visibleIds.has(String(r.id)))return false;
       if(comp && String(r.competence||'')!==comp)return false;
       return true;
     });
