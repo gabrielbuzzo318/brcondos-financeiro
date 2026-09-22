@@ -3,6 +3,7 @@ import { gerarBoletoPdf } from './boleto-pdf.js';
 import { consultarBoletoSicredi } from './sicredi.js';
 import { consultarNfsePorNumeroGiss, consultarNfsePorRpsGiss } from './giss.js';
 import { gerarNfsePdf } from './nfse-pdf.js';
+import { gerarReceiptPdf } from './receipt-pdf.js';
 
 function safeName(value,fallback='arquivo.pdf'){
   return String(value||fallback)
@@ -119,7 +120,7 @@ async function officialNfsePdf(item){
 export async function sendBillingDocumentsZip(req,res,body={}){
   const type=String(body.type||'').trim();
   const items=Array.isArray(body.items)?body.items:[];
-  if(!['boletos','nfse'].includes(type)){const err=new Error('Tipo de documento inválido.');err.status=400;throw err;}
+  if(!['boletos','nfse','receipts'].includes(type)){const err=new Error('Tipo de documento inválido.');err.status=400;throw err;}
   if(!items.length){const err=new Error('Nenhum documento selecionado.');err.status=400;throw err;}
   if(items.length>250){const err=new Error('Selecione no máximo 250 documentos por vez.');err.status=400;throw err;}
 
@@ -134,8 +135,9 @@ export async function sendBillingDocumentsZip(req,res,body={}){
         const payload=await enrichBoletoPayload(item?.payload||{});
         buffer=await gerarBoletoPdf(payload);
       }
-      else buffer=await officialNfsePdf(item);
-      const fileName=uniqueName(item?.name||`${type==='boletos'?'Boleto':'NF'}.pdf`,used);
+      else if(type==='nfse') buffer=await officialNfsePdf(item);
+      else buffer=await gerarReceiptPdf(item?.payload||{});
+      const fileName=uniqueName(item?.name||`${type==='boletos'?'Boleto':type==='nfse'?'NF':'Recibo'}.pdf`,used);
       files.push({name:/\.pdf$/i.test(fileName)?fileName:`${fileName}.pdf`,buffer});
     }catch(err){
       failures.push(`${safeName(item?.name||'documento')}: ${err?.message||'não foi possível gerar'}`);
