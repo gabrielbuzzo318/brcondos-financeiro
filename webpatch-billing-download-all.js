@@ -18,6 +18,13 @@
   function safe(value,fallback='DOCUMENTO'){
     return String(value||fallback).replace(/[\\/:*?"<>|\r\n\t]+/g,'-').replace(/\s+/g,' ').trim().slice(0,110)||fallback;
   }
+  function boletoFileDate(v){
+    const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}-${m[2]}-${m[1]}`:String(v||'SEM VENCIMENTO');
+  }
+  function boletoFileValue(v){
+    return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
   function pick(obj,names){
     for(const n of names){if(obj&&obj[n]!==undefined&&obj[n]!==null&&String(obj[n]).trim()!=='')return obj[n];}
     return '';
@@ -96,7 +103,7 @@
     const rows=(Array.isArray(boletos)?boletos:[]).filter(b=>String(b?.due||'').slice(0,7)===month&&b?.sicrediRegistered);
     if(!rows.length)return alert(`Não há boletos oficiais do Sicredi em ${label(month)}.`);
     const items=rows.map(b=>({
-      name:`${safe(b.client,'CLIENTE')} - BOLETO ${safe(b.docNumber||b.sicrediNossoNumero||b.id,'SEM NÚMERO')}.pdf`,
+      name:`${safe(b.client,'CLIENTE')} - R$ ${boletoFileValue(b.value)} - ${boletoFileDate(b.due)}.pdf`,
       payload:boletoPayload(b)
     }));
     await requestZip('boletos',items,`BRCONDOS - BOLETOS - ${zipLabel(month)}.zip`,document.getElementById('boleto_download_all_btn'));
