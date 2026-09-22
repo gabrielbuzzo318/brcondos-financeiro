@@ -83,10 +83,51 @@ function previewReceipt(id){
   const row=receipts.find(x=>x.id===id);if(!row)return;
   openReceiptPrintWindow([row],`${row.client||'CLIENTE'} - RECIBO ${String(row.receiptNumber||'').replace('/','-')} - ${money(row.value)}`);
 }
-function generateReceiptPdf(id){
+async function generateReceiptPdf(id){
   const row=receipts.find(x=>x.id===id);if(!row)return;
-  if(!openReceiptPrintWindow([row],`${row.client||'CLIENTE'} - RECIBO ${String(row.receiptNumber||'').replace('/','-')} - ${money(row.value)}`))return;
-  row.status='gerado';saveData('receipts',receipts);renderAll();
+  const c=receiptClient(row);
+  const clientName=String(c?.name||row.client||'CLIENTE').trim();
+  const safeName=clientName.replace(/[\\/:*?"<>|\r\n\t]+/g,'-').replace(/\s+/g,' ').trim()||'CLIENTE';
+  const nr=String(row.receiptNumber||'SEM NÚMERO').replace('/','-');
+  const valor=Number(row.value||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fileName=`${safeName} - RECIBO ${nr} - R$ ${valor}.pdf`;
+  const payload={
+    receiptNumber:String(row.receiptNumber||''),
+    client:clientName,
+    address:receiptAddress(c),
+    value:Number(row.value||0),
+    amountWords:receiptAmountWords(row.value),
+    competence:String(row.competence||''),
+    competenceLabel:receiptCompetenceLabel(row.competence),
+    issueDate:String(row.issueDate||''),
+    issueDateLong:receiptDateLong(row.issueDate),
+    description:String(row.description||'')
+  };
+  try{
+    const response=await fetch('/api/receipts/pdf',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({payload})
+    });
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(data?.error||'Não foi possível gerar o PDF.');
+    }
+    const blob=await response.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    row.status='gerado';
+    saveData('receipts',receipts);
+    renderAll();
+  }catch(e){
+    alert('Erro ao baixar o recibo:\n'+(e?.message||e));
+  }
 }
 
 function openNewReceipt(){
