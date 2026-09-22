@@ -36,6 +36,33 @@
   }
   function remember(key,value){try{sessionStorage.setItem(key,String(value||''));}catch(_){ }}
 
+  function updateBoletoMonthCards(){
+    const root=document.getElementById('view-boletos');
+    if(!root)return;
+    const month=String(document.getElementById('boleto_download_month')?.value||currentMonth());
+    const rows=(Array.isArray(boletos)?boletos:[]).filter(b=>String(b?.due||'').slice(0,7)===month);
+    const open=rows.filter(b=>b.status!=='recebido').reduce((sum,b)=>sum+Number(b.value||0),0);
+    const received=rows.filter(b=>b.status==='recebido').reduce((sum,b)=>sum+Number(b.value||0),0);
+    const noDue=0;
+    const total=rows.length;
+
+    [...root.querySelectorAll('.cards.grid .card')].forEach(card=>{
+      const label=String(card.querySelector('.kpi-label')?.textContent||'').trim().toUpperCase();
+      const value=card.querySelector('.kpi-value');
+      if(!value)return;
+      if(label==='EM ABERTO')value.textContent=money(open);
+      else if(label==='RECEBIDOS')value.textContent=money(received);
+      else if(label==='SEM VENCIMENTO')value.textContent=String(noDue);
+      else if(label==='TOTAL DE BOLETOS')value.textContent=String(total);
+    });
+  }
+
+  function removeBoletoNotice(){
+    const root=document.getElementById('view-boletos');
+    const notice=root?.querySelector('.notice');
+    if(notice)notice.remove();
+  }
+
   function boletoMonths(){
     const set=new Set([currentMonth()]);
     (Array.isArray(boletos)?boletos:[]).forEach(b=>{
@@ -137,7 +164,14 @@
 
   window.brDownloadAllBoletos=async function(){
     const month=String(document.getElementById('boleto_download_month')?.value||currentMonth());
-    const rows=(Array.isArray(boletos)?boletos:[]).filter(b=>String(b?.due||'').slice(0,7)===month&&b?.sicrediRegistered);
+    const root=document.getElementById('view-boletos');
+    const tableRows=[...root.querySelectorAll('tbody tr[data-id]')];
+    const visibleIds=new Set(tableRows.filter(tr=>tr.style.display!=='none').map(tr=>String(tr.dataset.id||'')));
+    const rows=(Array.isArray(boletos)?boletos:[]).filter(b=>
+      String(b?.due||'').slice(0,7)===month &&
+      b?.sicrediRegistered &&
+      (!tableRows.length || visibleIds.has(String(b.id)))
+    );
     if(!rows.length)return alert(`Não há boletos oficiais do Sicredi em ${label(month)}.`);
     const items=rows.map(b=>({
       name:`${safe(b.client,'CLIENTE')} - R$ ${boletoFileValue(b.value)} - ${boletoFileDate(b.due)}.pdf`,
@@ -183,7 +217,10 @@
     const wrap=document.createElement('div');
     wrap.className='br-billing-download-wrap';
     wrap.innerHTML=`<select id="${idPrefix}_download_month" class="br-billing-download-month" title="${title}">${months.map(m=>`<option value="${m}" ${m===selected?'selected':''}>${label(m)}</option>`).join('')}</select><button id="${idPrefix}_download_all_btn" type="button" class="btn">↓ Baixar tudo</button>`;
-    wrap.querySelector('select')?.addEventListener('change',e=>remember(key,e.target.value));
+    wrap.querySelector('select')?.addEventListener('change',e=>{
+      remember(key,e.target.value);
+      if(idPrefix==='boleto')updateBoletoMonthCards();
+    });
     wrap.querySelector('button')?.addEventListener('click',handler);
     return wrap;
   }
@@ -192,6 +229,8 @@
     const root=document.getElementById('view-boletos');const section=root?.querySelector('.section-title');const actions=section?.lastElementChild;
     if(!actions||actions.querySelector('#boleto_download_month'))return;
     actions.insertBefore(controls('boleto',boletoMonths(),KEY_BOLETO,window.brDownloadAllBoletos,'Mês de vencimento dos boletos'),actions.firstChild);
+    removeBoletoNotice();
+    updateBoletoMonthCards();
   }
   function injectNfse(){
     const root=document.getElementById('view-nfse');const section=root?.querySelector('.section-title');const actions=section?.lastElementChild;
@@ -206,7 +245,7 @@
     btn.addEventListener('click',window.brDownloadAllReceipts);
     actions.insertBefore(btn,actions.firstChild);
   }
-  function inject(){injectBoleto();injectNfse();injectReceipts();}
+  function inject(){injectBoleto();injectNfse();injectReceipts();removeBoletoNotice();}
 
   if(!document.getElementById('br-billing-download-style')){
     const style=document.createElement('style');style.id='br-billing-download-style';style.textContent=`
