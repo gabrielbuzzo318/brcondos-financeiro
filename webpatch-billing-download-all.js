@@ -2,6 +2,7 @@
   const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const KEY_BOLETO='brcondos_boleto_download_month_v1';
   const KEY_NFSE='brcondos_nfse_download_month_v1';
+  const KEY_RECEIPT='brcondos_receipt_download_month_v1';
 
   function currentMonth(){
     const raw=String(typeof today==='function'?today():new Date().toISOString().slice(0,10));
@@ -51,6 +52,14 @@
     });
     return [...set].sort((a,b)=>b.localeCompare(a));
   }
+  function receiptMonths(){
+    const set=new Set([currentMonth()]);
+    (Array.isArray(receipts)?receipts:[]).forEach(r=>{
+      const comp=String(r?.competence||'');
+      if(/^\d{4}-\d{2}$/.test(comp))set.add(comp);
+    });
+    return [...set].sort((a,b)=>b.localeCompare(a));
+  }
 
   function boletoPayload(b){
     const c=(typeof findClientByLooseName==='function'?findClientByLooseName(b.client):null)||(Array.isArray(clients)?clients:[]).find(x=>Number(x.id)===Number(b.clientId));
@@ -75,6 +84,34 @@
       linhaDigitavel:String(b.sicrediLinhaDigitavel||'').trim(),
       codigoBarras:String(pick(resp,['codigoBarras','codigo_barras','codigoDeBarras'])||''),
       qrCode:String(b.sicrediQrCode||pick(resp,['qrCode','qrcode','qrCodePix','pixCopiaECola','codigoQrCode'])||'')
+    };
+  }
+
+  function receiptPayload(row){
+    let cl=null;
+    try{cl=typeof receiptClient==='function'?receiptClient(row):null;}catch(_){ }
+    if(!cl){
+      try{cl=(Array.isArray(clients)?clients:[]).find(x=>Number(x.id)===Number(row?.clientId))||findClientByLooseName(row?.client);}catch(_){ }
+    }
+    let address='-';
+    try{address=typeof receiptAddress==='function'?receiptAddress(cl):'-';}catch(_){ }
+    let competenceLabel=String(row?.competence||'');
+    let issueDateLong=String(row?.issueDate||'');
+    let amountWords='';
+    try{if(typeof receiptCompetenceLabel==='function')competenceLabel=receiptCompetenceLabel(row?.competence);}catch(_){ }
+    try{if(typeof receiptDateLong==='function')issueDateLong=receiptDateLong(row?.issueDate);}catch(_){ }
+    try{if(typeof receiptAmountWords==='function')amountWords=receiptAmountWords(row?.value);}catch(_){ }
+    return {
+      receiptNumber:String(row?.receiptNumber||''),
+      client:String(cl?.name||row?.client||''),
+      address:String(address||'-'),
+      value:Number(row?.value||0),
+      amountWords,
+      competence:String(row?.competence||''),
+      competenceLabel,
+      issueDate:String(row?.issueDate||''),
+      issueDateLong,
+      description:String(row?.description||'')
     };
   }
 
@@ -120,6 +157,26 @@
     await requestZip('nfse',items,`BRCONDOS - NOTAS FISCAIS - ${zipLabel(month)}.zip`,document.getElementById('nfse_download_all_btn'));
   };
 
+  window.brDownloadAllReceipts=async function(){
+    const root=document.getElementById('view-recibos');
+    const visibleIds=new Set([...root.querySelectorAll('tbody tr[data-id]')]
+      .filter(tr=>tr.style.display!=='none')
+      .map(tr=>String(tr.dataset.id||'')));
+    const comp=String(document.getElementById('receipt_comp_filter')?.value||'');
+    const rows=(Array.isArray(receipts)?receipts:[]).filter(r=>{
+      if(visibleIds.size && !visibleIds.has(String(r.id)))return false;
+      if(comp && String(r.competence||'')!==comp)return false;
+      return true;
+    });
+    if(!rows.length)return alert('Não há recibos nos filtros atuais para baixar.');
+    const items=rows.map(r=>({
+      name:`${safe(r.client,'CLIENTE')} - RECIBO ${safe(String(r.receiptNumber||'').replace('/','-'),'SEM NÚMERO')}.pdf`,
+      payload:receiptPayload(r)
+    }));
+    const suffix=comp?zipLabel(comp):'FILTRADOS';
+    await requestZip('receipts',items,`BRCONDOS - RECIBOS - ${suffix}.zip`,document.getElementById('receipt_download_all_btn'));
+  };
+
   function controls(idPrefix,months,key,handler,title){
     const selected=saved(key,months);
     const wrap=document.createElement('div');
@@ -140,7 +197,15 @@
     if(!actions||actions.querySelector('#nfse_download_month'))return;
     actions.insertBefore(controls('nfse',nfseMonths(),KEY_NFSE,window.brDownloadAllNfse,'Competência das notas fiscais'),actions.firstChild);
   }
-  function inject(){injectBoleto();injectNfse();}
+  function injectReceipts(){
+    const root=document.getElementById('view-recibos');const section=root?.querySelector('.section-title');const actions=section?.lastElementChild;
+    if(!actions||actions.querySelector('#receipt_download_all_btn'))return;
+    const btn=document.createElement('button');
+    btn.id='receipt_download_all_btn';btn.type='button';btn.className='btn';btn.textContent='↓ Baixar tudo';
+    btn.addEventListener('click',window.brDownloadAllReceipts);
+    actions.insertBefore(btn,actions.firstChild);
+  }
+  function inject(){injectBoleto();injectNfse();injectReceipts();}
 
   if(!document.getElementById('br-billing-download-style')){
     const style=document.createElement('style');style.id='br-billing-download-style';style.textContent=`
@@ -155,6 +220,8 @@
   if(typeof oldBoletos==='function')window.renderBoletos=function(){const out=oldBoletos.apply(this,arguments);setTimeout(injectBoleto,20);return out;};
   const oldNfse=window.renderNfse;
   if(typeof oldNfse==='function')window.renderNfse=function(){const out=oldNfse.apply(this,arguments);setTimeout(injectNfse,20);return out;};
+  const oldReceipts=window.renderReceipts;
+  if(typeof oldReceipts==='function')window.renderReceipts=function(){const out=oldReceipts.apply(this,arguments);setTimeout(injectReceipts,20);return out;};
   const obs=new MutationObserver(()=>setTimeout(inject,0));obs.observe(document.documentElement,{childList:true,subtree:true});
   setTimeout(inject,300);
 })();
