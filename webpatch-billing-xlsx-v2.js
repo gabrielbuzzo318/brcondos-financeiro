@@ -138,6 +138,20 @@
       };
       if(idx.cliente<0||idx.total<0)throw new Error('A planilha precisa ter as colunas CLIENTE e TOTAL.');
 
+      const contTitleRow=selected.matrix.findIndex((row,ri)=>
+        ri>selected.headerRow && norm(row?.[0]).includes('HONORARIOS CONTABEIS ASSOCIACOES')
+      );
+      const contHeaderRow=contTitleRow>=0?contTitleRow+1:-1;
+      let contEndRow=-1;
+      if(contHeaderRow>=0){
+        for(let rr=contHeaderRow+1;rr<selected.matrix.length;rr++){
+          const rw=selected.matrix[rr]||[];
+          const clientTxt=String(rw[idx.cliente]??'').trim();
+          const totalVal=n(rw[idx.total]);
+          if(!clientTxt && totalVal>0){contEndRow=rr-1;break;}
+        }
+      }
+
       const parsed=[];
       for(let r=selected.headerRow+1;r<selected.matrix.length;r++){
         const row=selected.matrix[r]||[];
@@ -146,9 +160,14 @@
         if(!client||total<=0)continue;
         let day=idx.venc>=0?Math.trunc(n(row[idx.venc])):0;
         if(day<1||day>31)day=0;
-        const obs=buildObservation(row,idx);
-        parsed.push({rowNo:r+1,client,total,day,obs,
-          honorario:idx.honorario>=0?n(row[idx.honorario]):0,
+        const isCont=contHeaderRow>=0 && r>contHeaderRow && (contEndRow<0 || r<=contEndRow);
+        const honorarioRaw=idx.honorario>=0?n(row[idx.honorario]):0;
+        const obs=isCont
+          ? (honorarioRaw>0?`Honorário Cont - ${brl(honorarioRaw)}`:'')
+          : buildObservation(row,idx);
+        parsed.push({rowNo:r+1,client,total,day,obs,section:isCont?'CONTABIL':'ADM',
+          honorario:isCont?0:honorarioRaw,
+          honorarioCont:isCont?honorarioRaw:0,
           cobranca:idx.cobranca>=0?n(row[idx.cobranca]):0,
           manutencao:idx.manutencao>=0?n(row[idx.manutencao]):0,
           assembleia:idx.assembleia>=0?n(row[idx.assembleia]):0,
@@ -162,30 +181,35 @@
 
       const dueMonth=nextMonth(selected.year,selected.month);
       const existing=new Set((boletos||[]).map(b=>b.sourceKey).filter(Boolean));
-      let added=0,dups=0,noDue=0;
+      let added=0,dups=0,noDue=0,admSeq=0,contSeq=0;
       const historicoEmitidoNoBanco=selected.ym>='2026-01'&&selected.ym<='2026-07';
 
       parsed.forEach((r,i)=>{
         const due=r.day?`${dueMonth.year}-${pad2(dueMonth.month)}-${pad2(r.day)}`:'';
         if(!due)noDue++;
-        const sourceKey=`xlsx-${selected.ym}-ADM-${norm(r.client)}-${r.total.toFixed(2)}-${r.day||'SEM'}-${norm(r.obs)}-${r.rowNo}`;
+        const sectionCode=r.section==='CONTABIL'?'CONT':'ADM';
+        const sectionSeq=r.section==='CONTABIL'?++contSeq:++admSeq;
+        const sourceKey=`xlsx-${selected.ym}-${sectionCode}-${norm(r.client)}-${r.total.toFixed(2)}-${r.day||'SEM'}-${norm(r.obs)}-${r.rowNo}`;
         if(existing.has(sourceKey)){dups++;return;}
         const c=typeof findClientByLooseName==='function'?findClientByLooseName(r.client):null;
         boletos.push({
           id:Date.now()+i+Math.floor(Math.random()*1000),
           clientId:c?.id||0,
           client:r.client,
-          docNumber:`FAT-${pad2(selected.month)}${selected.year}-ADM-${String(r.rowNo-selected.headerRow).padStart(3,'0')}`,
+          docNumber:`FAT-${pad2(selected.month)}${selected.year}-${sectionCode}-${String(sectionSeq).padStart(3,'0')}`,
           due,
           value:Number(r.total),
-          description:`Faturamento ADM - ${pad2(selected.month)}/${selected.year}`,
+          description:r.section==='CONTABIL'
+            ?`Faturamento CONT - ${pad2(selected.month)}/${selected.year}`
+            :`Faturamento ADM - ${pad2(selected.month)}/${selected.year}`,
           details:r.obs,
           bank:historicoEmitidoNoBanco?'Emitido diretamente no banco':'Integração pendente',
           status:!due?'pendente_vencimento':(historicoEmitidoNoBanco?'emitido_externo':'aguardando_integracao'),
           externalIssued:historicoEmitidoNoBanco&&!!due,
-          receiptDate:'',flowId:null,sourceKey,competence:selected.ym,section:'ADM',
+          receiptDate:'',flowId:null,sourceKey,competence:selected.ym,section:r.section,
           billingBreakdown:{
             honorarioAdm:r.honorario,
+            honorarioCont:r.honorarioCont,
             moduloCobranca:r.cobranca,
             moduloManutencao:r.manutencao,
             assembleiaExtra:r.assembleia,
@@ -223,7 +247,7 @@
     }
     const notice=view.querySelector('.notice');
     if(notice){
-      notice.innerHTML='<b>Regra do faturamento:</b> importe a planilha mensal em Excel. O sistema usa <b>TOTAL</b> como valor do boleto e monta a observação com Honorário Adm, Módulo cobrança, Módulo manutenção, Assemb. Extra e RPA somente quando houver valor. Os códigos do RPA são puxados de <b>DETALHES</b>. O vencimento continua no mês seguinte à competência.';
+      notice.innerHTML='<b>Regra do faturamento:</b> importe a planilha mensal em Excel. O sistema usa <b>TOTAL</b> como valor do boleto. No quadro ADM, a observação usa Honorário Adm, Módulo cobrança, Módulo manutenção, Assemb. Extra e RPA somente quando houver valor. No quadro <b>Honorários Contábeis - Associações</b>, a descrição fica <b>Faturamento CONT</b> e os detalhes mostram apenas <b>Honorário Cont</b>. O vencimento continua no mês seguinte à competência.';
     }
     const ths=[...view.querySelectorAll('thead th')];
     const detailsTh=ths.find(th=>/^Detalhes$/i.test((th.textContent||'').trim()));
