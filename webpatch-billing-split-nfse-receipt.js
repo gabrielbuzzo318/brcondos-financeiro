@@ -181,7 +181,7 @@
           const year=String(b.competence||issueDate).slice(0,4);
           receipts.push(normalizeReceipt({
             id:Date.now()+i+5000+Math.floor(Math.random()*100),
-            sourceBoletoId:b.id,clientId:c.id,client:c.name||b.client,
+            sourceBoletoId:b.id,clientId:c?.id||Number(b.clientId||0),client:c?.name||b.client,
             competence:b.competence,issueDate,value:receiptValue,
             description:receiptDescription,details:String(b.billingBreakdown.detalhes||''),
             receiptNumber:nextReceiptNumber(year),status:'pendente',billingSplitType:'extras'
