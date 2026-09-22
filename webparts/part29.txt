@@ -81,11 +81,11 @@ function openReceiptPrintWindow(rows,title='Recibo de Prestação de Serviço'){
 
 function previewReceipt(id){
   const row=receipts.find(x=>x.id===id);if(!row)return;
-  openReceiptPrintWindow([row],`Recibo ${row.receiptNumber||''}`);
+  openReceiptPrintWindow([row],`${row.client||'CLIENTE'} - RECIBO ${String(row.receiptNumber||'').replace('/','-')} - ${money(row.value)}`);
 }
 function generateReceiptPdf(id){
   const row=receipts.find(x=>x.id===id);if(!row)return;
-  if(!openReceiptPrintWindow([row],`Recibo ${row.receiptNumber||''}`))return;
+  if(!openReceiptPrintWindow([row],`${row.client||'CLIENTE'} - RECIBO ${String(row.receiptNumber||'').replace('/','-')} - ${money(row.value)}`))return;
   row.status='gerado';saveData('receipts',receipts);renderAll();
 }
 
