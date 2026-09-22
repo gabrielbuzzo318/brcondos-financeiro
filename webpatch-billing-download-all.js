@@ -185,7 +185,7 @@
     const rows=(Array.isArray(nfse)?nfse:[]).filter(n=>String(n?.competence||'')===month&&['emitida_nfse','cancelada_nfse'].includes(n?.status)&&n?.nfseNumber);
     if(!rows.length)return alert(`Não há NFS-e emitidas em ${label(month)}.`);
     const items=rows.map(n=>({
-      name:`${safe(n.client,'CLIENTE')} - NF ${safe(n.nfseNumber,'SEM NÚMERO')}.pdf`,
+      name:`${safe(n.client,'CLIENTE')} - NF ${safe(n.nfseNumber,'SEM NÚMERO')} - R$ ${boletoFileValue(n.value)}.pdf`,
       idInterno:String(n.gissInternalId||''),numero:String(n.nfseNumber||''),rps:String(n.gissRpsNumber||n.rpsNumber||''),verificacao:String(n.verificationCode||'')
     }));
     await requestZip('nfse',items,`BRCONDOS - NOTAS FISCAIS - ${zipLabel(month)}.zip`,document.getElementById('nfse_download_all_btn'));
