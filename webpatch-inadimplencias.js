@@ -547,6 +547,16 @@
     return row||null;
   };
 
+  function addMonthsToIso(date,months){
+    const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m)return date||'';
+    const year=Number(m[1]),month=Number(m[2])-1,day=Number(m[3]);
+    const first=new Date(Date.UTC(year,month+Number(months||0),1));
+    const lastDay=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+    const d=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth(),Math.min(day,lastDay)));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  }
+
   window.openManualInadimplencia=function(id=null){
     const x=id?manualInadimplencias.find(r=>Number(r.id)===Number(id)):{client:'',due:hoje(),description:'',value:'',status:'em_aberto',liquidationDate:''};
     if(!x)return;
@@ -559,17 +569,47 @@
         ${field('Valor',`<input id="inad_manual_value" type="text" inputmode="decimal" value="${x.value!==''?esc(moneyInputBR(x.value)):''}" placeholder="0,00">`)}
         ${field('Status',`<select id="inad_manual_status"><option value="em_aberto" ${x.status!=='liquidado'?'selected':''}>Em aberto / automático</option><option value="liquidado" ${x.status==='liquidado'?'selected':''}>Liquidado</option></select>`)}
         ${field('Data da liquidação',`<input id="inad_manual_liq" type="date" value="${esc(x.liquidationDate||'')}">`)}
+        ${!id?field('Criar por quantos meses?',`<input id="inad_manual_months" type="number" min="1" max="60" step="1" value="1">`):''}
       </div>
-      <div class="notice">Se o vencimento já passou e não estiver liquidado, o status vira <b>Vencido</b> automaticamente.</div>
+      <div class="notice">
+        Se o vencimento já passou e não estiver liquidado, o status vira <b>Vencido</b> automaticamente.
+        ${!id?'<br><b>Repetição mensal:</b> informe 6 para criar 6 inadimplências mensais, começando no vencimento informado.':''}
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveManualInadimplencia(${id||'null'})">Salvar</button></div>`);
   };
 
   window.saveManualInadimplencia=function(id){
     const client=val('inad_manual_client').trim(),due=val('inad_manual_due'),description=val('inad_manual_desc').trim(),value=parseMoneyBR(val('inad_manual_value')),status=val('inad_manual_status'),liq=val('inad_manual_liq');
     if(!client||!due||!description||!(value>0))return alert('Preencha cliente, vencimento, descrição e valor.');
-    const obj={id:id||Date.now(),client,due,description,value,status:status==='liquidado'?'liquidado':'em_aberto',liquidationDate:status==='liquidado'?(liq||hoje()):''};
-    if(id)manualInadimplencias=manualInadimplencias.map(x=>Number(x.id)===Number(id)?obj:x);else manualInadimplencias.push(obj);
+
+    if(id){
+      const obj={id,client,due,description,value,status:status==='liquidado'?'liquidado':'em_aberto',liquidationDate:status==='liquidado'?(liq||hoje()):''};
+      manualInadimplencias=manualInadimplencias.map(x=>Number(x.id)===Number(id)?{...x,...obj}:x);
+      saveManual();closeModal();renderAll();
+      return;
+    }
+
+    const monthsRaw=Number(document.getElementById('inad_manual_months')?.value||1);
+    const months=Math.max(1,Math.min(60,Number.isFinite(monthsRaw)?Math.floor(monthsRaw):1));
+    const groupId=Date.now();
+
+    for(let i=0;i<months;i++){
+      manualInadimplencias.push({
+        id:groupId+i,
+        client,
+        due:addMonthsToIso(due,i),
+        description,
+        value,
+        status:status==='liquidado'?'liquidado':'em_aberto',
+        liquidationDate:status==='liquidado'?(liq||hoje()):'',
+        recurrenceGroup:months>1?groupId:null,
+        recurrenceIndex:months>1?i+1:null,
+        recurrenceTotal:months>1?months:null
+      });
+    }
+
     saveManual();closeModal();renderAll();
+    if(months>1)alert(months+' inadimplências mensais criadas ✅');
   };
 
   window.liquidateManualInadimplencia=function(id){const x=manualInadimplencias.find(r=>Number(r.id)===Number(id));if(!x)return;x.status='liquidado';x.liquidationDate=hoje();saveManual();renderAll()};
