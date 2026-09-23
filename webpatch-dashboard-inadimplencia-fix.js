@@ -6,8 +6,9 @@
     const s=norm(b?.sicrediStatus||'');
     if(/BAIXADO\s+POR\s+SOLICIT/.test(s))return 'baixado';
     if(/LIQUIDAD|PAGO|PAGA/.test(s))return 'liquidado';
-    if(/VENCID/.test(s)||b?.status==='vencido')return 'vencido';
     if(b?.status==='recebido')return 'liquidado';
+    if(b?.status==='recebido_parcial')return 'parcial';
+    if(/VENCID/.test(s)||b?.status==='vencido')return 'vencido';
     if(b?.due&&String(b.due)<hoje())return 'vencido';
     return 'em_aberto';
   }
