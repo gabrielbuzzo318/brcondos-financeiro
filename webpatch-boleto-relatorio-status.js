@@ -2,11 +2,15 @@
   const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
 
   const STATUS_ORDER=[
-    'liquidado','em_carteira','vencido','baixado','emitido','emitido_externo',
+    'liquidado','recebido_parcial','em_carteira','vencido','baixado','emitido','emitido_externo',
     'aguardando_integracao','pendente_vencimento','recebido'
   ];
 
   function statusInfo(b){
+    const raw=String(b?.status||'');
+    if(raw==='recebido_parcial'){
+      return {key:'recebido_parcial',label:'PARCIAL',css:'background:#fff7d6;color:#8a6814;border:1px solid #e8cf78'};
+    }
     const s=norm(b?.sicrediStatus||'');
 
     if(/BAIXADO\s+POR\s+SOLICIT/.test(s)){
@@ -22,7 +26,6 @@
       return {key:'em_carteira',label:/PIX/.test(s)?'Em carteira PIX':'Em carteira',css:'background:#eef7fb;color:#28789c;border:1px solid #b9ddec'};
     }
 
-    const raw=String(b?.status||'');
     if(raw==='recebido')return {key:'recebido',label:'Recebido',css:'background:#e8f7ec;color:#1b7a39;border:1px solid #b9e2c4'};
     if(raw==='vencido'||(b?.due&&String(b.due)<today()))return {key:'vencido',label:'Vencido',css:'background:#fff0f0;color:#bd3030;border:1px solid #efb0b0'};
     if(raw==='emitido')return {key:'emitido',label:'Emitido',css:'background:#eef7fb;color:#28789c;border:1px solid #b9ddec'};
