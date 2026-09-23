@@ -47,7 +47,7 @@
       return sum+Number(b.value||0);
     },0);
     const received=rows.reduce((sum,b)=>{
-      if(b.status==='recebido')return sum+Number(b.receivedAmount??b.value||0);
+      if(b.status==='recebido')return sum+Number((b.receivedAmount??b.value)||0);
       if(b.status==='recebido_parcial')return sum+Number(b.receivedAmount||0);
       return sum;
     },0);
