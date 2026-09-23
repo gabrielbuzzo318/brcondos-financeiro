@@ -260,8 +260,13 @@
     if(b?.status==='recebido_parcial')return {key:'recebido_parcial',html:badge('PARCIAL','yellow')};
     if(isBankBaixado(real)||b?.status==='baixado')return {key:'baixado',html:badge('Baixado','gray')};
     if(isLiquidated(real)||b?.status==='liquidado')return {key:'liquidado',html:badge('Liquidado','green')};
-    const closed=b?.status==='recebido';
-    if(!closed&&b?.due&&String(b.due)<today())return {key:'vencido',html:badge('Vencido','red')};
+
+    // O recebimento confirmado no sistema é definitivo para a exibição.
+    // Um status Sicredi antigo (ex.: VENCIDO) ou a data já passada não pode
+    // voltar um boleto já recebido para "Vencido".
+    if(b?.status==='recebido')return {key:'recebido',html:badge('Recebido','green')};
+
+    if(b?.due&&String(b.due)<today())return {key:'vencido',html:badge('Vencido','red')};
     return null;
   }
 
