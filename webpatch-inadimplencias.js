@@ -1,9 +1,13 @@
 (function(){
   const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
   const manualKey='inadimplencias_manual';
+  const excludedKey='inadimplencias_excluidas';
   const loadManual=()=>{try{const x=JSON.parse(localStorage.getItem('brcondos_'+manualKey)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}};
+  const loadExcluded=()=>{try{const x=JSON.parse(localStorage.getItem('brcondos_'+excludedKey)||'[]');return Array.isArray(x)?x.map(String):[]}catch(_){return []}};
   let manualInadimplencias=loadManual();
+  let excludedInadimplencias=loadExcluded();
   const saveManual=()=>typeof saveData==='function'?saveData(manualKey,manualInadimplencias):localStorage.setItem('brcondos_'+manualKey,JSON.stringify(manualInadimplencias));
+  const saveExcluded=()=>typeof saveData==='function'?saveData(excludedKey,excludedInadimplencias):localStorage.setItem('brcondos_'+excludedKey,JSON.stringify(excludedInadimplencias));
   const hoje=()=>typeof today==='function'?today():new Date().toISOString().slice(0,10);
 
   function boletoFinanceStatus(b){
@@ -299,17 +303,25 @@
   const manualStatus=x=>x.status==='liquidado'?'liquidado':(x.due&&String(x.due)<hoje()?'vencido':'em_aberto');
   const originLabel=o=>({boleto:'Boleto',recibo:'Recibo',boleto_recibo:'Boleto + Recibo',manual:'Manual',boleto_parcial:'Boleto parcial'}[o]||o);
   function daysLate(d){if(!d||d>=hoje())return 0;return Math.max(0,Math.floor((new Date(hoje()+'T12:00:00')-new Date(d+'T12:00:00'))/86400000))}
+  function exclusionKey(x){
+    if(!x)return '';
+    if(x.origin==='boleto_parcial')return 'boleto_parcial:'+String(x.sourceBoletoId||x.id||'');
+    if(x.origin==='boleto'||x.origin==='boleto_recibo')return 'boleto:'+String(x.id||'');
+    if(x.origin==='recibo')return 'recibo:'+String(x.id||'');
+    return x.origin+':'+String(x.id||'');
+  }
+  const isExcluded=x=>excludedInadimplencias.includes(exclusionKey(x));
 
   window.renderInadimplencias=function(){
     ensureInadimplencias();
     const view=document.getElementById('view-inadimplencias');if(!view)return;
     const auto=automaticRows();
     const manual=manualInadimplencias.map(x=>({...x,origin:x.sourceType==='boleto_parcial'?'boleto_parcial':'manual',status:manualStatus(x)}));
-    const rows=[...auto,...manual].sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+    const rows=[...auto,...manual].filter(x=>!isExcluded(x)).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
     const active=rows.filter(x=>x.status==='vencido');
     const total=active.reduce((s,x)=>s+Number(x.value||0),0);
-    const bCount=auto.filter(x=>x.origin==='boleto'||x.origin==='boleto_recibo').length + manual.filter(x=>x.origin==='boleto_parcial'&&x.status==='vencido').length;
-    const rCount=auto.filter(x=>x.origin==='recibo'||x.origin==='boleto_recibo').length;
+    const bCount=active.filter(x=>x.origin==='boleto'||x.origin==='boleto_recibo'||x.origin==='boleto_parcial').length;
+    const rCount=active.filter(x=>x.origin==='recibo'||x.origin==='boleto_recibo').length;
 
     view.innerHTML=`
       <div class="section-title">
@@ -337,7 +349,7 @@
           <td><b>${esc(x.client||'-')}</b></td><td>${esc(x.document||'-')}</td><td>${x.due?formatDate(x.due):'-'}</td>
           <td>${x.status==='vencido'?`<b style="color:var(--danger)">${daysLate(x.due)} dia(s)</b>`:'-'}</td><td>${esc(x.description||'-')}</td><td>${finBadge(x.status)}</td>
           <td class="amount ${x.status==='liquidado'?'pos':'neg'}">${money(x.value)}</td>
-          <td><div class="actions">${x.origin==='boleto_parcial'?`<button class="btn small" onclick="openBoleto(${x.sourceBoletoId})">Abrir boleto</button>`:x.origin==='manual'?`<button class="btn small" onclick="openManualInadimplencia(${x.id})">Editar</button>${x.status!=='liquidado'?`<button class="btn small green" onclick="liquidateManualInadimplencia(${x.id})">Liquidar</button>`:`<button class="btn small" onclick="reopenManualInadimplencia(${x.id})">Reabrir</button>`}<button class="btn small danger" onclick="deleteManualInadimplencia(${x.id})">Excluir</button>`:x.origin==='recibo'?`<button class="btn small" onclick="openReceiptEdit(${x.id})">Abrir recibo</button>`:`<button class="btn small" onclick="openBoleto(${x.id})">Abrir boleto</button>`}</div></td>
+          <td><div class="actions">${x.origin==='boleto_parcial'?`<button class="btn small" onclick="openBoleto(${x.sourceBoletoId})">Abrir boleto</button><button class="btn small danger" onclick="deleteInadimplencia('${exclusionKey(x)}')">Excluir</button>`:x.origin==='manual'?`<button class="btn small" onclick="openManualInadimplencia(${x.id})">Editar</button>${x.status!=='liquidado'?`<button class="btn small green" onclick="liquidateManualInadimplencia(${x.id})">Liquidar</button>`:`<button class="btn small" onclick="reopenManualInadimplencia(${x.id})">Reabrir</button>`}<button class="btn small danger" onclick="deleteManualInadimplencia(${x.id})">Excluir</button>`:x.origin==='recibo'?`<button class="btn small" onclick="openReceiptEdit(${x.id})">Abrir recibo</button><button class="btn small danger" onclick="deleteInadimplencia('${exclusionKey(x)}')">Excluir</button>`:`<button class="btn small" onclick="openBoleto(${x.id})">Abrir boleto</button><button class="btn small danger" onclick="deleteInadimplencia('${exclusionKey(x)}')">Excluir</button>`}</div></td>
         </tr>`).join(''):`<tr><td colspan="9" class="empty">Nenhuma inadimplência encontrada.</td></tr>`}
       </tbody></table></div>`;
     setTimeout(()=>filterInadimplencias(),0);
@@ -363,7 +375,7 @@
       origin:x.sourceType==='boleto_parcial'?'boleto_parcial':'manual',
       status:manualStatus(x)
     }));
-    return [...auto,...manual].sort((a,b)=>
+    return [...auto,...manual].filter(x=>!isExcluded(x)).sort((a,b)=>
       (a.due||'9999-99-99').localeCompare(b.due||'9999-99-99') ||
       String(a.client||'').localeCompare(String(b.client||''),'pt-BR')
     );
@@ -472,6 +484,15 @@
     }else{
       alert('Não foi possível abrir o relatório agora.');
     }
+  };
+
+  window.deleteInadimplencia=function(key){
+    key=String(key||'').trim();
+    if(!key)return;
+    if(!confirm('Excluir esta inadimplência do controle?\n\nO boleto ou recibo de origem será mantido; somente a inadimplência deixará de aparecer nesta aba, no relatório e no indicador do dashboard.'))return;
+    if(!excludedInadimplencias.includes(key))excludedInadimplencias.push(key);
+    saveExcluded();
+    if(typeof renderAll==='function')renderAll();
   };
 
   window.brUpsertPartialBoletoDelinquency=function(boleto,{remaining,received,cumulative,date,history=[]}={}){
