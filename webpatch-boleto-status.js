@@ -87,7 +87,7 @@
     return /BAIXAD|CANCELAD/.test(s);
   }
 
-  function syncBankBaixado(boleto,data,statusText){
+  function syncBankBaixado(boleto,data,statusText,{persist=true}={}){
     if(!boleto||!isBankBaixado(statusText))return false;
 
     const baixaDate=findDate(data||boleto.sicrediResponse||null)||'';
@@ -108,7 +108,7 @@
     boleto.sicrediSettlementType='';
     boleto.sicrediBaixaDate=baixaDate;
 
-    if(typeof saveData==='function'){
+    if(persist&&typeof saveData==='function'){
       saveData('transactions',transactions);
       saveData('boletos',boletos);
     }
@@ -159,7 +159,7 @@
     return id;
   }
 
-  function syncLiquidatedToFlow(boleto,data,statusText,{allowFallbackToday=true}={}){
+  function syncLiquidatedToFlow(boleto,data,statusText,{allowFallbackToday=true,persist=true}={}){
     if(!boleto||!isLiquidated(statusText))return false;
 
     const sourceData=data||boleto.sicrediResponse||null;
@@ -210,7 +210,7 @@
       boleto.flowId=flowId;
     }
 
-    if(typeof saveData==='function'){
+    if(persist&&typeof saveData==='function'){
       saveData('transactions',transactions);
       saveData('boletos',boletos);
     }
@@ -234,20 +234,24 @@
             boleto.sicrediStatus=sicrediStatus;
             boleto.sicrediStatusUpdatedAt=new Date().toISOString();
             boleto.sicrediResponse=data;
+            const bulk=!!window.__brSicrediBulkConsult;
             if(isBankBaixado(sicrediStatus)){
-              syncBankBaixado(boleto,data,sicrediStatus);
+              syncBankBaixado(boleto,data,sicrediStatus,{persist:!bulk});
             }else if(isLiquidated(sicrediStatus)){
-              syncLiquidatedToFlow(boleto,data,sicrediStatus);
-            }else if(typeof saveData==='function'){
+              syncLiquidatedToFlow(boleto,data,sicrediStatus,{persist:!bulk});
+            }else if(!bulk&&typeof saveData==='function'){
               saveData('boletos',boletos);
             }
-            if(typeof renderAll==='function')setTimeout(()=>renderAll(),0);
+            if(!bulk&&typeof renderAll==='function')setTimeout(()=>renderAll(),0);
           }
         }
       }catch(_){ }
     }
     return response;
   };
+
+  window.brSicrediStatusFromResponse=findStatusText;
+  window.brSicrediNormalizeStatus=normalize;
 
   function badge(text,color){return `<span class="badge ${color}">${text}</span>`;}
   function boletoVisualStatus(b){
