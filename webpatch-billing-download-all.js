@@ -41,8 +41,16 @@
     if(!root)return;
     const month=String(document.getElementById('boleto_download_month')?.value||currentMonth());
     const rows=(Array.isArray(boletos)?boletos:[]).filter(b=>String(b?.due||'').slice(0,7)===month);
-    const open=rows.filter(b=>b.status!=='recebido').reduce((sum,b)=>sum+Number(b.value||0),0);
-    const received=rows.filter(b=>b.status==='recebido').reduce((sum,b)=>sum+Number(b.value||0),0);
+    const open=rows.reduce((sum,b)=>{
+      if(b.status==='recebido')return sum;
+      if(b.status==='recebido_parcial')return sum+Math.max(0,Number(b.remainingBalance??(Number(b.value||0)-Number(b.receivedAmount||0))));
+      return sum+Number(b.value||0);
+    },0);
+    const received=rows.reduce((sum,b)=>{
+      if(b.status==='recebido')return sum+Number(b.receivedAmount??b.value||0);
+      if(b.status==='recebido_parcial')return sum+Number(b.receivedAmount||0);
+      return sum;
+    },0);
     const noDue=0;
     const total=rows.length;
 
