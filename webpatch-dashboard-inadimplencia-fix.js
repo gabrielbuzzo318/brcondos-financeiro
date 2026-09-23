@@ -37,13 +37,21 @@
     }catch(_){return [];}
   }
 
+  function loadExcluded(){
+    try{
+      const x=JSON.parse(localStorage.getItem('brcondos_inadimplencias_excluidas')||'[]');
+      return new Set(Array.isArray(x)?x.map(String):[]);
+    }catch(_){return new Set();}
+  }
+
   function manualStatus(x){
     return x?.status==='liquidado'?'liquidado':(x?.due&&String(x.due)<hoje()?'vencido':'em_aberto');
   }
 
   function inadStats(){
+    const excluded=loadExcluded();
     const overdueBoletos=(Array.isArray(boletos)?boletos:[])
-      .filter(b=>boletoFinanceStatus(b)==='vencido')
+      .filter(b=>boletoFinanceStatus(b)==='vencido'&&!excluded.has('boleto:'+String(b.id)))
       .map(b=>({id:b.id,value:Number(b.value||0)}));
 
     const boletoIds=new Set(overdueBoletos.map(x=>String(x.id)));
@@ -52,11 +60,18 @@
       if(receiptFinanceStatusLocal(r)!=='vencido')return;
       const sid=String(r?.sourceBoletoId||'');
       if(sid&&boletoIds.has(sid))return; // Boleto + Recibo contam uma única inadimplência, igual à aba.
+      if(excluded.has('recibo:'+String(r.id)))return;
       overdueReceipts.push({id:r.id,value:Number(r.value||0)});
     });
 
     const overdueManual=loadManual()
       .filter(x=>manualStatus(x)==='vencido')
+      .filter(x=>{
+        if(x?.sourceType==='boleto_parcial'){
+          return !excluded.has('boleto_parcial:'+String(x.sourceBoletoId||x.id||''));
+        }
+        return true;
+      })
       .map(x=>({id:x.id,value:Number(x.value||0)}));
 
     const all=[...overdueBoletos,...overdueReceipts,...overdueManual];
