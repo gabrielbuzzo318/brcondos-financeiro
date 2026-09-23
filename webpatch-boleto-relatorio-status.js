@@ -19,14 +19,19 @@
     if(/LIQUIDAD|PAGO|PAGA/.test(s)){
       return {key:'liquidado',label:'Liquidado',css:'background:#e8f7ec;color:#1b7a39;border:1px solid #b9e2c4'};
     }
+
+    // Se a baixa já foi confirmada no próprio sistema, ela prevalece sobre
+    // um retorno Sicredi antigo como VENCIDO/EM CARTEIRA.
+    if(raw==='recebido'){
+      return {key:'recebido',label:'Recebido',css:'background:#e8f7ec;color:#1b7a39;border:1px solid #b9e2c4'};
+    }
+
     if(/VENCID/.test(s)){
       return {key:'vencido',label:'Vencido',css:'background:#fff0f0;color:#bd3030;border:1px solid #efb0b0'};
     }
     if(/EM\s+CARTEIRA/.test(s)){
       return {key:'em_carteira',label:/PIX/.test(s)?'Em carteira PIX':'Em carteira',css:'background:#eef7fb;color:#28789c;border:1px solid #b9ddec'};
     }
-
-    if(raw==='recebido')return {key:'recebido',label:'Recebido',css:'background:#e8f7ec;color:#1b7a39;border:1px solid #b9e2c4'};
     if(raw==='vencido'||(b?.due&&String(b.due)<today()))return {key:'vencido',label:'Vencido',css:'background:#fff0f0;color:#bd3030;border:1px solid #efb0b0'};
     if(raw==='emitido')return {key:'emitido',label:'Emitido',css:'background:#eef7fb;color:#28789c;border:1px solid #b9ddec'};
     if(raw==='emitido_externo')return {key:'emitido_externo',label:'Emitido no banco',css:'background:#eef7fb;color:#28789c;border:1px solid #b9ddec'};
