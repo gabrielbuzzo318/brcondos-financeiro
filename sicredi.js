@@ -209,7 +209,7 @@ export async function consultarBoletoSicredi(nossoNumero){
 }
 
 
-export async function consultarBoletosLiquidadosDiaSicredi(dia,pagina=0){
+export async function consultarBoletosLiquidadosDiaSicredi(dia,pagina=null){
   assertConfig();
   const raw=String(dia||'').trim();
   let d=raw;
@@ -220,9 +220,9 @@ export async function consultarBoletosLiquidadosDiaSicredi(dia,pagina=0){
   if(!/^\d{2}\/\d{2}\/\d{4}$/.test(d))throw sicrediError('Dia inválido para consulta de liquidados.',400);
   const q=new URLSearchParams({
     codigoBeneficiario:cfg.codigoBeneficiario,
-    dia:d,
-    pagina:String(Math.max(0,Number(pagina)||0))
+    dia:d
   });
+  if(pagina!==null&&pagina!==undefined&&String(pagina)!=='')q.set('pagina',String(Math.max(0,Number(pagina)||0)));
   return sicrediFetch(`${cfg.baseUrl}/boletos/liquidados/dia?${q.toString()}`,{
     method:'GET',
     headers:{'Content-Type':'application/x-www-form-urlencoded'}
