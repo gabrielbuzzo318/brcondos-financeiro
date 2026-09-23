@@ -10,9 +10,10 @@
     const s=norm(b?.sicrediStatus||'');
     if(/BAIXADO\s+POR\s+SOLICIT/.test(s))return 'baixado';
     if(/LIQUIDAD|PAGO|PAGA/.test(s))return 'liquidado';
-    if(/VENCID/.test(s)||b?.status==='vencido')return 'vencido';
+    // A baixa confirmada no sistema prevalece sobre um status Sicredi antigo.
     if(b?.status==='recebido')return 'liquidado';
     if(b?.status==='recebido_parcial')return 'parcial';
+    if(/VENCID/.test(s)||b?.status==='vencido')return 'vencido';
     if(b?.due&&String(b.due)<hoje())return 'vencido';
     return 'em_aberto';
   }
@@ -311,7 +312,13 @@
     const rCount=auto.filter(x=>x.origin==='recibo'||x.origin==='boleto_recibo').length;
 
     view.innerHTML=`
-      <div class="section-title"><div><h2>Inadimplências</h2><span>Controle consolidado de cobranças vencidas</span></div><button class="btn primary" onclick="openManualInadimplencia()">+ Nova inadimplência</button></div>
+      <div class="section-title">
+        <div><h2>Inadimplências</h2><span>Controle consolidado de cobranças vencidas</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="openInadimplenciaReport()">▤ Relatório</button>
+          <button class="btn primary" onclick="openManualInadimplencia()">+ Nova inadimplência</button>
+        </div>
+      </div>
       <div class="cards grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card" style="border-top:3px solid var(--danger)"><div class="kpi-label">TOTAL EM ATRASO</div><div class="kpi-value">${money(total)}</div></div>
         <div class="card accent-blue"><div class="kpi-label">BOLETOS VENCIDOS</div><div class="kpi-value">${bCount}</div></div>
@@ -346,6 +353,125 @@
   window.clearInadimplenciaFilters=function(){
     ['inad_search','inad_origin','inad_status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
     filterInadimplencias();
+  };
+
+
+  function allInadimplenciaRows(){
+    const auto=automaticRows();
+    const manual=manualInadimplencias.map(x=>({
+      ...x,
+      origin:x.sourceType==='boleto_parcial'?'boleto_parcial':'manual',
+      status:manualStatus(x)
+    }));
+    return [...auto,...manual].sort((a,b)=>
+      (a.due||'9999-99-99').localeCompare(b.due||'9999-99-99') ||
+      String(a.client||'').localeCompare(String(b.client||''),'pt-BR')
+    );
+  }
+
+  const inadStatusLabel=s=>({
+    vencido:'Vencido',
+    em_aberto:'Em aberto',
+    liquidado:'Liquidado',
+    parcial:'Recebido parcial'
+  }[s]||s||'-');
+
+  window.openInadimplenciaReport=function(){
+    openModal('Relatório de inadimplências',`
+      <div class="modal-grid">
+        ${field('Vencimento de',`<input id="inad_rep_from" type="date">`)}
+        ${field('Vencimento até',`<input id="inad_rep_to" type="date" value="${hoje()}">`)}
+        ${field('Origem',`<select id="inad_rep_origin">
+          <option value="">Todas</option>
+          <option value="boleto">Boleto</option>
+          <option value="recibo">Recibo</option>
+          <option value="boleto_recibo">Boleto + Recibo</option>
+          <option value="boleto_parcial">Boleto parcial</option>
+          <option value="manual">Manual</option>
+        </select>`)}
+        ${field('Status',`<select id="inad_rep_status">
+          <option value="vencido" selected>Vencido</option>
+          <option value="">Todos</option>
+          <option value="em_aberto">Em aberto</option>
+          <option value="liquidado">Liquidado</option>
+        </select>`)}
+        ${field('Pesquisar',`<input id="inad_rep_search" placeholder="Cliente, documento ou descrição">`)}
+      </div>
+      <div class="notice" style="margin-top:14px">
+        Por padrão, o relatório mostra somente as cobranças <b>vencidas</b> até hoje.
+        Boletos recebidos não entram como inadimplência, mesmo que exista um status bancário antigo.
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="generateInadimplenciaReport()">Gerar relatório</button>
+      </div>
+    `);
+  };
+
+  window.generateInadimplenciaReport=function(){
+    const from=String(document.getElementById('inad_rep_from')?.value||'');
+    const to=String(document.getElementById('inad_rep_to')?.value||'');
+    const origin=String(document.getElementById('inad_rep_origin')?.value||'');
+    const status=String(document.getElementById('inad_rep_status')?.value||'');
+    const q=normalizeSearchText(document.getElementById('inad_rep_search')?.value||'');
+
+    const data=allInadimplenciaRows().filter(x=>{
+      const due=String(x.due||'');
+      if(from&&(!due||due<from))return false;
+      if(to&&(!due||due>to))return false;
+      if(origin&&x.origin!==origin)return false;
+      if(status&&x.status!==status)return false;
+      if(q){
+        const hay=normalizeSearchText([
+          originLabel(x.origin),x.client,x.document,x.description,x.status,
+          x.due,x.value,typeof money==='function'?money(x.value):x.value
+        ].filter(Boolean).join(' '));
+        if(!hay.includes(q))return false;
+      }
+      return true;
+    });
+
+    const total=data.reduce((s,x)=>s+Number(x.value||0),0);
+    const vencidos=data.filter(x=>x.status==='vencido');
+    const clientes=new Set(data.map(x=>String(x.client||'').trim()).filter(Boolean)).size;
+    const atrasoMedio=vencidos.length
+      ? Math.round(vencidos.reduce((s,x)=>s+daysLate(x.due),0)/vencidos.length)
+      : 0;
+
+    const summary=`
+      <div class="sum"><small>VALOR TOTAL</small><b>${money(total)}</b></div>
+      <div class="sum"><small>REGISTROS</small><b>${data.length}</b></div>
+      <div class="sum"><small>CLIENTES</small><b>${clientes}</b></div>
+      <div class="sum"><small>ATRASO MÉDIO</small><b>${atrasoMedio} dia(s)</b></div>`;
+
+    const headers=['Cliente / Devedor','Origem','Documento','Vencimento','Atraso','Descrição','Status','Valor'];
+    const rows=data.map(x=>[
+      esc(x.client||'-'),
+      esc(originLabel(x.origin)),
+      esc(x.document||'-'),
+      x.due?formatDate(x.due):'-',
+      x.status==='vencido'?`${daysLate(x.due)} dia(s)`:'-',
+      esc(x.description||'-'),
+      esc(inadStatusLabel(x.status)),
+      money(x.value)
+    ]);
+
+    const period=(from||to)
+      ? `${from?formatDate(from):'início'} até ${to?formatDate(to):'hoje'}`
+      : 'Todos os vencimentos';
+    const filtros=[
+      status?`Status: ${inadStatusLabel(status)}`:'',
+      origin?`Origem: ${originLabel(origin)}`:'',
+      q?`Pesquisa aplicada`:''
+    ].filter(Boolean).join(' • ');
+    const subtitle=filtros?`${period} • ${filtros}`:period;
+
+    closeModal();
+    if(typeof printableReport==='function'){
+      printableReport('Relatório de Inadimplências',subtitle,summary,headers,rows);
+    }else{
+      alert('Não foi possível abrir o relatório agora.');
+    }
   };
 
   window.brUpsertPartialBoletoDelinquency=function(boleto,{remaining,received,cumulative,date,history=[]}={}){
