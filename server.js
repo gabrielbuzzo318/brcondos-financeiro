@@ -18,6 +18,7 @@ import {
 } from './giss.js';
 import {
   consultarBoletoSicredi,
+  consultarBoletosLiquidadosDiaSicredi,
   getSicrediConfigStatus,
   registrarBoletoSicredi,
   testSicredi
@@ -148,6 +149,7 @@ app.post('/api/boletos/pdf', async (req, res) => {
     res.status(status).json({ error: err?.message || 'Erro ao gerar PDF do boleto.', details: err?.details ?? null });
   }
 });
+app.get('/api/boletos/liquidados-dia', route(req => consultarBoletosLiquidadosDiaSicredi(req.query.dia,req.query.pagina)));
 app.get('/api/boletos/:nossoNumero', route(req => consultarBoletoSicredi(req.params.nossoNumero)));
 
 // O HTML financeiro contém dados e nunca é servido sem sessão válida.
