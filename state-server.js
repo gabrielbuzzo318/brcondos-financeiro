@@ -54,6 +54,54 @@ function norm(v) {
     .trim();
 }
 
+const SEEDED_DELETED_BOLETO_KEYS = [
+  'source:pdf-2026-08-ADM-GIARDINO-2301.80-10-'
+];
+
+function boletoDeleteKey(b) {
+  const source=String(b?.sourceKey||'').trim();
+  if(source)return 'source:'+source;
+  const id=String(b?.id??'').trim();
+  return id?'id:'+id:'';
+}
+
+function applyDeletedBoletoTombstones(data, extraKeys=[]) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const storage=data.storage;
+  if (!storage || typeof storage !== 'object' || Array.isArray(storage)) return data;
+
+  const boletos=parseArrayValue(storage,'brcondos_boletos');
+  if(!boletos)return data;
+
+  const stored=parseArrayValue(storage,'brcondos_deletedBoletoKeys')||[];
+  const keys=[...new Set([
+    ...SEEDED_DELETED_BOLETO_KEYS,
+    ...stored.map(String),
+    ...(Array.isArray(extraKeys)?extraKeys:[]).map(String)
+  ].filter(Boolean))];
+  const deleted=new Set(keys);
+  const filtered=boletos.filter(b=>!deleted.has(boletoDeleteKey(b)));
+
+  storage.brcondos_deletedBoletoKeys=JSON.stringify(keys);
+  if(filtered.length!==boletos.length)storage.brcondos_boletos=JSON.stringify(filtered);
+  return data;
+}
+
+async function currentDeletedBoletoKeys(token) {
+  try{
+    const res=await supabaseFetch('/rest/v1/app_state?select=data&state_key=eq.main&limit=1',token,{
+      method:'GET',
+      headers:{Accept:'application/json'}
+    });
+    if(!res.ok)return [];
+    const rows=await readJson(res);
+    const row=Array.isArray(rows)?rows[0]:null;
+    return parseArrayValue(row?.data?.storage,'brcondos_deletedBoletoKeys')||[];
+  }catch{
+    return [];
+  }
+}
+
 function parseArrayValue(storage, key) {
   const raw = storage?.[key];
   if (Array.isArray(raw)) return raw;
@@ -478,6 +526,7 @@ export async function getSharedState(req) {
   if (!row) return { ok: true, exists: false };
   if (row.data) {
     ensureTimeClient(row.data);
+    applyDeletedBoletoTombstones(row.data);
     repairBillingState(row.data);
   }
   return { ok: true, exists: true, ...row };
@@ -498,8 +547,10 @@ export async function putSharedState(req, body = {}) {
     throw err;
   }
 
+  const preservedDeletedBoletoKeys=await currentDeletedBoletoKeys(token);
   repairFinancialState(data);
   ensureTimeClient(data);
+  applyDeletedBoletoTombstones(data,preservedDeletedBoletoKeys);
   repairBillingState(data);
 
   const res = await supabaseFetch('/rest/v1/app_state?on_conflict=state_key', token, {
