@@ -12,6 +12,7 @@
     if(/LIQUIDAD|PAGO|PAGA/.test(s))return 'liquidado';
     if(/VENCID/.test(s)||b?.status==='vencido')return 'vencido';
     if(b?.status==='recebido')return 'liquidado';
+    if(b?.status==='recebido_parcial')return 'parcial';
     if(b?.due&&String(b.due)<hoje())return 'vencido';
     return 'em_aberto';
   }
@@ -27,6 +28,7 @@
     if(b){
       const st=boletoFinanceStatus(b);
       if(st==='liquidado')return 'liquidado';
+      if(st==='parcial')return 'parcial';
       if(st==='vencido')return 'vencido';
     }
     const due=receiptDue(r);
@@ -35,7 +37,7 @@
   window.receiptFinanceStatus=receiptFinanceStatus;
 
   function finBadge(st){
-    const m={em_aberto:['Em aberto','yellow'],vencido:['Vencido','red'],liquidado:['Liquidado','green']};
+    const m={em_aberto:['Em aberto','yellow'],vencido:['Vencido','red'],liquidado:['Liquidado','green'],parcial:['Recebido parcial','orange']};
     const x=m[st]||[st,'gray'];
     return `<span class="badge ${x[1]}">${x[0]}</span>`;
   }
@@ -294,18 +296,18 @@
   }
 
   const manualStatus=x=>x.status==='liquidado'?'liquidado':(x.due&&String(x.due)<hoje()?'vencido':'em_aberto');
-  const originLabel=o=>({boleto:'Boleto',recibo:'Recibo',boleto_recibo:'Boleto + Recibo',manual:'Manual'}[o]||o);
+  const originLabel=o=>({boleto:'Boleto',recibo:'Recibo',boleto_recibo:'Boleto + Recibo',manual:'Manual',boleto_parcial:'Boleto parcial'}[o]||o);
   function daysLate(d){if(!d||d>=hoje())return 0;return Math.max(0,Math.floor((new Date(hoje()+'T12:00:00')-new Date(d+'T12:00:00'))/86400000))}
 
   window.renderInadimplencias=function(){
     ensureInadimplencias();
     const view=document.getElementById('view-inadimplencias');if(!view)return;
     const auto=automaticRows();
-    const manual=manualInadimplencias.map(x=>({...x,origin:'manual',status:manualStatus(x)}));
+    const manual=manualInadimplencias.map(x=>({...x,origin:x.sourceType==='boleto_parcial'?'boleto_parcial':'manual',status:manualStatus(x)}));
     const rows=[...auto,...manual].sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
     const active=rows.filter(x=>x.status==='vencido');
     const total=active.reduce((s,x)=>s+Number(x.value||0),0);
-    const bCount=auto.filter(x=>x.origin==='boleto'||x.origin==='boleto_recibo').length;
+    const bCount=auto.filter(x=>x.origin==='boleto'||x.origin==='boleto_recibo').length + manual.filter(x=>x.origin==='boleto_parcial'&&x.status==='vencido').length;
     const rCount=auto.filter(x=>x.origin==='recibo'||x.origin==='boleto_recibo').length;
 
     view.innerHTML=`
@@ -318,7 +320,7 @@
       </div>
       <div class="filter-bar">
         <div class="field search"><label>Pesquisar</label><input id="inad_search" placeholder="Cliente, documento, descrição, valor..." oninput="filterInadimplencias()"></div>
-        <div class="field"><label>Origem</label><select id="inad_origin" onchange="filterInadimplencias()"><option value="">Todas</option><option value="boleto">Boleto</option><option value="recibo">Recibo</option><option value="boleto_recibo">Boleto + Recibo</option><option value="manual">Manual</option></select></div>
+        <div class="field"><label>Origem</label><select id="inad_origin" onchange="filterInadimplencias()"><option value="">Todas</option><option value="boleto">Boleto</option><option value="recibo">Recibo</option><option value="boleto_recibo">Boleto + Recibo</option><option value="manual">Manual</option><option value="boleto_parcial">Boleto parcial</option></select></div>
         <div class="field"><label>Status</label><select id="inad_status" onchange="filterInadimplencias()"><option value="">Todos</option><option value="vencido">Vencido</option><option value="em_aberto">Em aberto</option><option value="liquidado">Liquidado</option></select></div>
         <button class="btn" onclick="clearInadimplenciaFilters()">Limpar filtros</button><div id="inad_filter_result" class="filter-result"></div>
       </div>
@@ -328,7 +330,7 @@
           <td><b>${esc(x.client||'-')}</b></td><td>${esc(x.document||'-')}</td><td>${x.due?formatDate(x.due):'-'}</td>
           <td>${x.status==='vencido'?`<b style="color:var(--danger)">${daysLate(x.due)} dia(s)</b>`:'-'}</td><td>${esc(x.description||'-')}</td><td>${finBadge(x.status)}</td>
           <td class="amount ${x.status==='liquidado'?'pos':'neg'}">${money(x.value)}</td>
-          <td><div class="actions">${x.origin==='manual'?`<button class="btn small" onclick="openManualInadimplencia(${x.id})">Editar</button>${x.status!=='liquidado'?`<button class="btn small green" onclick="liquidateManualInadimplencia(${x.id})">Liquidar</button>`:`<button class="btn small" onclick="reopenManualInadimplencia(${x.id})">Reabrir</button>`}<button class="btn small danger" onclick="deleteManualInadimplencia(${x.id})">Excluir</button>`:x.origin==='recibo'?`<button class="btn small" onclick="openReceiptEdit(${x.id})">Abrir recibo</button>`:`<button class="btn small" onclick="openBoleto(${x.id})">Abrir boleto</button>`}</div></td>
+          <td><div class="actions">${x.origin==='boleto_parcial'?`<button class="btn small" onclick="openBoleto(${x.sourceBoletoId})">Abrir boleto</button>`:x.origin==='manual'?`<button class="btn small" onclick="openManualInadimplencia(${x.id})">Editar</button>${x.status!=='liquidado'?`<button class="btn small green" onclick="liquidateManualInadimplencia(${x.id})">Liquidar</button>`:`<button class="btn small" onclick="reopenManualInadimplencia(${x.id})">Reabrir</button>`}<button class="btn small danger" onclick="deleteManualInadimplencia(${x.id})">Excluir</button>`:x.origin==='recibo'?`<button class="btn small" onclick="openReceiptEdit(${x.id})">Abrir recibo</button>`:`<button class="btn small" onclick="openBoleto(${x.id})">Abrir boleto</button>`}</div></td>
         </tr>`).join(''):`<tr><td colspan="9" class="empty">Nenhuma inadimplência encontrada.</td></tr>`}
       </tbody></table></div>`;
     setTimeout(()=>filterInadimplencias(),0);
@@ -344,6 +346,58 @@
   window.clearInadimplenciaFilters=function(){
     ['inad_search','inad_origin','inad_status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
     filterInadimplencias();
+  };
+
+  window.brUpsertPartialBoletoDelinquency=function(boleto,{remaining,received,cumulative,date,history=[]}={}){
+    if(!boleto)return null;
+    const sourceId=String(boleto.id);
+    let row=manualInadimplencias.find(x=>x.sourceType==='boleto_parcial'&&String(x.sourceBoletoId)===sourceId);
+    const remainingValue=Math.max(0,Number(remaining||0));
+    const receivedValue=Math.max(0,Number(received||0));
+    const cumulativeValue=Math.max(0,Number(cumulative||0));
+    const entry={
+      date:date||hoje(),
+      received:receivedValue,
+      cumulative:cumulativeValue,
+      remaining:remainingValue
+    };
+
+    if(remainingValue>0){
+      const desc=`Saldo remanescente do boleto ${boleto.docNumber||''}. Recebido até agora: ${money(cumulativeValue)} • Saldo: ${money(remainingValue)}`;
+      if(!row){
+        row={
+          id:Date.now()+29,
+          sourceType:'boleto_parcial',
+          sourceBoletoId:boleto.id,
+          client:boleto.client||'-',
+          document:boleto.docNumber||'Boleto',
+          due:boleto.due||date||hoje(),
+          description:desc,
+          value:remainingValue,
+          status:'em_aberto',
+          liquidationDate:'',
+          history:[entry]
+        };
+        manualInadimplencias.push(row);
+      }else{
+        row.client=boleto.client||row.client;
+        row.document=boleto.docNumber||row.document;
+        row.due=boleto.due||row.due||date||hoje();
+        row.description=desc;
+        row.value=remainingValue;
+        row.status='em_aberto';
+        row.liquidationDate='';
+        row.history=[...(Array.isArray(row.history)?row.history:[]),entry];
+      }
+    }else if(row){
+      row.status='liquidado';
+      row.liquidationDate=date||hoje();
+      row.description=`Saldo remanescente do boleto ${boleto.docNumber||''} quitado em ${formatDate(date||hoje())}.`;
+      row.history=[...(Array.isArray(row.history)?row.history:[]),entry];
+    }
+
+    saveManual();
+    return row||null;
   };
 
   window.openManualInadimplencia=function(id=null){
