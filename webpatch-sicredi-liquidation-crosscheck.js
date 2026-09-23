@@ -79,7 +79,7 @@
       situacao:'LIQUIDADO',
       dadosLiquidacao:{
         data:item.dataPagamento||'',
-        valor:Number(item.valorLiquidado??item.valor??b.value||0),
+        valor:Number((item.valorLiquidado??item.valor??b.value)||0),
         tipoLiquidacao:item.tipoLiquidacao||''
       },
       liquidacaoConfirmadaPorDia:item
