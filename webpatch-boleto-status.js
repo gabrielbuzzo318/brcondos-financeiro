@@ -252,6 +252,7 @@
 
   window.brSicrediStatusFromResponse=findStatusText;
   window.brSicrediNormalizeStatus=normalize;
+  window.brSyncLiquidatedToFlow=syncLiquidatedToFlow;
 
   function badge(text,color){return `<span class="badge ${color}">${text}</span>`;}
   function boletoVisualStatus(b){
