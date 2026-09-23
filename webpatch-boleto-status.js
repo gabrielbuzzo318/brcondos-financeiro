@@ -256,6 +256,7 @@
   function badge(text,color){return `<span class="badge ${color}">${text}</span>`;}
   function boletoVisualStatus(b){
     const real=normalize(b?.sicrediStatus||'');
+    if(b?.status==='recebido_parcial')return {key:'recebido_parcial',html:badge('Recebido parcial','orange')};
     if(isBankBaixado(real)||b?.status==='baixado')return {key:'baixado',html:badge('Baixado','gray')};
     if(isLiquidated(real)||b?.status==='liquidado')return {key:'liquidado',html:badge('Liquidado','green')};
     const closed=b?.status==='recebido';
@@ -280,6 +281,7 @@
     const statusSelect=document.getElementById('boleto_status');
     if(statusSelect){
       if(![...statusSelect.options].some(o=>o.value==='liquidado'))statusSelect.add(new Option('Liquidado','liquidado'));
+      if(![...statusSelect.options].some(o=>o.value==='recebido_parcial'))statusSelect.add(new Option('Recebido parcial','recebido_parcial'));
       if(![...statusSelect.options].some(o=>o.value==='baixado'))statusSelect.add(new Option('Baixado','baixado'));
       if(![...statusSelect.options].some(o=>o.value==='vencido'))statusSelect.add(new Option('Vencido','vencido'));
     }
