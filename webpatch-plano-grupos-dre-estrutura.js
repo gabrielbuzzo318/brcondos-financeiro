@@ -3,6 +3,8 @@
   const ACCOUNTING_REVENUE='Receita de Contabilidade';
   const LEGACY_REVENUE='Receitas de serviços';
   const INVESTMENT_ACCOUNTS=['Imóvel','Capital Social - Sicredi','Aplicações Financeiras'];
+  const INVESTMENT_GROUP='Investimentos';
+  const PLUS_INVESTMENT_GROUP='Investimentos +';
   const LEGACY_APPLICATION='Aplicação Financeira';
   const GROUP_STORAGE_KEY='brcondos_chartAccountGroups';
   const collator=new Intl.Collator('pt-BR',{sensitivity:'base',numeric:true});
@@ -180,7 +182,7 @@
         <button class="btn small" type="button" onclick="openChartAccountGroupCreator()">+ Categoria / Grupo</button>
         <span class="subtle">Crie um grupo novo sem sair do Plano de Contas.</span>
       </div>
-      <div class="notice" style="margin-top:14px">Contas de investimento aparecem em uma seção própria, depois do <b>Resultado do Período</b>.</div>
+      <div class="notice" style="margin-top:14px">Contas dos grupos <b>Investimentos</b> e <b>Investimentos +</b> aparecem em seções próprias, depois do <b>Resultado do Período</b>, e compõem o <b>Resultado do Período após Investimentos</b>.</div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
         <button class="btn" onclick="closeModal()">Cancelar</button>
         <button class="btn primary" onclick="saveChartAccount(${id||'null'})">Salvar</button>
@@ -198,12 +200,49 @@
     if(kind==='accounting')return rows.filter(isAccountingRevenue);
     return rows.filter(t=>!isAccountingRevenue(t));
   }
+  function isInvestmentGroup(group){
+    const g=norm(group);
+    return g===norm(INVESTMENT_GROUP)||g===norm(PLUS_INVESTMENT_GROUP);
+  }
+  function investmentAccount(category){
+    return accountByName('saida',category);
+  }
   function investmentKind(category){
+    const account=investmentAccount(category);
+    if(account&&isInvestmentGroup(account.group))return clean(account.name||category);
+
     const n=norm(category);
     if(n===norm('Imóvel'))return'Imóvel';
     if(n===norm('Capital Social - Sicredi'))return'Capital Social - Sicredi';
     if(n===norm('Aplicações Financeiras')||n===norm(LEGACY_APPLICATION))return'Aplicações Financeiras';
     return'';
+  }
+  function investmentGroupFor(category){
+    const account=investmentAccount(category);
+    if(account&&isInvestmentGroup(account.group)){
+      return norm(account.group)===norm(PLUS_INVESTMENT_GROUP)?PLUS_INVESTMENT_GROUP:INVESTMENT_GROUP;
+    }
+    return investmentKind(category)?INVESTMENT_GROUP:'';
+  }
+  function investmentSections(){
+    const map=new Map();
+    const add=(group,name)=>{
+      if(!group||!name)return;
+      if(!map.has(group))map.set(group,new Set());
+      map.get(group).add(name);
+    };
+
+    INVESTMENT_ACCOUNTS.forEach(name=>add(INVESTMENT_GROUP,name));
+    try{
+      (Array.isArray(chartAccounts)?chartAccounts:[])
+        .filter(a=>a?.type==='saida'&&isInvestmentGroup(a?.group))
+        .forEach(a=>add(norm(a.group)===norm(PLUS_INVESTMENT_GROUP)?PLUS_INVESTMENT_GROUP:INVESTMENT_GROUP,clean(a.name)));
+    }catch(_){ }
+
+    const order=[INVESTMENT_GROUP,PLUS_INVESTMENT_GROUP];
+    return [...map.entries()]
+      .sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]))
+      .map(([group,names])=>({group,names:[...names]}));
   }
   function feeValue(t){return t?.type==='saida'?Math.max(0,Number(t?.fine||0))+Math.max(0,Number(t?.interest||0)):0;}
   function baseValue(t){
@@ -212,7 +251,13 @@
     return Math.max(0,Number(t?.value||0)-feeValue(t));
   }
   function investmentRows(prefix,name=''){
-    return (Array.isArray(transactions)?transactions:[]).filter(t=>String(t?.date||'').startsWith(prefix)&&t?.status==='pago'&&t?.type==='saida'&&investmentKind(t?.category)&&(!name||norm(investmentKind(t.category))===norm(name)));
+    return (Array.isArray(transactions)?transactions:[]).filter(t=>
+      String(t?.date||'').startsWith(prefix)&&
+      t?.status==='pago'&&
+      t?.type==='saida'&&
+      investmentKind(t?.category)&&
+      (!name||norm(investmentKind(t.category))===norm(name))
+    );
   }
   function previousPrefix(prefix){
     const [y,m]=String(prefix||'').split('-').map(Number);if(!y||!m)return'';
@@ -279,22 +324,37 @@
 
       const resultRow=[...demo.querySelectorAll(':scope > .dre-compare-row')].find(r=>norm(r.firstElementChild?.textContent)==='resultado do periodo');
       if(resultRow){
-        const invPrevByName={},invCurByName={};
-        INVESTMENT_ACCOUNTS.forEach(name=>{
-          invPrevByName[name]=investmentRows(prev,name).reduce((s,x)=>s+baseValue(x),0);
-          invCurByName[name]=investmentRows(prefix,name).reduce((s,x)=>s+baseValue(x),0);
-        });
-        const totalPrev=Object.values(invPrevByName).reduce((s,v)=>s+v,0),totalCur=Object.values(invCurByName).reduce((s,v)=>s+v,0);
+        const sections=investmentSections();
+        let totalPrev=0,totalCur=0;
         const operatingPrev=parseMoney(resultRow.querySelector('.dre-compare-prev')?.textContent);
         const operatingCur=parseMoney(resultRow.querySelector('.dre-compare-current')?.textContent);
+        let cursor=resultRow;
 
-        const header=document.createElement('div');header.className='dre-group-row br-dre-investment-header';header.innerHTML=`<span class="dre-group-name">INVESTIMENTOS</span><span class="dre-group-value">${money(totalPrev)}</span><span class="dre-group-value">${money(totalCur)}</span>`;
-        let cursor=resultRow;cursor.insertAdjacentElement('afterend',header);cursor=header;
-        INVESTMENT_ACCOUNTS.forEach(name=>{
-          const holder=document.createElement('div');holder.innerHTML=rowHtml(`(-) ${name}`,invPrevByName[name],invCurByName[name],'br-dre-investment-detail',`openBrInvestmentDetails('${encodeURIComponent(name)}')`);
-          const r=holder.firstElementChild;cursor.insertAdjacentElement('afterend',r);cursor=r;
+        sections.forEach(section=>{
+          const prevByName={},curByName={};
+          section.names.forEach(name=>{
+            prevByName[name]=investmentRows(prev,name).reduce((s,x)=>s+baseValue(x),0);
+            curByName[name]=investmentRows(prefix,name).reduce((s,x)=>s+baseValue(x),0);
+          });
+
+          const sectionPrev=Object.values(prevByName).reduce((s,v)=>s+v,0);
+          const sectionCur=Object.values(curByName).reduce((s,v)=>s+v,0);
+          totalPrev+=sectionPrev;totalCur+=sectionCur;
+
+          const header=document.createElement('div');
+          header.className='dre-group-row br-dre-investment-header';
+          header.innerHTML=`<span class="dre-group-name">${escHtml(section.group).toUpperCase()}</span><span class="dre-group-value">${money(sectionPrev)}</span><span class="dre-group-value">${money(sectionCur)}</span>`;
+          cursor.insertAdjacentElement('afterend',header);cursor=header;
+
+          section.names.forEach(name=>{
+            const holder=document.createElement('div');
+            holder.innerHTML=rowHtml(`(-) ${name}`,prevByName[name],curByName[name],'br-dre-investment-detail',`openBrInvestmentDetails('${encodeURIComponent(name)}')`);
+            const r=holder.firstElementChild;cursor.insertAdjacentElement('afterend',r);cursor=r;
+          });
         });
-        const finalHolder=document.createElement('div');finalHolder.innerHTML=rowHtml('RESULTADO DO PERÍODO APÓS APLICAÇÕES',operatingPrev-totalPrev,operatingCur-totalCur,'result br-dre-result-after','');
+
+        const finalHolder=document.createElement('div');
+        finalHolder.innerHTML=rowHtml('RESULTADO DO PERÍODO APÓS INVESTIMENTOS',operatingPrev-totalPrev,operatingCur-totalCur,'result br-dre-result-after','');
         cursor.insertAdjacentElement('afterend',finalHolder.firstElementChild);
       }
     }finally{enhancing=false;}
