@@ -47,8 +47,16 @@
     return chartAccounts.find(a=>norm(a.name)===cat && (!t.type || a.type===t.type))||null;
   }
 
+  function isPostResultInvestmentGroup(group){
+    const g=norm(group);
+    return g===norm('Investimentos') || g===norm('Investimentos +');
+  }
+
   function goesToDre(t){
     const account=accountForTransaction(t);
+    // Investimentos ficam fora do resultado operacional e entram na seção
+    // própria depois de "RESULTADO DO PERÍODO".
+    if(t?.type==='saida'&&account&&isPostResultInvestmentGroup(account.group))return false;
     return account ? account.dre!==false : true;
   }
 
