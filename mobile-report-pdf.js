@@ -49,16 +49,18 @@ export function gerarMobileReportPdf(payload={}){
         const titleText=clean(row?.title)||'-';
         const valueText=clean(row?.value);
         const meta=clean(row?.meta);
+        const labelWidth=valueText?Math.max(210,width-170):width-16;
         doc.font('Helvetica-Bold').fontSize(9.5);
-        const th=doc.heightOfString(titleText,{width:width-145});
+        const th=doc.heightOfString(titleText,{width:labelWidth,lineGap:1});
         doc.font('Helvetica').fontSize(8.2);
-        const mh=meta?doc.heightOfString(meta,{width:width-16}):0;
-        const h=Math.max(32,th+mh+17);
+        const mh=meta?doc.heightOfString(meta,{width:width-16,lineGap:1.5}):0;
+        const metaY=7+th+(meta?4:0);
+        const h=Math.max(34,metaY+mh+9);
         ensure(h);
         const y=doc.y;
-        doc.fillColor(COLORS.ink).font('Helvetica-Bold').fontSize(9.5).text(titleText,50,y+7,{width:width-155});
-        if(valueText)doc.fillColor(COLORS.blue).font('Helvetica-Bold').fontSize(9.5).text(valueText,42+width-140,y+7,{width:132,align:'right'});
-        if(meta)doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8.2).text(meta,50,y+20,{width:width-16,lineGap:1});
+        doc.fillColor(COLORS.ink).font('Helvetica-Bold').fontSize(9.5).text(titleText,50,y+7,{width:labelWidth,lineGap:1});
+        if(valueText)doc.fillColor(COLORS.blue).font('Helvetica-Bold').fontSize(9.2).text(valueText,42+width-145,y+7,{width:137,align:'right'});
+        if(meta)doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8.2).text(meta,50,y+metaY,{width:width-16,lineGap:1.5});
         doc.moveTo(42,y+h).lineTo(42+width,y+h).strokeColor(COLORS.line).lineWidth(.5).stroke();
         doc.y=y+h;
       }
