@@ -154,7 +154,7 @@ app.get('/api/boletos/:nossoNumero', route(req => consultarBoletoSicredi(req.par
 
 // O HTML financeiro contém dados e nunca é servido sem sessão válida.
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/login.html', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/login.html', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));\napp.get('/mobile-preview', (_req, res) => res.sendFile(path.join(__dirname, 'mobile-preview.html')));
 app.get(['/', '/index.html'], requirePageAuth, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get(/.*/, requirePageAuth, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
