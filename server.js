@@ -25,6 +25,7 @@ import {
 } from './sicredi.js';
 import { gerarBoletoPdf } from './boleto-pdf.js';
 import { gerarReceiptPdf } from './receipt-pdf.js';
+import { gerarMobileReportPdf } from './mobile-report-pdf.js';
 import {
   adoptSession,
   authConfig,
@@ -127,6 +128,23 @@ app.post('/api/receipts/pdf', requireAuth, async (req, res) => {
     res.send(pdf);
   } catch (err) {
     res.status(Number(err?.status||500)).json({error:err?.message||'Erro ao gerar PDF do recibo.'});
+  }
+});
+
+app.post('/api/mobile/report/pdf', requireAuth, async (req, res) => {
+  try {
+    const payload={...(req.body||{}),emittedAt:new Date().toISOString(),emittedBy:String(req.appUser?.full_name||req.appUser?.email||'Usuário não identificado')};
+    const pdf=await gerarMobileReportPdf(payload);
+    const fileName=String(req.body?.filename||'BRCONDOS-Relatorio.pdf').replace(/[\\/:*?"<>|\r\n\t]+/g,'-').slice(0,160)||'BRCONDOS-Relatorio.pdf';
+    res.set({
+      'Content-Type':'application/pdf',
+      'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      'Content-Length':String(pdf.length),
+      'Cache-Control':'private, no-store'
+    });
+    res.send(pdf);
+  } catch (err) {
+    res.status(Number(err?.status||500)).json({error:err?.message||'Erro ao gerar PDF do relatório.'});
   }
 });
 
