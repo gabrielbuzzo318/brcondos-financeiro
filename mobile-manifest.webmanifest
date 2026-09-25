@@ -1,0 +1,25 @@
+{
+  "name": "BRCondos",
+  "short_name": "BRCondos",
+  "description": "Gestão financeira BRCondos",
+  "start_url": "/mobile-preview",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f36c2f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/brcondos-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/brcondos-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
