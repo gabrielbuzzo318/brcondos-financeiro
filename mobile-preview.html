@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#003D32">
+<title>BRCondos Mobile</title>
+<style>
+:root{--p:#075b49;--pd:#003d32;--bg:#f3f6f5;--card:#fff;--txt:#17221f;--mut:#71807a;--bd:#dfe8e4;--ok:#138a64;--oks:#e7f7f0;--bad:#d64545;--bads:#fdecec;--warn:#b87317}
+*{box-sizing:border-box}html,body{margin:0;background:#dfe7e4;color:var(--txt);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input{font:inherit}.shell{max-width:460px;min-height:100dvh;margin:0 auto;background:var(--bg);position:relative;box-shadow:0 0 45px #0002}.hidden{display:none!important}
+.login{min-height:100dvh;background:linear-gradient(160deg,var(--pd),#08705a);padding:72px 22px 28px;display:flex;flex-direction:column;justify-content:center}
+.brand{text-align:center;color:#fff;margin-bottom:28px}.logo{width:72px;height:72px;background:#fff;border-radius:22px;display:grid;place-items:center;margin:0 auto 12px;color:var(--p);font-size:25px;font-weight:950;box-shadow:0 15px 35px #002a2240}.brand h1{font-size:34px;margin:0;font-weight:950}.brand p{margin:5px 0 0;color:#cfe5de;font-size:13px}
+.login-card{background:#fff;border-radius:25px;padding:22px;box-shadow:0 25px 70px #00261e45}.login-card h2{margin:0;font-size:22px}.login-card .help{color:var(--mut);font-size:13px;margin:5px 0 20px}.field{margin-top:12px}.field label{display:block;font-size:11px;font-weight:800;margin-bottom:7px}.field input{width:100%;height:50px;border:1px solid var(--bd);border-radius:13px;padding:0 14px;outline:none;background:#fbfcfc}.field input:focus{border-color:#63a895}.primary{width:100%;height:52px;border:0;border-radius:14px;background:var(--p);color:#fff;font-weight:900;margin-top:20px;cursor:pointer}.err{font-size:12px;color:var(--bad);margin-top:12px}
+.app{padding-bottom:78px}.top{padding:48px 18px 14px;background:linear-gradient(180deg,#fff 75%,transparent)}.topline{display:flex;align-items:center;justify-content:space-between}.hello{font-size:25px;font-weight:950}.sub{font-size:12px;color:var(--mut);margin-top:3px}.avatar{width:42px;height:42px;border-radius:50%;background:var(--p);color:#fff;display:grid;place-items:center;font-weight:900}.screen{padding:4px 17px 24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kpi{padding:14px;border-radius:17px;min-height:94px}.kpi small{font-size:9px;font-weight:900;color:var(--mut)}.kpi b{display:block;font-size:18px;margin-top:11px}.green{background:var(--oks)}.green b{color:var(--ok)}.red{background:var(--bads)}.red b{color:var(--bad)}.section-title{font-size:17px;font-weight:950;margin:24px 0 10px}.card{background:#fff;border:1px solid var(--bd);border-radius:17px;overflow:hidden}.row{display:flex;gap:10px;align-items:center;padding:14px;border-bottom:1px solid var(--bd)}.row:last-child{border-bottom:0}.row-main{min-width:0;flex:1}.row-title{font-weight:850;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row-sub{font-size:10px;color:var(--mut);margin-top:4px}.money{font-weight:950;font-size:12px;white-space:nowrap}.money.bad{color:var(--bad)}.money.ok{color:var(--ok)}.pill{font-size:9px;font-weight:900;border-radius:999px;padding:4px 7px;background:#eef4f2;color:var(--p)}.empty{padding:20px;color:var(--mut);font-size:13px;text-align:center}.note{font-size:12px;line-height:1.55;color:var(--mut);padding:16px}
+.page-title{font-size:26px;font-weight:950;margin:2px 0}.page-sub{font-size:12px;color:var(--mut);margin-bottom:20px}.report-row{display:flex;align-items:center;padding:15px;border-bottom:1px solid var(--bd)}.report-row:last-child{border-bottom:0}.report-ico{width:38px;height:38px;border-radius:12px;background:#e7f4f0;display:grid;place-items:center;margin-right:12px}.report-name{font-weight:850}.report-desc{font-size:10px;color:var(--mut);margin-top:3px}.chev{margin-left:auto;color:#89968f;font-size:24px}
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(460px,100%);height:72px;background:#fff;border-top:1px solid var(--bd);display:grid;grid-template-columns:repeat(4,1fr);z-index:10;padding-bottom:env(safe-area-inset-bottom)}.tab{border:0;background:transparent;color:#7b8782;font-size:10px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}.tab .ico{font-size:20px}.tab.active{color:var(--p)}.logout{height:50px;width:100%;margin-top:20px;border-radius:13px;border:1px solid #f0cccc;background:#fff;color:var(--bad);font-weight:900}.refresh{border:0;background:#fff;border:1px solid var(--bd);border-radius:11px;padding:8px 10px;color:var(--p);font-size:11px;font-weight:850}.hero{background:var(--bads);border:1px solid #f3cccc;border-radius:18px;padding:18px;margin-bottom:14px}.hero small{font-size:9px;font-weight:900;color:var(--mut)}.hero strong{display:block;font-size:29px;color:var(--bad);margin-top:7px}.hero span{display:block;font-size:11px;color:var(--mut);margin-top:4px}
+@media(min-width:600px){body{padding:20px 0}.shell{border-radius:28px;min-height:calc(100dvh - 40px);overflow:hidden}.login{min-height:calc(100dvh - 40px)}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <section id="login" class="login">
+    <div class="brand"><div class="logo">BR</div><h1>BRCondos</h1><p>Gestão condominial na palma da sua mão</p></div>
+    <div class="login-card">
+      <h2>Bem-vindo de volta!</h2><div class="help">Entre com o mesmo acesso do sistema BRCondos.</div>
+      <div class="field"><label>E-mail</label><input id="email" type="email" autocomplete="username" placeholder="seu@email.com"></div>
+      <div class="field"><label>Senha</label><input id="password" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+      <div id="loginErr" class="err hidden"></div>
+      <button id="loginBtn" class="primary">Entrar</button>
+    </div>
+  </section>
+
+  <main id="app" class="app hidden">
+    <div class="top">
+      <div class="topline">
+        <div><div id="hello" class="hello">Olá!</div><div class="sub">Aqui está o resumo da BRCondos.</div></div>
+        <div id="avatar" class="avatar">BR</div>
+      </div>
+    </div>
+
+    <section id="view-inicio" class="screen">
+      <div class="grid">
+        <div class="kpi green"><small>A RECEBER</small><b id="kReceber">R$ 0,00</b></div>
+        <div class="kpi red"><small>A PAGAR</small><b id="kPagar">R$ 0,00</b></div>
+        <div class="kpi green"><small>RECEBIDO NO MÊS</small><b id="kMes">R$ 0,00</b></div>
+        <div class="kpi red"><small>INADIMPLÊNCIA</small><b id="kInad">R$ 0,00</b></div>
+      </div>
+      <div class="section-title">Precisam de atenção</div>
+      <div id="attention" class="card"><div class="empty">Carregando...</div></div>
+      <div class="section-title">Sobre esta versão</div>
+      <div class="card"><div class="note">Esta é a primeira prévia mobile conectada à base da BRCondos. Emissão de boletos e NFS continua somente no sistema web.</div></div>
+    </section>
+
+    <section id="view-financeiro" class="screen hidden">
+      <div class="page-title">Financeiro</div><div class="page-sub">Contas a receber e a pagar.</div>
+      <div class="section-title">Contas a receber</div><div id="receivables" class="card"></div>
+      <div class="section-title">Contas a pagar</div><div id="payables" class="card"></div>
+    </section>
+
+    <section id="view-relatorios" class="screen hidden">
+      <div class="page-title">Relatórios</div><div class="page-sub">Visão rápida das principais rotinas.</div>
+      <div class="card">
+        <div class="report-row" data-open="inad"><div class="report-ico">!</div><div><div class="report-name">Inadimplência</div><div class="report-desc">Cobranças vencidas e pendentes</div></div><div class="chev">›</div></div>
+        <div class="report-row"><div class="report-ico">⇄</div><div><div class="report-name">Fluxo de Caixa</div><div class="report-desc">Entradas e saídas por período</div></div><div class="chev">·</div></div>
+        <div class="report-row"><div class="report-ico">▥</div><div><div class="report-name">DRE</div><div class="report-desc">Demonstrativo de Resultado</div></div><div class="chev">·</div></div>
+        <div class="report-row"><div class="report-ico">▣</div><div><div class="report-name">Contas a Pagar</div><div class="report-desc">Por fornecedor e categoria</div></div><div class="chev">·</div></div>
+      </div>
+    </section>
+
+    <section id="view-inad" class="screen hidden">
+      <div class="topline" style="margin-bottom:14px"><div><div class="page-title">Inadimplências</div><div class="page-sub" style="margin:0">Cobranças que precisam de atenção.</div></div><button id="backReports" class="refresh">Voltar</button></div>
+      <div class="hero"><small>TOTAL EM INADIMPLÊNCIA</small><strong id="inadTotal">R$ 0,00</strong><span id="inadCount">0 cobranças pendentes</span></div>
+      <div id="inadRows" class="card"></div>
+    </section>
+
+    <section id="view-mais" class="screen hidden">
+      <div class="page-title">Mais</div><div class="page-sub">Outras áreas do aplicativo.</div>
+      <div class="card">
+        <div class="report-row"><div class="report-ico">⌂</div><div class="report-name">Condomínios</div><div class="chev">·</div></div>
+        <div class="report-row"><div class="report-ico">▤</div><div class="report-name">Documentos</div><div class="chev">·</div></div>
+        <div class="report-row"><div class="report-ico">●</div><div class="report-name">Notificações</div><div class="chev">·</div></div>
+        <div class="report-row"><div class="report-ico">☺</div><div class="report-name">Meu perfil</div><div class="chev">·</div></div>
+      </div>
+      <button id="logoutBtn" class="logout">Sair da conta</button>
+    </section>
+
+    <nav class="tabbar">
+      <button class="tab active" data-tab="inicio"><span class="ico">⌂</span><span>Início</span></button>
+      <button class="tab" data-tab="financeiro"><span class="ico">▣</span><span>Financeiro</span></button>
+      <button class="tab" data-tab="relatorios"><span class="ico">▥</span><span>Relatórios</span></button>
+      <button class="tab" data-tab="mais"><span class="ico">•••</span><span>Mais</span></button>
+    </nav>
+  </main>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const parse=(v,f=[])=>{if(v==null)return f;if(typeof v!=='string')return v;try{return JSON.parse(v)}catch{return f}};
+const norm=v=>String(v||'').toLowerCase();
+const today=()=>new Date().toISOString().slice(0,10);
+const month=()=>today().slice(0,7);
+let currentUser=null,currentData=null;
+
+async function api(path,options={}){
+  const r=await fetch(path,{credentials:'same-origin',...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||'Erro de comunicação.');
+  return d;
+}
+function storageData(s){
+  const st=s?.data?.storage||{};
+  return {storage:st,payables:parse(st.brcondos_payables),transactions:parse(st.brcondos_transactions),boletos:parse(st.brcondos_boletos),receipts:parse(st.brcondos_receipts),manual:parse(st.brcondos_inadimplencias_manual),clients:parse(st.brcondos_clients)};
+}
+function boletoOpen(b){return !['recebido','liquidado','pago','baixado'].includes(norm(b.status))}
+function renderRows(el,items,kind){
+  if(!items.length){el.innerHTML='<div class="empty">Nenhum lançamento em aberto.</div>';return}
+  el.innerHTML=items.slice(0,20).map(x=>`<div class="row"><div class="row-main"><div class="row-title">${escapeHtml(kind==='pay'?x.supplier||x.description||'Fornecedor':x.client||x.payer||x.description||'Cliente')}</div><div class="row-sub">${escapeHtml(x.description||x.docNumber||'')}${x.due?' • '+escapeHtml(x.due):''}</div></div><div><div class="money ${kind==='pay'?'bad':'ok'}">${money(x.value)}</div><div class="row-sub" style="text-align:right">${escapeHtml(x.status||'em aberto')}</div></div></div>`).join('');
+}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function getInad(d){
+  const b=d.boletos.filter(x=>boletoOpen(x)&&x.due&&String(x.due)<today()).map(x=>({...x,_src:'Boleto',_name:x.client||x.payer||'Cliente'}));
+  const m=d.manual.filter(x=>!['liquidado','pago','baixado','resolvida'].includes(norm(x.status))).map(x=>({...x,_src:'Manual',_name:x.client||x.condominio||x.description||'Cobrança'}));
+  return [...b,...m].sort((a,b)=>String(a.due||a.date||'').localeCompare(String(b.due||b.date||'')));
+}
+function render(){
+  const d=currentData;if(!d)return;
+  const openPay=d.payables.filter(x=>!['pago','recebido','cancelado'].includes(norm(x.status)));
+  const openRec=d.boletos.filter(b=>boletoOpen(b));
+  const recMonth=d.transactions.filter(t=>t.type==='entrada'&&String(t.date||'').startsWith(month())).reduce((s,t)=>s+Number(t.value||0),0);
+  const inad=getInad(d); const inadValue=inad.reduce((s,x)=>s+Number(x.value||0),0);
+  $('kReceber').textContent=money(openRec.reduce((s,x)=>s+Number(x.value||0),0));
+  $('kPagar').textContent=money(openPay.reduce((s,x)=>s+Number(x.value||0),0));
+  $('kMes').textContent=money(recMonth); $('kInad').textContent=money(inadValue);
+  const overdue=openPay.filter(p=>p.due&&String(p.due)<today()).sort((a,b)=>String(a.due).localeCompare(String(b.due))).slice(0,5);
+  $('attention').innerHTML=overdue.length?overdue.map(p=>`<div class="row"><div class="row-main"><div class="row-title">${escapeHtml(p.supplier||p.description||'Conta a pagar')}</div><div class="row-sub">${escapeHtml(p.description||'')} • vence ${escapeHtml(p.due||'')}</div></div><div class="money bad">${money(p.value)}</div></div>`).join(''):'<div class="empty">Nenhuma conta vencida 🎉</div>';
+  renderRows($('receivables'),openRec.sort((a,b)=>String(a.due||'').localeCompare(String(b.due||''))),'rec');
+  renderRows($('payables'),openPay.sort((a,b)=>String(a.due||'').localeCompare(String(b.due||''))),'pay');
+  $('inadTotal').textContent=money(inadValue); $('inadCount').textContent=`${inad.length} cobrança${inad.length===1?'':'s'} pendente${inad.length===1?'':'s'}`;
+  $('inadRows').innerHTML=inad.length?inad.map(x=>`<div class="row"><div class="row-main"><div style="display:flex;gap:7px;align-items:center"><div class="row-title">${escapeHtml(x._name)}</div><span class="pill">${escapeHtml(x._src)}</span></div><div class="row-sub">${escapeHtml(x.description||x.docNumber||'Cobrança em atraso')}${x.due?' • '+escapeHtml(x.due):''}</div></div><div class="money bad">${money(x.value)}</div></div>`).join(''):'<div class="empty">Nenhuma inadimplência ativa 🎉</div>';
+}
+async function loadApp(){
+  const [u,s]=await Promise.all([api('/api/auth/me'),api('/api/state')]);currentUser=u;currentData=storageData(s);
+  const first=String(u.full_name||'BRCondos').split(' ')[0];$('hello').textContent='Olá, '+first+'!';
+  $('avatar').textContent=String(u.full_name||'BR').split(/\s+/).filter(Boolean).map(x=>x[0]).join('').slice(0,2).toUpperCase();
+  $('login').classList.add('hidden');$('app').classList.remove('hidden');render();
+}
+async function trySession(){try{await loadApp()}catch{}}
+$('loginBtn').onclick=async()=>{const btn=$('loginBtn'),err=$('loginErr');btn.disabled=true;btn.textContent='Entrando...';err.classList.add('hidden');try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});await loadApp()}catch(e){err.textContent=e.message||'Não foi possível entrar.';err.classList.remove('hidden')}finally{btn.disabled=false;btn.textContent='Entrar'}};
+$('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
+function openTab(tab){
+  document.querySelectorAll('[id^="view-"]').forEach(x=>x.classList.add('hidden'));
+  $('view-'+tab).classList.remove('hidden');
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
+document.querySelector('[data-open="inad"]').onclick=()=>{document.querySelectorAll('[id^="view-"]').forEach(x=>x.classList.add('hidden'));$('view-inad').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})};
+$('backReports').onclick=()=>openTab('relatorios');
+$('logoutBtn').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',body:'{}'})}catch{}location.reload()};
+trySession();
+</script>
+</body>
+</html>
