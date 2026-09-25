@@ -174,6 +174,19 @@ app.get('/api/boletos/:nossoNumero', route(req => consultarBoletoSicredi(req.par
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/login.html', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/mobile-preview', (_req, res) => res.sendFile(path.join(__dirname, 'mobile-preview.html')));
+app.get('/mobile-manifest.webmanifest', (_req, res) => {
+  res.type('application/manifest+json');
+  res.sendFile(path.join(__dirname, 'mobile-manifest.webmanifest'));
+});
+app.get('/mobile-sw.js', (_req, res) => {
+  res.set('Service-Worker-Allowed', '/');
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, 'mobile-sw.js'));
+});
+app.get('/brcondos-app-icon.svg', (_req, res) => {
+  res.type('image/svg+xml');
+  res.sendFile(path.join(__dirname, 'brcondos-app-icon.svg'));
+});
 app.get(['/', '/index.html'], requirePageAuth, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get(/.*/, requirePageAuth, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
