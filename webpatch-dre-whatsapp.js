@@ -17,7 +17,7 @@
     return `${months[(m||1)-1]||''}/${y||''}`;
   }
   function messageFor(prefix){
-    return `O mês ${periodLabel(prefix)} da Comarc Rio Preto foi finalizado e a DRE concluída! ✅\n\nVocê já pode consultar direto pelo sistema ou aqui no anexo 👇🏻`;
+    return `Tenho uma ótima notícia pra você!\n\nA sua DRE de ${periodLabel(prefix)} já foi concluída! ✅\n\nVocê já pode consultar direto pelo sistema ou no anexo abaixo 👇🏻`;
   }
   function downloadBlob(blob,filename){
     const url=URL.createObjectURL(blob);
