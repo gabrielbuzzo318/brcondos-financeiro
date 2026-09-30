@@ -223,6 +223,9 @@
     if(duplicate)return alert('Já existe uma conta com esse nome.');
     if(id)chartAccounts=chartAccounts.map(x=>x.id===id?obj:x);else chartAccounts.push(obj);
     saveData('chartAccounts',chartAccounts);
+    if(typeof window.brcondosFlushSharedState==='function'){
+      window.brcondosFlushSharedState().catch(err=>console.error('PLANO DE CONTAS SYNC:',err));
+    }
     closeModal();
     renderAll();
   };
