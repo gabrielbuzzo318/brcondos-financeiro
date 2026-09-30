@@ -65,8 +65,9 @@
       chartAccounts.push({id:Date.now()+8401,code:'',name:ADMIN_REVENUE,type:'entrada',group:'Receitas Operacionais',dre:true});
       accountsChanged=true;
     }else{
-      if(clean(admin.group)!=='Receitas Operacionais'){admin.group='Receitas Operacionais';accountsChanged=true;}
-      if(admin.dre===false){admin.dre=true;accountsChanged=true;}
+      // Conta já existente: a configuração manual do Plano de Contas sempre prevalece.
+      if(!clean(admin.group)){admin.group='Receitas Operacionais';accountsChanged=true;}
+      if(typeof admin.dre!=='boolean'){admin.dre=true;accountsChanged=true;}
     }
 
     let accounting=accountByName('entrada',ACCOUNTING_REVENUE);
@@ -74,8 +75,9 @@
       chartAccounts.push({id:Date.now()+8402,code:'',name:ACCOUNTING_REVENUE,type:'entrada',group:'Receitas Operacionais',dre:true});
       accountsChanged=true;
     }else{
-      if(clean(accounting.group)!=='Receitas Operacionais'){accounting.group='Receitas Operacionais';accountsChanged=true;}
-      if(accounting.dre===false){accounting.dre=true;accountsChanged=true;}
+      // Não reclassifica ao entrar no sistema/renderizar a DRE.
+      if(!clean(accounting.group)){accounting.group='Receitas Operacionais';accountsChanged=true;}
+      if(typeof accounting.dre!=='boolean'){accounting.dre=true;accountsChanged=true;}
     }
 
     const legacyApp=accountByName('saida',LEGACY_APPLICATION);
@@ -84,8 +86,9 @@
     INVESTMENT_ACCOUNTS.forEach(name=>{
       const a=accountByName('saida',name);
       if(!a)return;
-      if(clean(a.group)!=='Investimentos'){a.group='Investimentos';accountsChanged=true;}
-      if(a.dre!==false){a.dre=false;accountsChanged=true;}
+      // Migração somente completa campos vazios; nunca desfaz ajustes manuais.
+      if(!clean(a.group)){a.group='Investimentos';accountsChanged=true;}
+      if(typeof a.dre!=='boolean'){a.dre=false;accountsChanged=true;}
     });
 
     if(Array.isArray(transactions)){
