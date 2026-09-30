@@ -6,6 +6,22 @@
     return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
   }
 
+  function deletedFlowKeys(){
+    try{
+      const raw=localStorage.getItem('brcondos_deletedBoletoFlowKeys');
+      const parsed=raw?JSON.parse(raw):[];
+      return new Set(Array.isArray(parsed)?parsed.map(String):[]);
+    }catch(_){return new Set();}
+  }
+  function flowDeleteKey(boleto){
+    const id=String(boleto?.id??'').trim();
+    return id?'boleto:'+id:'';
+  }
+  function isFlowDeleted(boleto){
+    const key=flowDeleteKey(boleto);
+    return !!key&&deletedFlowKeys().has(key);
+  }
+
   function findStatusText(data){
     const priorityKeys=['situacao','status','situacaoTitulo','statusTitulo','descricaoSituacao','situacaoBoleto','statusBoleto'];
     const seen=new Set();
@@ -161,6 +177,22 @@
 
   function syncLiquidatedToFlow(boleto,data,statusText,{allowFallbackToday=true,persist=true}={}){
     if(!boleto||!isLiquidated(statusText))return false;
+
+    if(isFlowDeleted(boleto)){
+      const boletoId=String(boleto.id);
+      const flowId=String(boleto.flowId||'');
+      transactions=(transactions||[]).filter(t=>{
+        const linked=String(t.sourceBoletoId||t.boletoId||'')===boletoId;
+        const sameFlow=flowId&&String(t.id||'')===flowId;
+        return !(linked||sameFlow);
+      });
+      boleto.flowId=null;
+      if(persist&&typeof saveData==='function'){
+        saveData('transactions',transactions);
+        saveData('boletos',boletos);
+      }
+      return false;
+    }
 
     const sourceData=data||boleto.sicrediResponse||null;
     const liquidationDate=findDate(sourceData)||boleto.sicrediLiquidationDate||boleto.receiptDate||(allowFallbackToday?today():'');
