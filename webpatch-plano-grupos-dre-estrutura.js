@@ -13,7 +13,7 @@
   const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   const DEFAULT_GROUPS=[
-    'Receitas Operacionais','Outras Receitas','Deduções da Receita','Despesas com Pessoal',
+    'Receitas Operacionais','Receitas Financeiras','Outras Receitas','Deduções da Receita','Despesas com Pessoal',
     'Despesas Administrativas','Despesas Comerciais','Despesas Financeiras','Despesas com Estrutura',
     'Investimentos','Investimentos – Imobilizados','Movimentações dos Sócios','Outras Despesas',
     'Contas fora da DRE','Transitória','Impostos e Taxas'
@@ -194,11 +194,49 @@
     const a=accountByName(type,category);
     return a?a.dre!==false:true;
   }
-  function isAccountingRevenue(t){return t?.type==='entrada'&&norm(t?.category)===norm(ACCOUNTING_REVENUE);}
-  function revenueBucket(prefix,kind){
-    const rows=(Array.isArray(transactions)?transactions:[]).filter(t=>String(t?.date||'').startsWith(prefix)&&t?.status==='pago'&&t?.type==='entrada'&&accountAllowed('entrada',t?.category));
-    if(kind==='accounting')return rows.filter(isAccountingRevenue);
-    return rows.filter(t=>!isAccountingRevenue(t));
+  function revenueRows(prefix){
+    return (Array.isArray(transactions)?transactions:[]).filter(t=>
+      String(t?.date||'').startsWith(prefix)&&
+      t?.status==='pago'&&
+      t?.type==='entrada'&&
+      accountAllowed('entrada',t?.category)
+    );
+  }
+  function revenueAccount(category){
+    return accountByName('entrada',category);
+  }
+  function revenueGroupFor(category){
+    const account=revenueAccount(category);
+    const group=clean(account?.group);
+    return group||'Receitas Operacionais';
+  }
+  function revenueSections(){
+    const map=new Map();
+    try{
+      (Array.isArray(chartAccounts)?chartAccounts:[])
+        .filter(a=>a?.type==='entrada'&&a?.dre!==false)
+        .forEach(a=>{
+          const group=clean(a.group)||'Receitas Operacionais';
+          if(!map.has(group))map.set(group,new Set());
+          map.get(group).add(clean(a.name));
+        });
+    }catch(_){ }
+    revenueRows(currentPrefix()).forEach(t=>{
+      const group=revenueGroupFor(t?.category);
+      if(!map.has(group))map.set(group,new Set());
+      map.get(group).add(clean(t?.category));
+    });
+    const groupRank=g=>{
+      const i=DEFAULT_GROUPS.findIndex(x=>norm(x)===norm(g));
+      return i<0?999:i;
+    };
+    return [...map.entries()]
+      .filter(([,names])=>[...names].some(Boolean))
+      .sort((a,b)=>groupRank(a[0])-groupRank(b[0])||collator.compare(a[0],b[0]))
+      .map(([group,names])=>({group,names:[...names].filter(Boolean).sort(collator.compare)}));
+  }
+  function revenueBucket(prefix,accountName){
+    return revenueRows(prefix).filter(t=>norm(t?.category)===norm(accountName));
   }
   function isInvestmentGroup(group){
     const g=norm(group);
@@ -288,10 +326,10 @@
       </tbody></table></div>
       <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn primary" onclick="closeModal()">Fechar</button></div>`);
   }
-  window.openBrRevenueDetails=function(kind){
+  window.openBrRevenueDetails=function(encodedName){
     const prefix=currentPrefix();if(!/^\d{4}-\d{2}$/.test(prefix))return;
-    const rows=revenueBucket(prefix,kind);
-    detailModal(kind==='accounting'?'Receita de Contabilidade':'Receita de Adm de Condominios',rows);
+    const name=decodeURIComponent(String(encodedName||''));
+    detailModal(name,revenueBucket(prefix,name));
   };
   window.openBrInvestmentDetails=function(encodedName){
     const prefix=currentPrefix();if(!/^\d{4}-\d{2}$/.test(prefix))return;
@@ -308,18 +346,36 @@
       const prefix=currentPrefix();if(!/^\d{4}-\d{2}$/.test(prefix))return;
       const prev=previousPrefix(prefix);
       const demo=document.querySelector('#view-dre .grid.two-cols > .card');if(!demo)return;
-      demo.querySelectorAll(':scope > .br-dre-revenue-detail,:scope > .br-dre-investment-header,:scope > .br-dre-investment-detail,:scope > .br-dre-result-after').forEach(el=>el.remove());
+      demo.querySelectorAll(':scope > .br-dre-revenue-group,:scope > .br-dre-revenue-detail,:scope > .br-dre-investment-header,:scope > .br-dre-investment-detail,:scope > .br-dre-result-after').forEach(el=>el.remove());
 
       const rows=[...demo.querySelectorAll(':scope > .dre-compare-row')];
       const revenueRow=rows.find(r=>norm(r.firstElementChild?.textContent).includes('receita operacional'));
       if(revenueRow){
-        const adminPrev=revenueBucket(prev,'admin').reduce((s,x)=>s+Number(x.value||0),0);
-        const adminCur=revenueBucket(prefix,'admin').reduce((s,x)=>s+Number(x.value||0),0);
-        const acctPrev=revenueBucket(prev,'accounting').reduce((s,x)=>s+Number(x.value||0),0);
-        const acctCur=revenueBucket(prefix,'accounting').reduce((s,x)=>s+Number(x.value||0),0);
-        const adminEl=document.createElement('div');adminEl.innerHTML=rowHtml(ADMIN_REVENUE,adminPrev,adminCur,'br-dre-revenue-detail',`openBrRevenueDetails('admin')`);const adminRow=adminEl.firstElementChild;
-        const acctEl=document.createElement('div');acctEl.innerHTML=rowHtml(ACCOUNTING_REVENUE,acctPrev,acctCur,'br-dre-revenue-detail',`openBrRevenueDetails('accounting')`);const acctRow=acctEl.firstElementChild;
-        revenueRow.insertAdjacentElement('afterend',adminRow);adminRow.insertAdjacentElement('afterend',acctRow);
+        revenueRow.firstElementChild.textContent='RECEITAS';
+        let cursor=revenueRow;
+        revenueSections().forEach(section=>{
+          const prevByName={},curByName={};
+          section.names.forEach(name=>{
+            prevByName[name]=revenueBucket(prev,name).reduce((s,x)=>s+Number(x.value||0),0);
+            curByName[name]=revenueBucket(prefix,name).reduce((s,x)=>s+Number(x.value||0),0);
+          });
+          const sectionPrev=Object.values(prevByName).reduce((s,v)=>s+v,0);
+          const sectionCur=Object.values(curByName).reduce((s,v)=>s+v,0);
+          if(Math.abs(sectionPrev)<0.005&&Math.abs(sectionCur)<0.005)return;
+
+          const header=document.createElement('div');
+          header.className='dre-group-row br-dre-revenue-group';
+          header.innerHTML=`<span class="dre-group-name">${escHtml(section.group).toUpperCase()}</span><span class="dre-group-value">${money(sectionPrev)}</span><span class="dre-group-value">${money(sectionCur)}</span>`;
+          cursor.insertAdjacentElement('afterend',header);cursor=header;
+
+          section.names.forEach(name=>{
+            const prevValue=prevByName[name]||0,curValue=curByName[name]||0;
+            if(Math.abs(prevValue)<0.005&&Math.abs(curValue)<0.005)return;
+            const holder=document.createElement('div');
+            holder.innerHTML=rowHtml(name,prevValue,curValue,'br-dre-revenue-detail',`openBrRevenueDetails('${encodeURIComponent(name)}')`);
+            const detail=holder.firstElementChild;cursor.insertAdjacentElement('afterend',detail);cursor=detail;
+          });
+        });
       }
 
       const resultRow=[...demo.querySelectorAll(':scope > .dre-compare-row')].find(r=>norm(r.firstElementChild?.textContent)==='resultado do periodo');
