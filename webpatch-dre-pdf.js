@@ -105,26 +105,32 @@
     };
   }
 
+  window.brBuildDrePdf=async function(){
+    const payload=collectPayload();
+    const response=await fetch('/api/dre/pdf',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(data.error||'Não foi possível gerar o PDF da DRE.');
+    }
+    const blob=await response.blob();
+    const filename=`DRE-BRCONDOS-${payload.period}.pdf`;
+    return {payload,blob,filename,file:new File([blob],filename,{type:'application/pdf'})};
+  };
+
   window.generateDrePdf=async function(){
     const btn=document.querySelector('#view-dre .dre-pdf-btn');
     const oldText=btn?.textContent||'PDF';
     try{
       if(btn){btn.disabled=true;btn.textContent='Gerando…';}
-      const payload=collectPayload();
-      const response=await fetch('/api/dre/pdf',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(payload)
-      });
-      if(!response.ok){
-        const data=await response.json().catch(()=>({}));
-        throw new Error(data.error||'Não foi possível gerar o PDF da DRE.');
-      }
-      const blob=await response.blob();
+      const {blob,filename}=await window.brBuildDrePdf();
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
-      a.download=`DRE-BRCONDOS-${payload.period}.pdf`;
+      a.download=filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
