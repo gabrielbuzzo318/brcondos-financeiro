@@ -87,6 +87,61 @@ function applyDeletedBoletoTombstones(data, extraKeys=[]) {
   return data;
 }
 
+function applyDeletedBoletoFlowTombstones(data, extraKeys=[]) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const storage=data.storage;
+  if (!storage || typeof storage !== 'object' || Array.isArray(storage)) return data;
+
+  const transactions=parseArrayValue(storage,'brcondos_transactions');
+  const boletos=parseArrayValue(storage,'brcondos_boletos');
+  if(!transactions)return data;
+
+  const stored=parseArrayValue(storage,'brcondos_deletedBoletoFlowKeys')||[];
+  const keys=[...new Set([
+    ...stored.map(String),
+    ...(Array.isArray(extraKeys)?extraKeys:[]).map(String)
+  ].filter(Boolean))];
+  const deletedIds=new Set(
+    keys.filter(k=>k.startsWith('boleto:')).map(k=>k.slice('boleto:'.length))
+  );
+
+  const filtered=transactions.filter(t=>{
+    const source=String(t?.sourceBoletoId??t?.boletoId??'');
+    return !source || !deletedIds.has(source);
+  });
+
+  if(Array.isArray(boletos)){
+    let boletoChanged=false;
+    boletos.forEach(b=>{
+      if(!deletedIds.has(String(b?.id??'')))return;
+      if(b.flowId!==null&&b.flowId!==undefined&&String(b.flowId)!==''){
+        b.flowId=null;
+        boletoChanged=true;
+      }
+    });
+    if(boletoChanged)storage.brcondos_boletos=JSON.stringify(boletos);
+  }
+
+  storage.brcondos_deletedBoletoFlowKeys=JSON.stringify(keys);
+  if(filtered.length!==transactions.length)storage.brcondos_transactions=JSON.stringify(filtered);
+  return data;
+}
+
+async function currentDeletedBoletoFlowKeys(token) {
+  try{
+    const res=await supabaseFetch('/rest/v1/app_state?select=data&state_key=eq.main&limit=1',token,{
+      method:'GET',
+      headers:{Accept:'application/json'}
+    });
+    if(!res.ok)return [];
+    const rows=await readJson(res);
+    const row=Array.isArray(rows)?rows[0]:null;
+    return parseArrayValue(row?.data?.storage,'brcondos_deletedBoletoFlowKeys')||[];
+  }catch{
+    return [];
+  }
+}
+
 async function currentDeletedBoletoKeys(token) {
   try{
     const res=await supabaseFetch('/rest/v1/app_state?select=data&state_key=eq.main&limit=1',token,{
@@ -527,6 +582,7 @@ export async function getSharedState(req) {
   if (row.data) {
     ensureTimeClient(row.data);
     applyDeletedBoletoTombstones(row.data);
+    applyDeletedBoletoFlowTombstones(row.data);
     repairBillingState(row.data);
   }
   return { ok: true, exists: true, ...row };
@@ -548,9 +604,11 @@ export async function putSharedState(req, body = {}) {
   }
 
   const preservedDeletedBoletoKeys=await currentDeletedBoletoKeys(token);
+  const preservedDeletedBoletoFlowKeys=await currentDeletedBoletoFlowKeys(token);
   repairFinancialState(data);
   ensureTimeClient(data);
   applyDeletedBoletoTombstones(data,preservedDeletedBoletoKeys);
+  applyDeletedBoletoFlowTombstones(data,preservedDeletedBoletoFlowKeys);
   repairBillingState(data);
 
   const res = await supabaseFetch('/rest/v1/app_state?on_conflict=state_key', token, {
