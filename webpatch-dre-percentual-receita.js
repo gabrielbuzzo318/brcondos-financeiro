@@ -51,7 +51,10 @@
     const rows=[...demo.querySelectorAll(':scope > .dre-compare-row')];
     if(!rows.length)return;
 
-    const revenueRow=rows.find(row=>norm(row.firstElementChild?.textContent).includes('receita operacional'));
+    const revenueRow=rows.find(row=>{
+      const label=norm(row.firstElementChild?.textContent);
+      return label==='receitas'||label.includes('receita operacional');
+    });
     const revenue=parseMoney(revenueRow?.querySelector('.dre-compare-current')?.textContent||'');
 
     const head=demo.querySelector(':scope > .dre-compare-head');
@@ -64,8 +67,10 @@
       if(!el){el=document.createElement('span');el.className='dre-percent-current';row.appendChild(el);}
       const current=parseMoney(row.querySelector('.dre-compare-current')?.textContent||'');
       const pct=revenue?current/revenue*100:0;
-      el.textContent=formatPct(pct);
-      el.title='Percentual desta linha sobre a Receita Operacional do mês selecionado';
+      const nextText=formatPct(pct);
+      if(el.textContent!==nextText)el.textContent=nextText;
+      const nextTitle='Percentual desta linha sobre a Receita do mês selecionado';
+      if(el.title!==nextTitle)el.title=nextTitle;
     });
 
     demo.querySelectorAll(':scope > .dre-group-row').forEach(row=>{
@@ -73,8 +78,10 @@
       if(!el){el=document.createElement('span');el.className='dre-percent-group';row.appendChild(el);}
       const values=row.querySelectorAll('.dre-group-value');
       const current=parseMoney(values[values.length-1]?.textContent||'');
-      el.textContent=formatPct(revenue?current/revenue*100:0);
-      el.title='Percentual do grupo sobre a Receita Operacional do mês selecionado';
+      const nextText=formatPct(revenue?current/revenue*100:0);
+      if(el.textContent!==nextText)el.textContent=nextText;
+      const nextTitle='Percentual do grupo sobre a Receita do mês selecionado';
+      if(el.title!==nextTitle)el.title=nextTitle;
     });
   }
 
@@ -85,7 +92,18 @@
   if(typeof oldRender==='function')window.renderDRE=function(){const out=oldRender.apply(this,arguments);schedule();return out;};
 
   const obs=new MutationObserver(mutations=>{
-    if(mutations.some(m=>m.target?.closest?.('#view-dre')||m.target?.id==='view-dre'))schedule();
+    const relevant=mutations.some(m=>{
+      const target=m.target?.nodeType===1?m.target:m.target?.parentElement;
+      if(!target?.closest?.('#view-dre')&&target?.id!=='view-dre')return false;
+      if(target?.closest?.('.dre-percent-current,.dre-percent-group,.dre-percent-head'))return false;
+      const added=[...(m.addedNodes||[])];
+      const removed=[...(m.removedNodes||[])];
+      const onlyPercent=[...added,...removed].every(n=>
+        n.nodeType!==1||n.matches?.('.dre-percent-current,.dre-percent-group,.dre-percent-head')
+      );
+      return !onlyPercent;
+    });
+    if(relevant)schedule();
   });
   const view=document.getElementById('view-dre');
   if(view)obs.observe(view,{childList:true,subtree:true});
