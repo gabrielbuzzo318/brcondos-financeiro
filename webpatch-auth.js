@@ -113,6 +113,12 @@
     clearTimeout(pushTimer);
     pushTimer=setTimeout(()=>{pushSharedState().catch(err=>console.error('BRCONDOS SYNC SAVE:',err));},350);
   }
+  window.brcondosFlushSharedState=async function(){
+    if(setupMode||isReadOnly()||!profile)return null;
+    clearTimeout(pushTimer);
+    pushTimer=null;
+    return await pushSharedState();
+  };
   async function hydrateSharedState(){
     if(setupMode||!profile)return false;
     const shared=await readSharedState();
@@ -194,6 +200,7 @@
       alert('O login definitivo será ativado assim que o domínio for conectado.');
       return;
     }
+    try{await window.brcondosFlushSharedState?.();}catch(err){console.error('BRCONDOS SYNC LOGOUT:',err);}
     try{await oldFetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}catch(_){ }
     localStorage.removeItem('brcondos_session');
     goLogin();
