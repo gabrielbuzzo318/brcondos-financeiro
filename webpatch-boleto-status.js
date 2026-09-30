@@ -189,7 +189,9 @@
       tx.date=flowDate;
       tx.type='entrada';
       tx.status='pago';
-      tx.category='Receitas de serviços';
+      // Nunca sobrescreve uma classificação ajustada manualmente no Fluxo de Caixa.
+      // A categoria padrão só é aplicada quando o lançamento ainda não possui categoria.
+      if(!String(tx.category||'').trim())tx.category='Receitas de serviços';
       tx.sourceBoletoId=boleto.id;
       tx.sicrediSettlementType=kind;
       boleto.flowId=tx.id;
