@@ -229,6 +229,76 @@
     if(typeof openModal==='function')openModal(title,body);else alert('Não foi possível abrir o formulário.');
   };
 
+
+  function syncReimbursementToFlow(item){
+    try{
+      if(typeof transactions==='undefined'||!Array.isArray(transactions)||typeof saveData!=='function'||!item)return;
+      const rid=String(item.id||'');
+      if(!rid)return;
+
+      let t=transactions.find(x=>String(x?.sourceReimbursementId??'')===rid)||null;
+
+      if(statusValue(item)!=='recebido'||!item.receivedDate){
+        if(t){
+          const idx=transactions.indexOf(t);
+          if(idx>=0)transactions.splice(idx,1);
+          saveData('transactions',transactions);
+        }
+        return;
+      }
+
+      if(!t){
+        t=transactions.find(x=>
+          String(x?.sourceReimbursementId??'')==='' &&
+          String(x?.type||'')==='entrada' &&
+          String(x?.date||'')===String(item.receivedDate||'') &&
+          Math.abs(Number(x?.value||0)-Number(item.value||0))<0.005 &&
+          (
+            norm(x?.category)==='reembolsos recebidos' ||
+            norm(x?.description)==='reembolso recebido'
+          )
+        )||null;
+      }
+
+      if(!t){
+        const used=new Set(transactions.map(x=>String(x?.id??'')).filter(Boolean));
+        let txId=Date.now();
+        while(used.has(String(txId)))txId++;
+        t={id:txId};
+        transactions.push(t);
+      }
+
+      Object.assign(t,{
+        type:'entrada',
+        date:item.receivedDate,
+        description:'Reembolso Recebido',
+        category:'Reembolsos recebidos',
+        party:item.reimbursableBy||'',
+        value:Number(item.value||0),
+        status:'pago',
+        sourceType:'reimbursement',
+        sourceReimbursementId:item.id
+      });
+
+      saveData('transactions',transactions);
+      item.flowId=t.id;
+    }catch(err){
+      console.error('REEMBOLSO -> FLUXO',err);
+    }
+  }
+
+  function reconcileReceivedReimbursements(){
+    const items=list();
+    let changed=false;
+    items.forEach(item=>{
+      const before=String(item.flowId??'');
+      syncReimbursementToFlow(item);
+      if(String(item.flowId??'')!==before)changed=true;
+    });
+    if(changed)persist(items);
+    return changed;
+  }
+
   window.brR2Save=function(id){
     const date=String(document.getElementById('br_r2_date')?.value||'');
     const description=String(document.getElementById('br_r2_description')?.value||'').trim();
@@ -254,8 +324,11 @@
       const newId=Date.now();
       items.push({id:newId,date,description,status,reimbursableBy,supplier,value,receivedDate:status==='recebido'?receivedDate:'',createdAt:now,updatedAt:now});
     }
+    const savedItem=id!=null?items.find(x=>Number(x.id)===Number(id)):items[items.length-1];
+    syncReimbursementToFlow(savedItem);
     persist(items);
     if(typeof closeModal==='function')closeModal();
+    try{if(typeof renderAll==='function')renderAll()}catch(_){ }
     render();
   };
 
@@ -264,7 +337,17 @@
     const item=items.find(x=>Number(x.id)===Number(id));
     if(!item)return;
     if(!confirm(`Excluir o reembolso "${item.description||''}"?`))return;
+    try{
+      if(typeof transactions!=='undefined'&&Array.isArray(transactions)&&typeof saveData==='function'){
+        const before=transactions.length;
+        for(let i=transactions.length-1;i>=0;i--){
+          if(String(transactions[i]?.sourceReimbursementId??'')===String(id))transactions.splice(i,1);
+        }
+        if(transactions.length!==before)saveData('transactions',transactions);
+      }
+    }catch(err){console.error('EXCLUIR REEMBOLSO DO FLUXO',err);}
     persist(items.filter(x=>Number(x.id)!==Number(id)));
+    try{if(typeof renderAll==='function')renderAll()}catch(_){ }
     render();
   };
 
@@ -374,6 +457,7 @@
     window.showView=wrapped;
   }
 
-  window.addEventListener('storage',e=>{if(e.key===STORAGE_KEY)render()});
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(render,0),{once:true});
+  window.addEventListener('storage',e=>{if(e.key===STORAGE_KEY){reconcileReceivedReimbursements();render()}});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{reconcileReceivedReimbursements();try{if(typeof renderAll==='function')renderAll()}catch(_){ }render();},900),{once:true});
+  else setTimeout(()=>{reconcileReceivedReimbursements();try{if(typeof renderAll==='function')renderAll()}catch(_){ }render();},900);
 })();
