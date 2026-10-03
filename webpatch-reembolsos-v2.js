@@ -290,7 +290,7 @@
   function reconcileReceivedReimbursements(){
     const items=list();
     let changed=false;
-    items.forEach(item=>{
+    items.filter(item=>String(item.receivedDate||'')>='2026-10-01').forEach(item=>{
       const before=String(item.flowId??'');
       syncReimbursementToFlow(item);
       if(String(item.flowId??'')!==before)changed=true;
