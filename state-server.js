@@ -521,7 +521,7 @@ function normalizeOctoberCashFlow(data) {
   if(!tx || !bills) return data;
   const targetBills=bills.filter(b=>
     ['2026-10-10','2026-10-13'].includes(String(b?.cashFlowDate||'')) &&
-    String(b?.docNumber||'').includes('092026')
+    (String(b?.docNumber||'').includes('092026') || (String(b?.docNumber||'')==='3' && sameNumber(b?.value,4042)))
   );
   const billIds=new Set(targetBills.map(b=>String(b.id)));
   const docs=new Set(targetBills.map(b=>String(b.docNumber||'')).filter(Boolean));
