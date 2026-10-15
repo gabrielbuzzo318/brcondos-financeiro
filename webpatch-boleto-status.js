@@ -167,7 +167,12 @@
     if(!liquidationDate)return false;
 
     const kind=findSettlementKind(sourceData,statusText||boleto.sicrediStatus||'');
-    const flowDate=kind==='pix'?liquidationDate:addDaysIso(liquidationDate,1);
+    // Respeita a data de crédito já registrada para o fluxo, inclusive ajustes manuais.
+    // A data de liquidação bancária permanece separada.
+    const savedFlowDate=String(boleto.cashFlowDate||'');
+    const flowDate=/^\d{4}-\d{2}-\d{2}$/.test(savedFlowDate)
+      ?savedFlowDate
+      :(kind==='pix'?liquidationDate:addDaysIso(liquidationDate,1));
 
     boleto.status='recebido';
     boleto.receiptDate=liquidationDate;
