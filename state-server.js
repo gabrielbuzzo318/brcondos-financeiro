@@ -520,7 +520,7 @@ function normalizeOctoberCashFlow(data) {
   const bills=parseArrayValue(storage,'brcondos_boletos');
   if(!tx || !bills) return data;
   const targetBills=bills.filter(b=>
-    String(b?.cashFlowDate||'')==='2026-10-10' &&
+    ['2026-10-10','2026-10-13'].includes(String(b?.cashFlowDate||'')) &&
     String(b?.docNumber||'').includes('092026')
   );
   const billIds=new Set(targetBills.map(b=>String(b.id)));
@@ -532,7 +532,7 @@ function normalizeOctoberCashFlow(data) {
       docs.has(String(t.description||'').replace(/^Recebimento de boleto\\s*/i,'').trim());
     if(linked) {t.date='2026-10-13';txChanged=true;}
   }
-  for(const b of targetBills){b.cashFlowDate='2026-10-13';billChanged=true;}
+  for(const b of targetBills){if(b.cashFlowDate==='2026-10-10'){b.cashFlowDate='2026-10-13';billChanged=true;}}
   if(txChanged)storage.brcondos_transactions=JSON.stringify(tx);
   if(billChanged)storage.brcondos_boletos=JSON.stringify(bills);
   return data;
