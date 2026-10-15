@@ -63,6 +63,24 @@
       }
     }
 
+    // Recebimentos bancários também possuem uma data de crédito no boleto.
+    // Sem sincronizar esta origem, a consulta Sicredi pode desfazer a edição.
+    if(id!=null && old && obj.date!==String(old.date||'') &&
+       typeof boletos!=='undefined' && Array.isArray(boletos)){
+      const boletoId=old.sourceBoletoId??old.boletoId;
+      const doc=String(old.description||'').match(/Recebimento de boleto\\s+(FAT-\\S+)/i)?.[1]||'';
+      const boleto=boletos.find(b=>
+        (boletoId!=null&&String(b.id)===String(boletoId)) ||
+        (b.flowId!=null&&String(b.flowId)===String(id)) ||
+        (doc&&String(b.docNumber||'')===doc)
+      );
+      if(boleto){
+        boleto.cashFlowDate=obj.date;
+        try{saveData('boletos',boletos);}
+        catch(e){console.error('BRCONDOS FLUXO -> BOLETOS:',e);return alert('Falha ao atualizar data do boleto.');}
+      }
+    }
+
     saveData('transactions',transactions);
     closeModal();
     renderAll();
