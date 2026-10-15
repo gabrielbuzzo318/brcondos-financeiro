@@ -129,11 +129,15 @@
       return false;
     }
     const rev=String(shared.updated_at||'');
-    if(rev&&sessionStorage.getItem(SHARED_REV)===rev)return false;
+    // Uma única hidratação forçada após a correção do fluxo de outubro.
+    // O marcador impede recarregamentos repetidos da página.
+    const migrationKey='brcondos_oct2026_flow_refresh_v1';
+    if(rev&&sessionStorage.getItem(SHARED_REV)===rev&&sessionStorage.getItem(migrationKey)==='done')return false;
     const storage=shared?.data?.storage;
     if(!storage||typeof storage!=='object')return false;
     if(!applyStorage(storage))return false;
     if(rev)sessionStorage.setItem(SHARED_REV,rev);
+    sessionStorage.setItem(migrationKey,'done');
     location.reload();
     return true;
   }
