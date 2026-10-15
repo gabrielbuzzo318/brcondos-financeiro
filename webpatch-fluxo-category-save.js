@@ -46,9 +46,20 @@
     // Assim a rotina de conciliação não devolve a categoria antiga depois do render.
     if(id!=null){
       const p=linkedPayable(id,old);
-      if(p&&String(p.category||'')!==String(obj.category||'')){
-        p.category=obj.category;
-        try{saveData('payables',payables);}catch(e){console.error('BRCONDOS FLUXO CATEGORIA -> A PAGAR:',e);}
+      if(p){
+        let changed=false;
+        if(String(p.category||'')!==String(obj.category||'')){
+          p.category=obj.category;
+          changed=true;
+        }
+        if(obj.date!==String(old?.date||'') && obj.date!==String(p.paymentDate||p.paidDate||p.due||'')){
+          p.paymentDate=obj.date;
+          if(p.paidDate!=null && p.paidDate!=='')p.paidDate=obj.date;
+          changed=true;
+        }
+        if(changed){
+          try{saveData('payables',payables);}catch(e){console.error('BRCONDOS FLUXO -> A PAGAR:',e);return alert('Falha ao sincronizar conta a pagar.');}
+        }
       }
     }
 
