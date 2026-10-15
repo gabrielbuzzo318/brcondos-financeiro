@@ -129,9 +129,18 @@
       return false;
     }
     const rev=String(shared.updated_at||'');
-    if(rev&&sessionStorage.getItem(SHARED_REV)===rev)return false;
     const storage=shared?.data?.storage;
     if(!storage||typeof storage!=='object')return false;
+    // O marcador da sessao pode estar atualizado enquanto o cache local
+    // continua antigo (especialmente apos correcoes diretas na base).
+    // Confere tambem o conteudo financeiro antes de pular a hidratacao.
+    const sameRevision=rev&&sessionStorage.getItem(SHARED_REV)===rev;
+    const financeKeys=['brcondos_transactions','brcondos_boletos','brcondos_payables'];
+    const financeChanged=financeKeys.some(key=>
+      Object.prototype.hasOwnProperty.call(storage,key)&&
+      String(localStorage.getItem(key)??'')!==String(storage[key]??'')
+    );
+    if(sameRevision&&!financeChanged)return false;
     if(!applyStorage(storage))return false;
     if(rev)sessionStorage.setItem(SHARED_REV,rev);
     location.reload();
