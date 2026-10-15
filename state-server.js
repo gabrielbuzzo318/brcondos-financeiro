@@ -510,6 +510,34 @@ function ensureTimeClient(data) {
   return data;
 }
 
+// Ajuste específico dos recebimentos do relatório de 10/10/2026.
+// Aplicado tanto na leitura quanto na gravação para evitar que uma aba antiga
+// restaure os lançamentos em 10/10 com um PUT de estado completo.
+function normalizeOctoberCashFlow(data) {
+  const storage=data?.storage;
+  if(!storage || typeof storage!=='object') return data;
+  const tx=parseArrayValue(storage,'brcondos_transactions');
+  const bills=parseArrayValue(storage,'brcondos_boletos');
+  if(!tx || !bills) return data;
+  const targetBills=bills.filter(b=>
+    String(b?.cashFlowDate||'')==='2026-10-10' &&
+    String(b?.docNumber||'').includes('092026')
+  );
+  const billIds=new Set(targetBills.map(b=>String(b.id)));
+  const docs=new Set(targetBills.map(b=>String(b.docNumber||'')).filter(Boolean));
+  let txChanged=false, billChanged=false;
+  for(const t of tx) {
+    if(String(t?.date||'')!=='2026-10-10' || String(t?.type||'')!=='entrada')continue;
+    const linked=billIds.has(String(t.sourceBoletoId??t.boletoId??'')) ||
+      docs.has(String(t.description||'').replace(/^Recebimento de boleto\\s*/i,'').trim());
+    if(linked) {t.date='2026-10-13';txChanged=true;}
+  }
+  for(const b of targetBills){b.cashFlowDate='2026-10-13';billChanged=true;}
+  if(txChanged)storage.brcondos_transactions=JSON.stringify(tx);
+  if(billChanged)storage.brcondos_boletos=JSON.stringify(bills);
+  return data;
+}
+
 export async function getSharedState(req) {
   const token = tokenFrom(req);
   const res = await supabaseFetch('/rest/v1/app_state?select=state_key,data,updated_at,updated_by&state_key=eq.main&limit=1', token, {
@@ -528,6 +556,7 @@ export async function getSharedState(req) {
     ensureTimeClient(row.data);
     applyDeletedBoletoTombstones(row.data);
     repairBillingState(row.data);
+    normalizeOctoberCashFlow(row.data);
   }
   return { ok: true, exists: true, ...row };
 }
@@ -549,6 +578,7 @@ export async function putSharedState(req, body = {}) {
 
   const preservedDeletedBoletoKeys=await currentDeletedBoletoKeys(token);
   repairFinancialState(data);
+  normalizeOctoberCashFlow(data);
   ensureTimeClient(data);
   applyDeletedBoletoTombstones(data,preservedDeletedBoletoKeys);
   repairBillingState(data);
