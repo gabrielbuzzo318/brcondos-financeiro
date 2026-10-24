@@ -3,6 +3,18 @@
   function isLockedNf(x){return ['emitida_nfse','cancelada_nfse'].includes(String(x?.status||''));}
   function isLockedReceipt(x){return String(x?.status||'')==='gerado';}
 
+  function detailSegment(details,kind){
+    const raw=String(details||'').trim();
+    // Cada assunto da coluna DETALHES fica separado por "+" ou por linha.
+    const pieces=raw.split(/\s*\+\s*|[\r\n]+/).map(x=>x.trim()).filter(Boolean);
+    const pattern=kind==='DP'?/^DP\b\s*[-:–]?\s*/i:/^RPA\b\s*[-:–]?\s*/i;
+    const piece=pieces.find(x=>pattern.test(x));
+    if(piece)return piece.replace(pattern,'').trim();
+    // Aceita DP no meio de uma frase sem capturar o texto referente a RPA.
+    const match=raw.match(kind==='DP'?/\bDP\b\s*[-:–]?\s*([^+\r\n]+)/i:/\bRPA\b\s*[-:–]?\s*([^+\r\n]+)/i);
+    return match?match[1].trim():'';
+  }
+
   function receiptLinesFromBreakdown(b){
     const d=b?.billingBreakdown||{};
     const lines=[];
@@ -12,22 +24,18 @@
     add('Assemb. Extra',d.assembleiaExtra);
     add('Livros - Emissão de Livro',d.livros);
     if(num(d.dp)>0){
-      const details=String(d.detalhes||'');
-      const match=details.match(/\\bDP\\s*[-:–]?\\s*([^\\n;|,]+)/i);
-      const description=match?.[1]?.trim()||'Serviço de DP (verificar DETALHES)';
-      add('DP - '+description,d.dp);
+      const description=detailSegment(d.detalhes,'DP');
+      add('DP'+(description?' - '+description:' - Descrição não encontrada em DETALHES'),d.dp);
     }
     const dbe=num(d.dbe);
     if(dbe>0){
-      const details=String(d.detalhes||'').trim();
-      lines.push('DBE - '+money(dbe)+(details?' - '+details:''));
+      const description=detailSegment(d.detalhes,'DBE');
+      lines.push('DBE - '+money(dbe)+(description?' - '+description:''));
     }
     const rpa=num(d.rpa);
     if(rpa>0){
-      let line='RPA - '+money(rpa);
-      const details=String(d.detalhes||'').trim();
-      if(details)line+=' - '+details;
-      lines.push(line);
+      const description=detailSegment(d.detalhes,'RPA');
+      lines.push('RPA - '+money(rpa)+(description?' - RPA '+description:''));
     }
     return lines;
   }
