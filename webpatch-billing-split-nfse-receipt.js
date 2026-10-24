@@ -99,10 +99,21 @@
       const isCont=String(b.section||'').toUpperCase()==='CONTABIL' && num(b.billingBreakdown.honorarioCont)>0;
       const honorario=num(b.billingBreakdown.honorarioAdm)+num(b.billingBreakdown.fopag)+num(b.billingBreakdown.spedEfd)+num(b.billingBreakdown.eSocial);
       const honorarioCont=num(b.billingBreakdown.honorarioCont);
-      const receiptValue=isCont?honorarioCont:extrasTotal(b);
-      const receiptLines=isCont
+      let receiptValue=isCont?honorarioCont:extrasTotal(b);
+      let receiptLines=isCont
         ? ['Honorário Cont - '+money(honorarioCont)]
         : receiptLinesFromBreakdown(b);
+      // Exceções confirmadas: recibo integral de ADM na competência 10/2026.
+      if(String(b.competence)==='2026-10'){
+        const overrides={
+          '1792857357827029':[3615,['Honorários ADM - R$ 1.994,00','DBE - Emissão de CNPJ - R$ 1.621,00']],
+          '1792857357827033':[3909,['Honorários ADM - R$ 2.288,00','DBE - Emissão de CNPJ - R$ 1.621,00']],
+          '1792857357827039':[1680,['Honorários ADM - R$ 1.640,00','Módulo Manutenção - R$ 40,00']],
+          '1792857357827038':[4924,['Honorários ADM - R$ 4.924,00']]
+        };
+        const manual=overrides[String(b.id)];
+        if(manual){receiptValue=manual[0];receiptLines=manual[1];}
+      }
       let nfExisting=nfse.find(x=>String(x.sourceBoletoId)===String(b.id));
       let recExisting=receipts.find(x=>String(x.sourceBoletoId)===String(b.id));
 
