@@ -10,6 +10,13 @@
     add('Módulo cobrança',d.moduloCobranca);
     add('Módulo manutenção',d.moduloManutencao);
     add('Assemb. Extra',d.assembleiaExtra);
+    add('Livros - Emissão de Livro',d.livros);
+    if(num(d.dp)>0){
+      const details=String(d.detalhes||'');
+      const match=details.match(/\\bDP\\s*[-:–]?\\s*([^\\n;|,]+)/i);
+      const description=match?.[1]?.trim()||'Serviço de DP (verificar DETALHES)';
+      add('DP - '+description,d.dp);
+    }
     const dbe=num(d.dbe);
     if(dbe>0){
       const details=String(d.detalhes||'').trim();
@@ -27,7 +34,7 @@
 
   function extrasTotal(b){
     const d=b?.billingBreakdown||{};
-    return num(d.dbe)+num(d.moduloCobranca)+num(d.moduloManutencao)+num(d.assembleiaExtra)+num(d.rpa);
+    return num(d.dbe)+num(d.moduloCobranca)+num(d.moduloManutencao)+num(d.assembleiaExtra)+num(d.rpa)+num(d.livros)+num(d.dp);
   }
 
   function syncSplitBilling(){
@@ -74,7 +81,7 @@
         }
         nfse.push({
           id:Date.now()+i+Math.floor(Math.random()*100),sourceBoletoId:b.id,clientId:c.id||b.clientId||0,client:b.client,
-          competence:b.competence,value:Number(b.value||0),description:'Administração de Condomínios.',
+          competence:b.competence,value:Number(b.value||0),description:'Honorários Administrativos',
           rpsNumber:nextRpsNumber(),issueDate:today(),serviceDate:'',aliquotaPct:null,status:'rascunho',
           nfseNumber:'',verificationCode:'',gissProtocol:'',lastError:'',gissResponse:null
         });
@@ -82,7 +89,7 @@
       }
 
       const isCont=String(b.section||'').toUpperCase()==='CONTABIL' && num(b.billingBreakdown.honorarioCont)>0;
-      const honorario=num(b.billingBreakdown.honorarioAdm);
+      const honorario=num(b.billingBreakdown.honorarioAdm)+num(b.billingBreakdown.fopag)+num(b.billingBreakdown.spedEfd)+num(b.billingBreakdown.eSocial);
       const honorarioCont=num(b.billingBreakdown.honorarioCont);
       const receiptValue=isCont?honorarioCont:extrasTotal(b);
       const receiptLines=isCont
@@ -129,7 +136,7 @@
         return;
       }
 
-      // NFS-e = SOMENTE HONORÁRIO ADM do quadro administrativo.
+      // NFS-e = HNO ADM COND + FOPAG + SPED-EFD + E-SOCIAL.
       if(honorario>0 && c){
         if(nfExisting){
           if(isLockedNf(nfExisting)){
@@ -139,7 +146,7 @@
             nfExisting.client=c.name||b.client;
             nfExisting.competence=b.competence;
             nfExisting.value=honorario;
-            nfExisting.description='Administração de Condomínios.';
+            nfExisting.description='Honorários Administrativos';
             nfExisting.billingSplitType='honorario_adm';
             nfUpdated++;
           }
@@ -147,7 +154,7 @@
           nfse.push({
             id:Date.now()+i+Math.floor(Math.random()*100),sourceBoletoId:b.id,
             clientId:c.id||b.clientId||0,client:c.name||b.client,
-            competence:b.competence,value:honorario,description:'Administração de Condomínios.',
+            competence:b.competence,value:honorario,description:'Honorários Administrativos',
             rpsNumber:nextRpsNumber(),issueDate:today(),serviceDate:'',aliquotaPct:null,status:'rascunho',
             nfseNumber:'',verificationCode:'',gissProtocol:'',lastError:'',gissResponse:null,
             billingSplitType:'honorario_adm'
@@ -200,7 +207,7 @@
 
     alert(
       'SINCRONIZAÇÃO CONCLUÍDA ✅\n\n'+
-      'NFS-e (somente Honorário Adm): '+(nfCreated+nfUpdated)+'\n'+
+      'NFS-e (Honorários Administrativos): '+(nfCreated+nfUpdated)+'\n'+
       'Recibos (demais valores + Honorário Cont): '+(recCreated+recUpdated)+'\n'+
       'Já sincronizados: '+ignored+'\n'+
       'Cliente não encontrado: '+missingClient+(missingClientNames.length?' ('+[...new Set(missingClientNames)].join(', ')+')':'')+'\n'+
