@@ -7,11 +7,11 @@
     const raw=String(details||'').trim();
     // Cada assunto da coluna DETALHES fica separado por "+" ou por linha.
     const pieces=raw.split(/\s*\+\s*|[\r\n]+/).map(x=>x.trim()).filter(Boolean);
-    const pattern=kind==='DP'?/^DP\b\s*[-:–]?\s*/i:/^RPA\b\s*[-:–]?\s*/i;
+    const pattern=kind==='DP'?/^DP\b\s*[-:–]?\s*/i:kind==='DBE'?/^DBE\b\s*[-:–]?\s*/i:/^RPA\b\s*[-:–]?\s*/i;
     const piece=pieces.find(x=>pattern.test(x));
     if(piece)return piece.replace(pattern,'').trim();
     // Aceita DP no meio de uma frase sem capturar o texto referente a RPA.
-    const match=raw.match(kind==='DP'?/\bDP\b\s*[-:–]?\s*([^+\r\n]+)/i:/\bRPA\b\s*[-:–]?\s*([^+\r\n]+)/i);
+    const match=raw.match(kind==='DP'?/\bDP\b\s*[-:–]?\s*([^+\r\n]+)/i:kind==='DBE'?/\bDBE\b\s*[-:–]?\s*([^+\r\n]+)/i:/\bRPA\b\s*[-:–]?\s*([^+\r\n]+)/i);
     return match?match[1].trim():'';
   }
 
