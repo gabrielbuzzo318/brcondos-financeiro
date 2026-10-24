@@ -113,6 +113,41 @@
     return out.sort((a,b)=>b.ym.localeCompare(a.ym));
   }
 
+  function chooseBillingRows(rows,competence){
+    return new Promise(resolve=>{
+      const overlay=document.createElement('div');
+      overlay.style.cssText='position:fixed;inset:0;background:rgba(10,20,35,.66);z-index:999999;display:flex;align-items:center;justify-content:center;padding:18px';
+      const panel=document.createElement('div');
+      panel.style.cssText='background:white;color:#17212f;width:min(850px,98vw);max-height:90vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;padding:18px;box-shadow:0 18px 55px #0005';
+      const h=document.createElement('h2');h.textContent='Selecionar faturamentos — '+competence;h.style.margin='0 0 6px';
+      const hint=document.createElement('p');hint.textContent='Marque somente os condomínios que deseja importar para emissão. Nenhum boleto será enviado ao banco nesta etapa.';hint.style.margin='0 0 12px';
+      const toolbar=document.createElement('div');toolbar.style.cssText='display:flex;gap:10px;align-items:center;margin-bottom:10px';
+      const all=document.createElement('input');all.type='checkbox';all.checked=true;all.id='billing-select-all';
+      const label=document.createElement('label');label.htmlFor=all.id;label.textContent=' Selecionar todos';
+      const count=document.createElement('span');count.style.marginLeft='auto';
+      toolbar.append(all,label,count);
+      const list=document.createElement('div');list.style.cssText='overflow:auto;border:1px solid #dce2e8;border-radius:8px;flex:1;min-height:120px';
+      const selected=new Set(rows.map((_,i)=>i));
+      const checks=[];
+      const update=()=>{count.textContent=selected.size+' de '+rows.length+' selecionados';all.checked=selected.size===rows.length;all.indeterminate=selected.size>0&&selected.size<rows.length;};
+      rows.forEach((r,i)=>{
+        const line=document.createElement('label');line.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #edf0f3;cursor:pointer';
+        const cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.addEventListener('change',()=>{if(cb.checked)selected.add(i);else selected.delete(i);update();});
+        const name=document.createElement('span');name.textContent=r.client;name.style.flex='1';
+        const val=document.createElement('strong');val.textContent=brl(r.total);
+        line.append(cb,name,val);list.append(line);checks.push(cb);
+      });
+      all.addEventListener('change',()=>{checks.forEach((cb,i)=>{cb.checked=all.checked;if(all.checked)selected.add(i);else selected.delete(i);});update();});
+      const foot=document.createElement('div');foot.style.cssText='display:flex;justify-content:flex-end;gap:10px;margin-top:14px';
+      const cancel=document.createElement('button');cancel.textContent='Cancelar';
+      const ok=document.createElement('button');ok.textContent='Importar selecionados';ok.style.cssText='background:#155abb;color:white;border:0;padding:10px 16px;border-radius:7px';
+      const finish=result=>{overlay.remove();resolve(result);};
+      cancel.onclick=()=>finish(null);
+      ok.onclick=()=>{if(!selected.size){alert('Selecione pelo menos um condomínio.');return;}finish(rows.filter((_,i)=>selected.has(i)));};
+      foot.append(cancel,ok);panel.append(h,hint,toolbar,list,foot);overlay.append(panel);document.body.append(overlay);update();
+    });
+  }
+
   async function importMonthlyBillingXlsx(input){
     const file=input?.files?.[0];
     if(!file)return;
@@ -127,7 +162,12 @@
       const headers=selected.matrix[selected.headerRow]||[];
       const idx={
         cliente:headerIndex(headers,['CLIENTE']),
-        honorario:headerIndex(headers,['HONO ADM COND','HONORARIO ADM','HONORÁRIO ADM']),
+        honorario:headerIndex(headers,['HNO ADM COND','HONO ADM COND','HONORARIO ADM','HONORÁRIO ADM']),
+        fopag:headerIndex(headers,['FOPAG']),
+        sped:headerIndex(headers,['SPED-EFD','SPED EFD']),
+        esocial:headerIndex(headers,['E-SOCIAL','E SOCIAL','ESOCIAL']),
+        livros:headerIndex(headers,['LIVROS']),
+        dp:headerIndex(headers,['DP']),
         dbe:headerIndex(headers,['DBE']),
         cobranca:headerIndex(headers,['MODULO COBANCA','MODULO COBRANCA','MODULO COBANÇA','MOD. COB.','VALOR COBRADO DO CLIENTE']),
         manutencao:headerIndex(headers,['MODULO MANUT','MODULO MANUTENCAO','MODULO MANUTENÇÃO']),
@@ -163,11 +203,18 @@
         if(day<1||day>31)day=0;
         const isCont=contHeaderRow>=0 && r>contHeaderRow && (contEndRow<0 || r<=contEndRow);
         const honorarioRaw=idx.honorario>=0?n(row[idx.honorario]):0;
+        const fopag=idx.fopag>=0?n(row[idx.fopag]):0;
+        const sped=idx.sped>=0?n(row[idx.sped]):0;
+        const esocial=idx.esocial>=0?n(row[idx.esocial]):0;
+        const livros=idx.livros>=0?n(row[idx.livros]):0;
+        const dp=idx.dp>=0?n(row[idx.dp]):0;
         const obs=isCont
           ? (honorarioRaw>0?`Honorário Cont - ${brl(honorarioRaw)}`:'')
           : buildObservation(row,idx);
         parsed.push({rowNo:r+1,client,total,day,obs,section:isCont?'CONTABIL':'ADM',
           honorario:isCont?0:honorarioRaw,
+          fopag:isCont?0:fopag,sped:isCont?0:sped,esocial:isCont?0:esocial,
+          livros:isCont?0:livros,dp:isCont?0:dp,
           honorarioCont:isCont?honorarioRaw:0,
           dbe:idx.dbe>=0?n(row[idx.dbe]):0,
           cobranca:idx.cobranca>=0?n(row[idx.cobranca]):0,
@@ -179,7 +226,8 @@
       }
       if(!parsed.length)throw new Error(`A aba ${selected.name} não possui linhas com CLIENTE e TOTAL preenchidos.`);
 
-      if(!confirm(`Importar ${selected.name} (${pad2(selected.month)}/${selected.year})?\n\nBoletos encontrados: ${parsed.length}\n\nO valor do boleto será exatamente a coluna TOTAL.`))return;
+      const chosen=await chooseBillingRows(parsed,selected.name+' ('+pad2(selected.month)+'/'+selected.year+')');
+      if(!chosen)return;
 
       const dueMonth=nextMonth(selected.year,selected.month);
       const existing=new Set((boletos||[]).map(b=>b.sourceKey).filter(Boolean));
@@ -187,7 +235,7 @@
       const billingIdBase=Date.now()*1000;
       const historicoEmitidoNoBanco=selected.ym>='2026-01'&&selected.ym<='2026-07';
 
-      parsed.forEach((r,i)=>{
+      chosen.forEach((r,i)=>{
         const due=r.day?`${dueMonth.year}-${pad2(dueMonth.month)}-${pad2(r.day)}`:'';
         if(!due)noDue++;
         const sectionCode=r.section==='CONTABIL'?'CONT':'ADM';
@@ -212,6 +260,7 @@
           receiptDate:'',flowId:null,sourceKey,competence:selected.ym,section:r.section,
           billingBreakdown:{
             honorarioAdm:r.honorario,
+            fopag:r.fopag,spedEfd:r.sped,eSocial:r.esocial,livros:r.livros,dp:r.dp,
             honorarioCont:r.honorarioCont,
             dbe:r.dbe,
             moduloCobranca:r.cobranca,
@@ -251,7 +300,7 @@
     }
     const notice=view.querySelector('.notice');
     if(notice){
-      notice.innerHTML='<b>Regra do faturamento:</b> importe a planilha mensal em Excel. O sistema usa <b>TOTAL</b> como valor do boleto. No quadro ADM, a observação usa Honorário Adm, Módulo cobrança, Módulo manutenção, Assemb. Extra e RPA somente quando houver valor. No quadro <b>Honorários Contábeis - Associações</b>, a descrição fica <b>Faturamento CONT</b> e os detalhes mostram apenas <b>Honorário Cont</b>. O vencimento continua no mês seguinte à competência.';
+      notice.innerHTML='<b>Regra do faturamento:</b> importe a planilha mensal em Excel. O sistema usa <b>TOTAL</b> como valor do boleto. No quadro ADM, a NFS-e soma HNO ADM COND, FOPAG, SPED-EFD e E-SOCIAL; LIVROS e DP entram no recibo. A observação usa Honorário Adm, Módulo cobrança, Módulo manutenção, Assemb. Extra e RPA somente quando houver valor. No quadro <b>Honorários Contábeis - Associações</b>, a descrição fica <b>Faturamento CONT</b> e os detalhes mostram apenas <b>Honorário Cont</b>. O vencimento continua no mês seguinte à competência.';
     }
     const ths=[...view.querySelectorAll('thead th')];
     const detailsTh=ths.find(th=>/^Detalhes$/i.test((th.textContent||'').trim()));
