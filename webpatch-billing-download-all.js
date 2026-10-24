@@ -220,6 +220,33 @@
     await requestZip('receipts',items,`BRCONDOS - RECIBOS - ${suffix}.zip`,document.getElementById('receipt_download_all_btn'));
   };
 
+  window.brDownloadContabilZip=async function(){
+    const month=String(document.getElementById('boleto_download_month')?.value||currentMonth());
+    const period=month.replace(/-(\\d{2})$/, '-$1');
+    const base=(Array.isArray(boletos)?boletos:[]).filter(b=>
+      String(b?.competence||'')===period && String(b?.section||'').toUpperCase()==='CONTABIL'
+    );
+    if(!base.length)return alert('Não há honorários contábeis importados nessa competência.');
+    const boletoItems=base.filter(b=>b.sicrediRegistered || b.externalIssued || b.sicrediNossoNumero)
+      .map(b=>({
+        kind:'boleto',
+        name:safe(b.client,'CLIENTE')+' - BOLETO - '+boletoFileValue(b.value)+'.pdf',
+        payload:boletoPayload(b)
+      }));
+    const ids=new Set(base.map(b=>String(b.id)));
+    const receiptItems=(Array.isArray(receipts)?receipts:[])
+      .filter(r=>ids.has(String(r.sourceBoletoId)) && !['cancelado','excluido'].includes(String(r.status||'').toLowerCase()))
+      .map(r=>({
+        kind:'recibo',
+        name:safe(r.client,'CLIENTE')+' - RECIBO '+safe(r.receiptNumber||'SEM NUMERO')+'.pdf',
+        payload:receiptPayload(r)
+      }));
+    const items=[...boletoItems,...receiptItems];
+    if(!items.length)return alert('Não há boletos registrados ou recibos de honorários contábeis para baixar.');
+    if(!confirm('Baixar '+boletoItems.length+' boleto(s) e '+receiptItems.length+' recibo(s) de honorários contábeis de '+label(month)+'?'))return;
+    await requestZip('contabil',items,'BRCONDOS - HONORARIOS CONTABEIS - '+zipLabel(month)+'.zip',document.getElementById('contabil_zip_btn'));
+  };
+
   function controls(idPrefix,months,key,handler,title){
     const selected=saved(key,months);
     const wrap=document.createElement('div');
@@ -237,6 +264,14 @@
     const root=document.getElementById('view-boletos');const section=root?.querySelector('.section-title');const actions=section?.lastElementChild;
     if(!actions||actions.querySelector('#boleto_download_month'))return;
     actions.insertBefore(controls('boleto',boletoMonths(),KEY_BOLETO,window.brDownloadAllBoletos,'Mês de vencimento dos boletos'),actions.firstChild);
+    if(!actions.querySelector('#contabil_zip_btn')){
+      const btn=document.createElement('button');
+      btn.id='contabil_zip_btn';btn.type='button';btn.className='btn';
+      btn.textContent='↓ Honorários Contábeis (ZIP)';
+      btn.title='Baixar boletos e recibos contábeis da competência selecionada';
+      btn.addEventListener('click',window.brDownloadContabilZip);
+      actions.insertBefore(btn,actions.firstChild);
+    }
     removeBoletoNotice();
     updateBoletoMonthCards();
   }
