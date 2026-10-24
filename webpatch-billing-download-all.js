@@ -222,7 +222,9 @@
 
   window.brDownloadContabilZip=async function(){
     const month=String(document.getElementById('boleto_download_month')?.value||currentMonth());
-    const period=month.replace(/-(\\d{2})$/, '-$1');
+    const [dueYear,dueMonth]=month.split('-').map(Number);
+    const prev=new Date(dueYear,dueMonth-2,1);
+    const period=prev.getFullYear()+'-'+String(prev.getMonth()+1).padStart(2,'0');
     const base=(Array.isArray(boletos)?boletos:[]).filter(b=>
       String(b?.competence||'')===period && String(b?.section||'').toUpperCase()==='CONTABIL'
     );
@@ -243,8 +245,8 @@
       }));
     const items=[...boletoItems,...receiptItems];
     if(!items.length)return alert('Não há boletos registrados ou recibos de honorários contábeis para baixar.');
-    if(!confirm('Baixar '+boletoItems.length+' boleto(s) e '+receiptItems.length+' recibo(s) de honorários contábeis de '+label(month)+'?'))return;
-    await requestZip('contabil',items,'BRCONDOS - HONORARIOS CONTABEIS - '+zipLabel(month)+'.zip',document.getElementById('contabil_zip_btn'));
+    if(!confirm('Baixar '+boletoItems.length+' boleto(s) e '+receiptItems.length+' recibo(s) de honorários contábeis da competência '+label(period)+' (vencimento '+label(month)+')?'))return;
+    await requestZip('contabil',items,'BRCONDOS - HONORARIOS CONTABEIS - '+zipLabel(period)+'.zip',document.getElementById('contabil_zip_btn'));
   };
 
   function controls(idPrefix,months,key,handler,title){
