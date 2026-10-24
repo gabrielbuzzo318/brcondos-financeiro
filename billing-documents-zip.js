@@ -120,7 +120,7 @@ async function officialNfsePdf(item){
 export async function sendBillingDocumentsZip(req,res,body={}){
   const type=String(body.type||'').trim();
   const items=Array.isArray(body.items)?body.items:[];
-  if(!['boletos','nfse','receipts'].includes(type)){const err=new Error('Tipo de documento inválido.');err.status=400;throw err;}
+  if(!['boletos','nfse','receipts','contabil'].includes(type)){const err=new Error('Tipo de documento inválido.');err.status=400;throw err;}
   if(!items.length){const err=new Error('Nenhum documento selecionado.');err.status=400;throw err;}
   if(items.length>250){const err=new Error('Selecione no máximo 250 documentos por vez.');err.status=400;throw err;}
 
@@ -131,7 +131,7 @@ export async function sendBillingDocumentsZip(req,res,body={}){
   async function processItem(item){
     try{
       let buffer;
-      if(type==='boletos'){
+      if(type==='boletos'||(type==='contabil'&&item?.kind==='boleto')){
         const payload=await enrichBoletoPayload(item?.payload||{});
         buffer=await gerarBoletoPdf(payload);
       }
