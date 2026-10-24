@@ -287,20 +287,29 @@
   function enhanceBoletos(){
     const view=document.getElementById('view-boletos');
     if(!view)return;
+    // Preserve the original PDF importer and provide a separate Excel importer.
     const oldInput=document.getElementById('monthlyBillingPdf');
-    if(oldInput){
-      oldInput.accept='.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
-      oldInput.setAttribute('onchange','importMonthlyBillingXlsx(this)');
-    }
     const buttons=[...view.querySelectorAll('button')];
     const importBtn=buttons.find(b=>/Importar PDF mensal/i.test(b.textContent||''));
-    if(importBtn){
-      importBtn.textContent='⇧ Importar planilha mensal';
-      importBtn.setAttribute('onclick',"document.getElementById('monthlyBillingPdf').click()");
+    if(importBtn && !document.getElementById('monthlyBillingXlsx')){
+      const excelInput=document.createElement('input');
+      excelInput.type='file';
+      excelInput.id='monthlyBillingXlsx';
+      excelInput.accept='.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
+      excelInput.style.display='none';
+      excelInput.addEventListener('change',()=>importMonthlyBillingXlsx(excelInput));
+      const excelBtn=document.createElement('button');
+      excelBtn.type='button';
+      excelBtn.className=importBtn.className;
+      excelBtn.textContent='⇧ Importar planilha mensal';
+      excelBtn.addEventListener('click',()=>excelInput.click());
+      importBtn.insertAdjacentElement('afterend',excelBtn);
+      excelBtn.insertAdjacentElement('afterend',excelInput);
     }
+    if(oldInput)oldInput.accept='.pdf,application/pdf';
     const notice=view.querySelector('.notice');
     if(notice){
-      notice.innerHTML='<b>Regra do faturamento:</b> importe a planilha mensal em Excel. O sistema usa <b>TOTAL</b> como valor do boleto. No quadro ADM, a NFS-e soma HNO ADM COND, FOPAG, SPED-EFD e E-SOCIAL; LIVROS e DP entram no recibo. A observação usa Honorário Adm, Módulo cobrança, Módulo manutenção, Assemb. Extra e RPA somente quando houver valor. No quadro <b>Honorários Contábeis - Associações</b>, a descrição fica <b>Faturamento CONT</b> e os detalhes mostram apenas <b>Honorário Cont</b>. O vencimento continua no mês seguinte à competência.';
+      notice.innerHTML='<b>Regra do faturamento:</b> importe o PDF mensal ou a planilha em Excel. O sistema usa <b>TOTAL</b> como valor do boleto. No quadro ADM, a NFS-e soma HNO ADM COND, FOPAG, SPED-EFD e E-SOCIAL; LIVROS e DP entram no recibo. A observação usa Honorário Adm, Módulo cobrança, Módulo manutenção, Assemb. Extra e RPA somente quando houver valor. No quadro <b>Honorários Contábeis - Associações</b>, a descrição fica <b>Faturamento CONT</b> e os detalhes mostram apenas <b>Honorário Cont</b>. O vencimento continua no mês seguinte à competência.';
     }
     const ths=[...view.querySelectorAll('thead th')];
     const detailsTh=ths.find(th=>/^Detalhes$/i.test((th.textContent||'').trim()));
