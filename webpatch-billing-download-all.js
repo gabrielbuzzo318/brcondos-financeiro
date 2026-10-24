@@ -225,28 +225,28 @@
     const [dueYear,dueMonth]=month.split('-').map(Number);
     const prev=new Date(dueYear,dueMonth-2,1);
     const period=prev.getFullYear()+'-'+String(prev.getMonth()+1).padStart(2,'0');
-    const base=(Array.isArray(boletos)?boletos:[]).filter(b=>
-      String(b?.competence||'')===period && String(b?.section||'').toUpperCase()==='CONTABIL'
-    );
-    if(!base.length)return alert('Não há honorários contábeis importados nessa competência.');
+    const base=(Array.isArray(boletos)?boletos:[]).filter(b=>String(b?.competence||'')===period);
+    if(!base.length)return alert('Não há faturamentos nessa competência.');
+    const section=b=>String(b?.section||'').toUpperCase()==='CONTABIL'?'CONTABIL':'ADM';
     const boletoItems=base.filter(b=>b.sicrediRegistered || b.externalIssued || b.sicrediNossoNumero)
       .map(b=>({
         kind:'boleto',
-        name:safe(b.client,'CLIENTE')+' - BOLETO - '+boletoFileValue(b.value)+'.pdf',
+        name:section(b)+' - '+safe(b.client,'CLIENTE')+' - BOLETO - '+boletoFileValue(b.value)+'.pdf',
         payload:boletoPayload(b)
       }));
-    const ids=new Set(base.map(b=>String(b.id)));
+    const byId=new Map(base.map(b=>[String(b.id),b]));
     const receiptItems=(Array.isArray(receipts)?receipts:[])
-      .filter(r=>ids.has(String(r.sourceBoletoId)) && !['cancelado','excluido'].includes(String(r.status||'').toLowerCase()))
+      .filter(r=>byId.has(String(r.sourceBoletoId))&&!['cancelado','excluido'].includes(String(r.status||'').toLowerCase()))
       .map(r=>({
         kind:'recibo',
-        name:safe(r.client,'CLIENTE')+' - RECIBO '+safe(r.receiptNumber||'SEM NUMERO')+'.pdf',
+        name:section(byId.get(String(r.sourceBoletoId)))+' - '+safe(r.client,'CLIENTE')+' - RECIBO '+safe(r.receiptNumber||'SEM NUMERO')+'.pdf',
         payload:receiptPayload(r)
       }));
     const items=[...boletoItems,...receiptItems];
-    if(!items.length)return alert('Não há boletos registrados ou recibos de honorários contábeis para baixar.');
-    if(!confirm('Baixar '+boletoItems.length+' boleto(s) e '+receiptItems.length+' recibo(s) de honorários contábeis da competência '+label(period)+' (vencimento '+label(month)+')?'))return;
-    await requestZip('contabil',items,'BRCONDOS - HONORARIOS CONTABEIS - '+zipLabel(period)+'.zip',document.getElementById('contabil_zip_btn'));
+    if(!items.length)return alert('Não há boletos registrados ou recibos vinculados para baixar.');
+    if(items.length>250)return alert('O ZIP permite no máximo 250 documentos. Separe a competência em lotes menores.');
+    if(!confirm('Baixar '+boletoItems.length+' boleto(s) e '+receiptItems.length+' recibo(s) da competência '+label(period)+' (vencimento '+label(month)+')?'))return;
+    await requestZip('contabil',items,'BRCONDOS - BOLETOS E RECIBOS - '+zipLabel(period)+'.zip',document.getElementById('contabil_zip_btn'));
   };
 
   function controls(idPrefix,months,key,handler,title){
@@ -269,8 +269,8 @@
     if(!actions.querySelector('#contabil_zip_btn')){
       const btn=document.createElement('button');
       btn.id='contabil_zip_btn';btn.type='button';btn.className='btn';
-      btn.textContent='↓ Honorários Contábeis (ZIP)';
-      btn.title='Baixar boletos e recibos contábeis da competência selecionada';
+      btn.textContent='↓ Boletos e recibos (ZIP)';
+      btn.title='Baixar boletos e recibos ADM e CONTABIL da competência anterior ao vencimento selecionado';
       btn.addEventListener('click',window.brDownloadContabilZip);
       actions.insertBefore(btn,actions.firstChild);
     }
