@@ -12,6 +12,8 @@
   let pushTimer=null;
   let watchTimer=null;
   let pendingSharedState=null;
+  let activePush=null;
+  let pushAgain=false;
 
   function isReadOnly(){return profile?.access_level==='consulta';}
   function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
@@ -94,29 +96,44 @@
 
   async function pushSharedState(){
     if(setupMode||isReadOnly()||!profile)return null;
-    const storage=captureStorage();
-    if(!Object.keys(storage).length)return null;
-    const r=await oldFetch('/api/state',{
-      method:'PUT',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({data:{version:1,storage}})
-    });
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||'Não foi possível salvar a base compartilhada.');
-    if(d.updated_at)sessionStorage.setItem(SHARED_REV,String(d.updated_at));
-    pendingSharedState=null;
-    removeSharedUpdateNotice();
-    return d;
+    if(activePush){
+      pushAgain=true;
+      return activePush;
+    }
+    activePush=(async()=>{
+      let last=null;
+      do {
+        pushAgain=false;
+        const storage=captureStorage();
+        if(!Object.keys(storage).length)break;
+        const r=await oldFetch('/api/state',{
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({data:{version:1,storage}})
+        });
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(d.error||'Não foi possível salvar a base compartilhada.');
+        if(d.updated_at)sessionStorage.setItem(SHARED_REV,String(d.updated_at));
+        pendingSharedState=null;
+        removeSharedUpdateNotice();
+        last=d;
+      } while(pushAgain);
+      return last;
+    })();
+    try{return await activePush;}
+    finally{activePush=null;}
   }
   function scheduleSharedPush(){
     if(setupMode||isReadOnly()||!profile)return;
+    if(activePush)pushAgain=true;
     clearTimeout(pushTimer);
-    pushTimer=setTimeout(()=>{pushSharedState().catch(err=>console.error('BRCONDOS SYNC SAVE:',err));},350);
+    pushTimer=setTimeout(()=>{pushSharedState().catch(err=>console.error('BRCONDOS SYNC SAVE:',err));},1500);
   }
   window.brcondosFlushSharedState=async function(){
     if(setupMode||isReadOnly()||!profile)return null;
     clearTimeout(pushTimer);
     pushTimer=null;
+    if(activePush)pushAgain=true;
     return await pushSharedState();
   };
   async function hydrateSharedState(){
