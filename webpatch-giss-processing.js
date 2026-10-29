@@ -115,9 +115,45 @@
     };
   }
 
+  // Recuperação pontual baseada no espelho oficial GISS de outubro/2026.
+  // Somente quatro pares RPS / CNPJ / valor / NFS-e conferidos; nenhum envio fiscal.
+  const officialOctober = {
+    '366':{nf:'3773',doc:'05895468000105',value:785.00,name:'Monte Santo'},
+    '370':{nf:'3776',doc:'46600362000114',value:3664.50,name:'Nova Residence'},
+    '378':{nf:'3783',doc:'37381644000187',value:2362.50,name:'Reserva dos Guyras'},
+    '379':{nf:'3784',doc:'57155439000100',value:2273.00,name:'Sense Residence'}
+  };
+  const officialDigits=v=>String(v??'').replace(/\\D/g,'');
+  async function recoverOfficialOctober(row, spec) {
+    if(String(row.competence||'')!=='2026-10') throw new Error('Competência diferente de 10/2026.');
+    if(String(row.rpsNumber||row.gissRpsNumber||'')!==Object.keys(officialOctober).find(k=>officialOctober[k]===spec)) throw new Error('RPS divergente.');
+    if(Math.abs(Number(row.value||0)-spec.value)>0.01) throw new Error('Valor divergente do registro oficial.');
+    const client=(clients||[]).find(c=>Number(c.id)===Number(row.clientId));
+    const doc=officialDigits(client?.doc||client?.documento||row.tomadorDocumento||row.tomadorDoc||'');
+    if(!doc||doc!==spec.doc) throw new Error('CNPJ do cadastro não confere com o documento oficial GISS: '+(doc||'ausente')+'.');
+    const duplicate=(nfse||[]).find(x=>x!==row&&String(x.nfseNumber||'')===spec.nf&&String(x.competence||'')==='2026-10');
+    if(duplicate) throw new Error('A NFS-e '+spec.nf+' já está vinculada a outro registro. Não houve alteração.');
+    if(!confirm('Vincular '+spec.name+' ao documento oficial GISS NFS-e '+spec.nf+' / RPS '+row.rpsNumber+' / R$ '+spec.value.toFixed(2)+'? Nenhuma nota será emitida.')) return;
+    Object.assign(row,{
+      nfseNumber:spec.nf, gissRpsNumber:String(row.rpsNumber),
+      status:'emitida_nfse',lastError:'',
+      gissOrigin:'conferencia_oficial_giss_20261029',
+      gissResponse:{fonte:'conferencia_visual_portal_giss',nfse:spec.nf,rps:String(row.rpsNumber),tomadorDoc:spec.doc,valor:spec.value}
+    });
+    saveData('nfse',nfse);
+    if(typeof window.brcondosFlushSharedState==='function') await window.brcondosFlushSharedState();
+    if(typeof renderAll==='function') renderAll();
+    alert('NFS-e '+spec.nf+' vinculada e salva. Nenhuma nota nova foi emitida.');
+  }
+
   window.atualizarGissNfse=async function(id){
     const row=(nfse||[]).find(x=>Number(x.id)===Number(id));
     if(!row)return;
+    const spec=officialOctober[String(row.rpsNumber||row.gissRpsNumber||'')];
+    if(spec&&String(row.competence||'')==='2026-10'&&row.status==='rascunho'){
+      try{await recoverOfficialOctober(row,spec);}catch(e){alert('Não foi possível recuperar a nota: '+e.message);}
+      return;
+    }
 
     // Mantém a rotina específica do histórico oficial intacta.
     if((row.gissOrigin==='producao_historico'||row.status==='rascunho')&&typeof oldAtualizar==='function'){
