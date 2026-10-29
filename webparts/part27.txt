@@ -188,7 +188,7 @@ async function atualizarTodasGiss(){
   );
 }
 async function emitNfseOne(id){
-  const row=nfse.find(x=>x.id===id);if(!row)return;
+  const row=(id&&typeof id==='object')?id:nfse.find(x=>x.id===id);if(!row)return;
   const reason=nfseCanEmit(row);if(reason)return alert(reason);
   let payload;try{payload=nfsePayload(row)}catch(e){return alert(e.message)}
   const envMsg='A emissão será feita no ambiente configurado no .env. Comece em HOMOLOGAÇÃO.';
