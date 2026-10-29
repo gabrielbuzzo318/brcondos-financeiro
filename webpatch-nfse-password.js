@@ -10,7 +10,7 @@
       const eligible=visible.filter(x=>typeof nfseCanEmit!=='function'||!nfseCanEmit(x));
       return eligible.length===1?'1 NFS-e apta para emissão':`${eligible.length} NFS-e aptas para emissão`;
     }
-    const row=(nfse||[]).find(x=>Number(x.id)===Number(action?.id));
+    const row=action?.row||(nfse||[]).find(x=>Number(x.id)===Number(action?.id));
     if(!row)return 'NFS-e selecionada';
     return `${row.client||'NFS-e'} • ${typeof money==='function'?money(row.value):row.value}`;
   }
@@ -127,7 +127,7 @@
 
       setTimeout(()=>{
         if(action.type==='all') originalEmitAllNfse?.();
-        else originalEmitNfseOne?.(action.id);
+        else if(action.row) originalEmitNfseOne?.(action.row);
       },60);
     }catch(e){
       validating=false;
@@ -137,15 +137,50 @@
     }
   };
 
+
+  // Emissão limitada aos três RPS pendentes conferidos na GISS.
+  const enabledRps={'384':1921.70,'387':3759.50,'386':4147.50};
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const selectedRow=btn=>{
+    const tr=btn.closest('tr');
+    const rps=String(tr?.querySelector('td')?.textContent||'').match(/^\s*(\d+)/)?.[1];
+    if(!rps||!(rps in enabledRps))return null;
+    const rows=(nfse||[]).filter(x=>String(x.competence)==='2026-10'&&String(x.rpsNumber||'')===rps);
+    if(rows.length!==1)throw new Error('RPS '+rps+' duplicado ou inexistente.');
+    const row=rows[0];
+    if(row.status!=='rascunho'&&row.status!=='erro_nfse')throw new Error('Status não permite emissão.');
+    if(Math.abs(Number(row.value)-enabledRps[rps])>0.01)throw new Error('Valor divergente do condomínio.');
+    const client=(clients||[]).find(c=>Number(c.id)===Number(row.clientId));
+    if(!client||norm(row.client)!==norm(client.name))throw new Error('Nome do tomador não confere com cadastro.');
+    const doc=digits(client.doc);
+    if(doc.length!==14)throw new Error('CNPJ do tomador inválido ou ausente.');
+    const visible=norm(tr.children?.[1]?.textContent||'');
+    if(!visible.includes(norm(row.client)))throw new Error('Condomínio exibido não confere com o RPS.');
+    if((nfse||[]).some(x=>x!==row&&String(x.competence)==='2026-10'&&String(x.rpsNumber||'')===rps))throw new Error('RPS duplicado.');
+    return row;
+  };
+  document.addEventListener('click',function(e){
+    const btn=e.target.closest('button');
+    if(!btn||!btn.closest('#view-nfse')||!/Emitir NF/i.test(btn.textContent||''))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    try{
+      const row=selectedRow(btn);
+      if(!row)throw new Error('Emissão temporariamente autorizada apenas para Curimbatás (384), Eco Village I (387) e Torres Cidade Norte (386).');
+      requestPassword({type:'one',id:row.id,row});
+    }catch(error){alert('Emissão bloqueada: '+error.message);}
+  },true);
   if(typeof originalEmitNfseOne==='function'){
     window.emitNfseOne=function(id){
-      alert('Emissão de NFS-e temporariamente bloqueada por segurança: o sistema identificou divergência no tomador. Consultas permanecem disponíveis.');
+      if(id&&typeof id==='object'){
+        const row=id;
+        if(!Object.prototype.hasOwnProperty.call(enabledRps,String(row.rpsNumber)))return alert('Emissão bloqueada.');
+        return requestPassword({type:'one',id:row.id,row});
+      }
+      alert('Emissão bloqueada: use o botão da linha para validar RPS e tomador.');
     };
   }
-
   if(typeof originalEmitAllNfse==='function'){
-    window.emitAllNfse=function(){
-      alert('Emissão em lote temporariamente bloqueada por segurança.');
-    };
+    window.emitAllNfse=function(){alert('Emissão em lote permanece bloqueada.');};
   }
 })();
