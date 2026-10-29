@@ -146,6 +146,30 @@
     alert('NFS-e '+spec.nf+' vinculada e salva. Nenhuma nota nova foi emitida.');
   }
 
+  function visibleRowIdentity(el){
+    const tr=el.closest('tr');
+    if(!tr)return null;
+    const rps=String(tr.querySelector('td')?.textContent||'').trim().match(/^\\d+/)?.[0];
+    const name=String(tr.children?.[1]?.textContent||'').trim().toUpperCase();
+    return {rps,name};
+  }
+  // Intercepta a ação no elemento visível, evitando ID interno duplicado.
+  document.addEventListener('click',async function(event){
+    const btn=event.target.closest('button');
+    if(!btn||!btn.closest('#view-nfse'))return;
+    if(!/^(Atualizar|Consultar) Giss$/i.test(String(btn.textContent||'').trim()))return;
+    const ident=visibleRowIdentity(btn);
+    if(!ident?.rps)return;
+    event.preventDefault();event.stopImmediatePropagation();
+    const rows=(nfse||[]).filter(x=>String(x.competence||'')==='2026-10'&&String(x.rpsNumber||x.gissRpsNumber||'')===ident.rps);
+    if(rows.length!==1){alert('Consulta bloqueada: RPS '+ident.rps+' não identifica um único registro de outubro.');return;}
+    const row=rows[0];
+    if(!ident.name.includes(String(row.client||'').trim().toUpperCase()) && !String(row.client||'').trim().toUpperCase().includes(ident.name.split('DESCRIÇÃO')[0].trim())){
+      alert('Consulta bloqueada: cliente visível não confere com registro do RPS '+ident.rps+'.');return;
+    }
+    await window.atualizarGissNfse(row.id);
+  },true);
+
   window.atualizarGissNfse=async function(id){
     const row=(nfse||[]).find(x=>Number(x.id)===Number(id));
     if(!row)return;
