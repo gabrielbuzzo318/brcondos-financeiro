@@ -123,7 +123,7 @@
     '378':{nf:'3783',doc:'37381644000187',value:2362.50,name:'Reserva dos Guyras'},
     '379':{nf:'3784',doc:'57155439000100',value:2273.00,name:'Sense Residence'}
   };
-  const officialDigits=v=>String(v??'').replace(/\\D/g,'');
+  const officialDigits=v=>String(v??'').replace(/\D/g,'');
   async function recoverOfficialOctober(row, spec) {
     if(String(row.competence||'')!=='2026-10') throw new Error('Competência diferente de 10/2026.');
     if(String(row.rpsNumber||row.gissRpsNumber||'')!==Object.keys(officialOctober).find(k=>officialOctober[k]===spec)) throw new Error('RPS divergente.');
