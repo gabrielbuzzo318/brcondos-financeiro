@@ -149,7 +149,7 @@
   function visibleRowIdentity(el){
     const tr=el.closest('tr');
     if(!tr)return null;
-    const rps=String(tr.querySelector('td')?.textContent||'').trim().match(/^\\d+/)?.[0];
+    const rps=String(tr.querySelector('td')?.textContent||'').trim().match(/^\d+/)?.[0];
     const name=String(tr.children?.[1]?.textContent||'').trim().toUpperCase();
     return {rps,name};
   }
@@ -167,7 +167,9 @@
     if(!ident.name.includes(String(row.client||'').trim().toUpperCase()) && !String(row.client||'').trim().toUpperCase().includes(ident.name.split('DESCRIÇÃO')[0].trim())){
       alert('Consulta bloqueada: cliente visível não confere com registro do RPS '+ident.rps+'.');return;
     }
-    await window.atualizarGissNfse(row.id);
+    const spec=officialOctober[ident.rps];
+    if(spec){try{await recoverOfficialOctober(row,spec);}catch(e){alert('Recuperação bloqueada: '+e.message);}return;}
+    alert('Consulta protegida: este RPS ainda não possui vinculação oficial validada. Nenhuma NFS-e foi alterada.');
   },true);
 
   window.atualizarGissNfse=async function(id){
