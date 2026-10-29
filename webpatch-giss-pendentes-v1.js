@@ -84,7 +84,7 @@
       const msg=(data.erros||[]).map(e=>[e.codigo,e.mensagem,e.correcao].filter(Boolean).join(' - ')).join('; ')||'A GISS não retornou a NFS-e para este RPS.';
       row.lastError=msg;saveData('nfse',nfse);renderAll();throw new Error(msg);
     }
-    const digits=v=>String(v||'').replace(/\\D/g,'');
+    const digits=v=>String(v||'').replace(/\D/g,'');
     const client=(clients||[]).find(c=>Number(c.id)===Number(row.clientId));
     const expectedDoc=digits(client?.doc||row.tomadorDocumento||row.tomadorDoc||'');
     const actualDoc=digits(item.tomadorDoc||'');
