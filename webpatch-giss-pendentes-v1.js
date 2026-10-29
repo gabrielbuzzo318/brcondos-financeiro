@@ -79,11 +79,12 @@
     const r=await fetch(`/api/nfse/consultar-rps-historico?numero=${encodeURIComponent(rps)}&serie=RPS&tipo=1&_=${Date.now()}`,{cache:'no-store'});
     const data=await r.json();
     if(!r.ok)throw new Error(data.error||'Falha ao consultar a GISS de produção.');
-    const item=(Array.isArray(data.nfse)?data.nfse:[]).find(x=>String(x.rpsNumero||'')===rps)||(Array.isArray(data.nfse)?data.nfse[0]:null);
+    const item=(Array.isArray(data.nfse)?data.nfse:[]).find(x=>String(x.rpsNumero||'')===rps);
     if(!item?.numero){
       const msg=(data.erros||[]).map(e=>[e.codigo,e.mensagem,e.correcao].filter(Boolean).join(' - ')).join('; ')||'A GISS não retornou a NFS-e para este RPS.';
       row.lastError=msg;saveData('nfse',nfse);renderAll();throw new Error(msg);
     }
+    if (Number(item.valorServicos||item.valor||0)>0 && Math.abs(Number(item.valorServicos||item.valor)-Number(row.value||0))>0.02) throw new Error('Valor da NFS-e retornada difere do rascunho. Verifique a nota na GISS antes de vincular.');
     const cancels=Array.isArray(data.cancelamentos)?data.cancelamentos:[];
     const cancel=cancels.find(c=>String(c.numero||'')===String(item.numero||''));
     const canceled=!!(item.cancelada||cancel);
