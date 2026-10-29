@@ -39,7 +39,7 @@
     const items=Array.isArray(data?.nfse)?data.nfse:[];
     const item=items.find(x=>String(x.rpsNumero||'')===rps)||items[0];
     if(!item?.numero || String(item.rpsNumero||'')!==rps)return false;
-    const digits=v=>String(v||'').replace(/\\D/g,'');
+    const digits=v=>String(v||'').replace(/\D/g,'');
     const client=(clients||[]).find(c=>Number(c.id)===Number(row.clientId));
     const doc=digits(client?.doc||row.tomadorDocumento||row.tomadorDoc||'');
     if(!doc||!item.tomadorDoc||doc!==digits(item.tomadorDoc))return false;
