@@ -26,6 +26,13 @@
   };
 
   function requestPassword(action){
+    if(action?.type==='one'){
+      const matches=(nfse||[]).filter(x=>String(x.id)===String(action.id));
+      if(matches.length!==1) {
+        alert('Emissão bloqueada: identificador duplicado ou inexistente. Nenhuma nota foi transmitida.');
+        return;
+      }
+    }
     pendingAction=action;
     const description=actionDescription(action);
     const uniqueName=`nfse-confirm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
