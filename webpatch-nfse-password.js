@@ -139,13 +139,13 @@
 
   if(typeof originalEmitNfseOne==='function'){
     window.emitNfseOne=function(id){
-      requestPassword({type:'one',id});
+      alert('Emissão de NFS-e temporariamente bloqueada por segurança: o sistema identificou divergência no tomador. Consultas permanecem disponíveis.');
     };
   }
 
   if(typeof originalEmitAllNfse==='function'){
     window.emitAllNfse=function(){
-      requestPassword({type:'all'});
+      alert('Emissão em lote temporariamente bloqueada por segurança.');
     };
   }
 })();
