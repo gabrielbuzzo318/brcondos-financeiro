@@ -138,6 +138,11 @@
   };
   async function hydrateSharedState(){
     if(setupMode||!profile)return false;
+    // A recarga logo após aplicar o snapshot já usa o mesmo localStorage.
+    // Evita buscar novamente toda a base em uma segunda navegação imediata.
+    const lastHydration=Number(sessionStorage.getItem('brcondos_just_hydrated_at')||0);
+    sessionStorage.removeItem('brcondos_just_hydrated_at');
+    if(lastHydration>0&&Date.now()-lastHydration<15000&&sessionStorage.getItem(SHARED_REV))return false;
     const shared=await readSharedState();
     if(!shared.exists){
       if(String(profile.email||'').toLowerCase()===SHARED_SEED_EMAIL&&!isReadOnly()){
@@ -155,6 +160,7 @@
     if(!applyStorage(storage))return false;
     if(rev)sessionStorage.setItem(SHARED_REV,rev);
     sessionStorage.setItem(migrationKey,'done');
+    sessionStorage.setItem('brcondos_just_hydrated_at',String(Date.now()));
     location.reload();
     return true;
   }
@@ -360,7 +366,10 @@
     document.getElementById('loginScreen')?.classList.add('hidden');
     document.getElementById('app')?.classList.add('hidden');
     try{
-      const cr=await oldFetch('/api/auth/config',{cache:'no-store'});
+      const [cr,r]=await Promise.all([
+        oldFetch('/api/auth/config',{cache:'no-store'}),
+        oldFetch('/api/auth/me',{cache:'no-store'})
+      ]);
       const cfg=await cr.json().catch(()=>({}));
       if(!cr.ok||!cfg.configured) throw new Error('Login ainda não configurado.');
       if(!cfg.publicUrlConfigured){
@@ -368,7 +377,6 @@
         profile={full_name:'Configuração',email:'configuracao@local',access_level:'admin',first_access_required:false,setup_mode:true};
         return showApp();
       }
-      const r=await oldFetch('/api/auth/me',{cache:'no-store'});
       const data=await r.json().catch(()=>({}));
       if(!r.ok) return goLogin();
       profile=data;
