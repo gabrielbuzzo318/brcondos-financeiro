@@ -146,6 +146,31 @@
     alert('NFS-e '+spec.nf+' vinculada e salva. Nenhuma nota nova foi emitida.');
   }
 
+  // Acesso ao PDF das notas recuperadas: utiliza número oficial e RPS da linha,
+  // sem procurar por ID interno potencialmente duplicado.
+  const recoveredPdfRows={366:'3773',370:'3776',378:'3783',379:'3784'};
+  const previousRenderNfse=renderNfse;
+  renderNfse=function(){
+    previousRenderNfse();
+    document.querySelectorAll('#view-nfse tbody tr').forEach(tr=>{
+      const rps=String(tr.querySelector('td')?.textContent||'').trim().match(/^\d+/)?.[0];
+      if(!recoveredPdfRows[rps])return;
+      const row=(nfse||[]).find(x=>String(x.competence||'')==='2026-10'&&String(x.rpsNumber||'')===rps&&String(x.nfseNumber||'')===recoveredPdfRows[rps]&&x.status==='emitida_nfse');
+      if(!row)return;
+      const actions=tr.querySelector('.actions')||tr.lastElementChild;
+      if(!actions||actions.querySelector('[data-official-pdf]'))return;
+      const button=document.createElement('button');
+      button.type='button';button.className='btn small';button.textContent='Visualizar NF';button.dataset.officialPdf='1';
+      button.onclick=e=>{
+        e.preventDefault();e.stopPropagation();
+        const params=new URLSearchParams({numero:recoveredPdfRows[rps],rps});
+        const url='/api/nfse/pdf/0?'+params.toString();
+        window.open(url,'_blank','noopener');
+      };
+      actions.appendChild(button);
+    });
+  };
+
   function visibleRowIdentity(el){
     const tr=el.closest('tr');
     if(!tr)return null;
