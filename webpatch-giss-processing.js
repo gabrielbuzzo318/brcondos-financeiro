@@ -115,7 +115,7 @@
     if(!row)return;
 
     // Mantém a rotina específica do histórico oficial intacta.
-    if(row.gissOrigin==='producao_historico'&&typeof oldAtualizar==='function'){
+    if((row.gissOrigin==='producao_historico'||row.status==='rascunho')&&typeof oldAtualizar==='function'){
       return oldAtualizar(id);
     }
 
