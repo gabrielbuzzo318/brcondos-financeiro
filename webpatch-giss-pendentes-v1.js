@@ -86,10 +86,10 @@
     }
     const digits=v=>String(v||'').replace(/\D/g,'');
     const client=(clients||[]).find(c=>Number(c.id)===Number(row.clientId));
-    const expectedDoc=digits(client?.doc||row.tomadorDocumento||row.tomadorDoc||'');
+    const expectedDoc=digits(client?.doc||client?.documento||client?.document||row.tomadorDocumento||row.tomadorDoc||'');
     const actualDoc=digits(item.tomadorDoc||'');
     if(!expectedDoc||!actualDoc||expectedDoc!==actualDoc) {
-      throw new Error('Consulta não vinculada: CPF/CNPJ do tomador não confere (ou está ausente). Confira a nota no portal GISS.');
+      throw new Error('Consulta não vinculada: CPF/CNPJ do tomador não confere ou está ausente na resposta GISS. RPS '+rps+'; cadastro '+(expectedDoc||'ausente')+'; retorno '+(actualDoc||'ausente')+'.');
     }
     if (Number(item.valorServicos||item.valor||0)>0 && Math.abs(Number(item.valorServicos||item.valor)-Number(row.value||0))>0.02) throw new Error('Valor da NFS-e retornada difere do rascunho. Verifique a nota na GISS antes de vincular.');
     const cancels=Array.isArray(data.cancelamentos)?data.cancelamentos:[];
@@ -103,7 +103,9 @@
       cancelCode:item.codigoCancelamento||cancel?.codigoCancelamento||row.cancelCode||'',
       lastError:'',gissResponse:data,gissOrigin:'producao_historico'
     });
-    saveData('nfse',nfse);renderAll();
+    saveData('nfse',nfse);
+    if(typeof window.brcondosFlushSharedState==='function') await window.brcondosFlushSharedState();
+    renderAll();
     return row;
   }
 
