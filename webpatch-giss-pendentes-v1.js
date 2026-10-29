@@ -102,7 +102,7 @@
   window.atualizarGissNfse=async function(id){
     const row=nfse.find(x=>Number(x.id)===Number(id));if(!row)return;
     try{
-      if(row.gissOrigin==='producao_historico'){
+      if(row.gissOrigin==='producao_historico' || (row.status==='rascunho' && String(row.rpsNumber||row.gissRpsNumber||'').trim())){
         await atualizarHistorica(row);
       }else if(String(row.gissProtocol||'').trim()){
         const r=await fetch(`/api/nfse/consultar-lote?protocolo=${encodeURIComponent(row.gissProtocol)}`,{cache:'no-store'});
@@ -128,11 +128,11 @@
     renderNfseOriginal();
     document.querySelectorAll('#view-nfse tbody tr[data-id]').forEach(tr=>{
       const row=nfse.find(x=>Number(x.id)===Number(tr.dataset.id));
-      if(!row||!LOCKED.has(row.status))return;
+      if(!row||(!LOCKED.has(row.status)&&row.status!=='rascunho'))return;
       const actions=tr.querySelector('.actions');if(!actions)return;
-      const already=[...actions.querySelectorAll('button')].some(b=>/ATUALIZAR\s+GISS/i.test(b.textContent||''));
+      const already=[...actions.querySelectorAll('button')].some(b=>/(ATUALIZAR|CONSULTAR)\s+GISS/i.test(b.textContent||''));
       if(!already){
-        const btn=document.createElement('button');btn.className='btn small';btn.textContent='Atualizar Giss';btn.onclick=()=>window.atualizarGissNfse(row.id);
+        const btn=document.createElement('button');btn.className='btn small';btn.textContent=row.status==='rascunho'?'Consultar Giss':'Atualizar Giss';btn.onclick=()=>window.atualizarGissNfse(row.id);
         const pdf=[...actions.querySelectorAll('button')].find(b=>/^PDF$/i.test((b.textContent||'').trim()));
         if(pdf)actions.insertBefore(btn,pdf);else actions.appendChild(btn);
       }
