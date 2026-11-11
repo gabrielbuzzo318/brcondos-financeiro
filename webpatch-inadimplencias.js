@@ -339,12 +339,14 @@
       </div>
       <div class="filter-bar">
         <div class="field search"><label>Pesquisar</label><input id="inad_search" placeholder="Cliente, documento, descrição, valor..." oninput="filterInadimplencias()"></div>
+        <div class="field"><label>Vencimento de</label><input id="inad_from" type="date" onchange="filterInadimplencias()"></div>
+        <div class="field"><label>Vencimento até</label><input id="inad_to" type="date" onchange="filterInadimplencias()"></div>
         <div class="field"><label>Origem</label><select id="inad_origin" onchange="filterInadimplencias()"><option value="">Todas</option><option value="boleto">Boleto</option><option value="recibo">Recibo</option><option value="boleto_recibo">Boleto + Recibo</option><option value="manual">Manual</option><option value="boleto_parcial">Boleto parcial</option></select></div>
         <div class="field"><label>Status</label><select id="inad_status" onchange="filterInadimplencias()"><option value="">Todos</option><option value="vencido">Vencido</option><option value="em_aberto">Em aberto</option><option value="liquidado">Liquidado</option></select></div>
         <button class="btn" onclick="clearInadimplenciaFilters()">Limpar filtros</button><div id="inad_filter_result" class="filter-result"></div>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Origem</th><th>Cliente / Devedor</th><th>Documento</th><th>Vencimento</th><th>Atraso</th><th>Descrição</th><th>Status</th><th>Valor</th><th></th></tr></thead><tbody>
-        ${rows.length?rows.map(x=>`<tr data-origin="${x.origin}" data-status="${x.status}" data-search="${esc([originLabel(x.origin),x.client,x.document,x.due,x.description,x.status,x.value,money(x.value)].filter(Boolean).join(' '))}">
+        ${rows.length?rows.map(x=>`<tr data-origin="${x.origin}" data-status="${x.status}" data-due="${esc(x.due||'')}" data-value="${Number(x.value||0)}" data-search="${esc([originLabel(x.origin),x.client,x.document,x.due,x.description,x.status,x.value,money(x.value)].filter(Boolean).join(' '))}">
           <td><span class="badge ${x.origin==='manual'?'gray':'blue'}">${originLabel(x.origin)}</span></td>
           <td><b>${esc(x.client||'-')}</b></td><td>${esc(x.document||'-')}</td><td>${x.due?formatDate(x.due):'-'}</td>
           <td>${x.status==='vencido'?`<b style="color:var(--danger)">${daysLate(x.due)} dia(s)</b>`:'-'}</td><td>${esc(x.description||'-')}</td><td>${finBadge(x.status)}</td>
@@ -356,17 +358,45 @@
   };
 
   window.filterInadimplencias=function(){
-    const q=normalizeSearchText(document.getElementById('inad_search')?.value||''),o=document.getElementById('inad_origin')?.value||'',s=document.getElementById('inad_status')?.value||'';
-    const rows=[...document.querySelectorAll('#view-inadimplencias tbody tr[data-search]')];let n=0;
-    rows.forEach(tr=>{const ok=(!q||normalizeSearchText(tr.dataset.search||'').includes(q))&&(!o||tr.dataset.origin===o)&&(!s||tr.dataset.status===s);tr.style.display=ok?'':'none';if(ok)n++});
-    const e=document.getElementById('inad_filter_result');if(e)e.textContent=`${n} resultado(s)`;
+    const q=normalizeSearchText(document.getElementById('inad_search')?.value||'');
+    const origin=document.getElementById('inad_origin')?.value||'';
+    const status=document.getElementById('inad_status')?.value||'';
+    const from=document.getElementById('inad_from')?.value||'';
+    const to=document.getElementById('inad_to')?.value||'';
+    const rows=[...document.querySelectorAll('#view-inadimplencias tbody tr[data-search]')];
+    let count=0,total=0,boletosVencidos=0,recibosVencidos=0,manualCount=0;
+    rows.forEach(tr=>{
+      const due=tr.dataset.due||'';
+      const ok=(!q||normalizeSearchText(tr.dataset.search||'').includes(q))
+        &&(!origin||tr.dataset.origin===origin)
+        &&(!status||tr.dataset.status===status)
+        &&(!from||(due&&due>=from))
+        &&(!to||(due&&due<=to));
+      tr.style.display=ok?'':'none';
+      if(!ok)return;
+      count++;
+      if(tr.dataset.origin==='manual'||tr.dataset.origin==='boleto_parcial')manualCount++;
+      if(tr.dataset.status!=='vencido')return;
+      total+=Number(tr.dataset.value||0);
+      if(['boleto','boleto_recibo','boleto_parcial'].includes(tr.dataset.origin))boletosVencidos++;
+      if(['recibo','boleto_recibo'].includes(tr.dataset.origin))recibosVencidos++;
+    });
+    const view=document.getElementById('view-inadimplencias');
+    const cards=[...view.querySelectorAll('.cards .kpi-value')];
+    if(cards[0])cards[0].textContent=money(total);
+    if(cards[1])cards[1].textContent=String(boletosVencidos);
+    if(cards[2])cards[2].textContent=String(recibosVencidos);
+    if(cards[3])cards[3].textContent=String(manualCount);
+    const result=document.getElementById('inad_filter_result');
+    if(result)result.textContent=count+' resultado(s)';
   };
 
   window.clearInadimplenciaFilters=function(){
-    ['inad_search','inad_origin','inad_status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
+    ['inad_search','inad_origin','inad_status','inad_from','inad_to'].forEach(id=>{
+      const e=document.getElementById(id);if(e)e.value='';
+    });
     filterInadimplencias();
   };
-
 
   function allInadimplenciaRows(){
     const auto=automaticRows();
