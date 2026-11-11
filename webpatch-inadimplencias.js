@@ -450,6 +450,12 @@
     `);
   };
 
+  // Consolida pequenas variacoes de nome, sem alterar o cadastro original.
+  function condominiumKey(value){
+    return String(value||'-').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()
+      .replace(/^(?:CONDOMINIO|EDIFICIO)\s+/,'').replace(/\s+/g,' ').trim();
+  }
+
   window.generateInadimplenciaReport=function(){
     const from=String(document.getElementById('inad_rep_from')?.value||'');
     const to=String(document.getElementById('inad_rep_to')?.value||'');
@@ -475,7 +481,7 @@
 
     const total=data.reduce((s,x)=>s+Number(x.value||0),0);
     const vencidos=data.filter(x=>x.status==='vencido');
-    const clientes=new Set(data.map(x=>String(x.client||'').trim()).filter(Boolean)).size;
+    const clientes=new Set(data.map(x=>condominiumKey(x.client))).size;
     const atrasoMedio=vencidos.length
       ? Math.round(vencidos.reduce((s,x)=>s+daysLate(x.due),0)/vencidos.length)
       : 0;
@@ -487,16 +493,31 @@
       <div class="sum"><small>ATRASO MÉDIO</small><b>${atrasoMedio} dia(s)</b></div>`;
 
     const headers=['Cliente / Devedor','Origem','Documento','Vencimento','Atraso','Descrição','Status','Valor'];
-    const rows=data.map(x=>[
-      esc(x.client||'-'),
-      esc(originLabel(x.origin)),
-      esc(x.document||'-'),
-      x.due?formatDate(x.due):'-',
-      x.status==='vencido'?`${daysLate(x.due)} dia(s)`:'-',
-      esc(x.description||'-'),
-      esc(inadStatusLabel(x.status)),
-      money(x.value)
-    ]);
+    const groups=new Map();
+    data.forEach(x=>{
+      const key=condominiumKey(x.client);
+      if(!groups.has(key))groups.set(key,{name:String(x.client||'-').trim(),items:[]});
+      const group=groups.get(key);
+      // Prefere o nome cadastrado mais descritivo nas variacoes do mesmo condominio.
+      if(String(x.client||'').length>group.name.length)group.name=String(x.client||'').trim();
+      group.items.push(x);
+    });
+    const rows=[];
+    [...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR',{sensitivity:'base'})).forEach(group=>{
+      group.items.sort((a,b)=>String(a.due||'').localeCompare(String(b.due||'')));
+      rows.push({__group:true,label:group.name});
+      group.items.forEach(x=>rows.push([
+        esc(x.client||'-'),
+        esc(originLabel(x.origin)),
+        esc(x.document||'-'),
+        x.due?formatDate(x.due):'-',
+        x.status==='vencido'?`${daysLate(x.due)} dia(s)`:'-',
+        esc(x.description||'-'),
+        esc(inadStatusLabel(x.status)),
+        money(x.value)
+      ]));
+      rows.push({__subtotal:true,label:group.name,count:group.items.length,total:money(group.items.reduce((sum,x)=>sum+Number(x.value||0),0))});
+    });
 
     const period=(from||to)
       ? `${from?formatDate(from):'início'} até ${to?formatDate(to):'hoje'}`
