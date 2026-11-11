@@ -55,7 +55,7 @@
     const c=receiptClient(row);
     const clientName=String(c?.name||row.client||'-').toUpperCase();
     const address=receiptAddress(c);
-    const description=String(row.description||'Honorários administrativos').split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean).map(s=>esc(s)).join('<br>');
+    const description=String(row.description||'Honorários administrativos').split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map(s=>esc(s)).join('<br>');
     return '<section class="receipt-page">'+
       '<div class="receipt-number">RECIBO Nº '+esc(row.receiptNumber||'-')+'</div>'+
       '<div class="receipt-logo-slot"></div>'+
