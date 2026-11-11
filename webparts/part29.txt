@@ -101,6 +101,7 @@ async function generateReceiptPdf(id){
     competenceLabel:receiptCompetenceLabel(row.competence),
     issueDate:String(row.issueDate||''),
     issueDateLong:receiptDateLong(row.issueDate),
+    dueDateLong:receiptDateLong(row.dueDate||row.due||(boletos.find(b=>String(b.id)===String(row.sourceBoletoId||''))||{}).due||row.issueDate),
     description:String(row.description||'')
   };
   try{
