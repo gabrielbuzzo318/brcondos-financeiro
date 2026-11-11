@@ -4,7 +4,7 @@ function txt(v){return String(v??'').trim();}
 function brl(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
 function cleanLines(value){
   const lines=Array.isArray(value)?value:txt(value).split(/\r?\n/);
-  return lines.map(v=>txt(v).replace(/^[•\\-*]\\s*/, '')).filter(Boolean);
+  return lines.map(v=>txt(v).replace(/^[•\-*]\s*/, '')).filter(Boolean);
 }
 
 export async function gerarReceiptPdf(input={}){
