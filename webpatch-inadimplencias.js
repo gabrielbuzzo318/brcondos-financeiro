@@ -317,7 +317,7 @@
     const view=document.getElementById('view-inadimplencias');if(!view)return;
     const auto=automaticRows();
     const manual=manualInadimplencias.map(x=>({...x,origin:x.sourceType==='boleto_parcial'?'boleto_parcial':'manual',status:manualStatus(x)}));
-    const rows=[...auto,...manual].filter(x=>!isExcluded(x)).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+    const rows=[...auto,...manual].filter(x=>!isExcluded(x)).sort((a,b)=>String(a.client||'').localeCompare(String(b.client||''),'pt-BR',{sensitivity:'base'})||(a.due||'9999').localeCompare(b.due||'9999'));
     const active=rows.filter(x=>x.status==='vencido');
     const total=active.reduce((s,x)=>s+Number(x.value||0),0);
     const bCount=active.filter(x=>x.origin==='boleto'||x.origin==='boleto_recibo'||x.origin==='boleto_parcial').length;
@@ -406,8 +406,8 @@
       status:manualStatus(x)
     }));
     return [...auto,...manual].filter(x=>!isExcluded(x)).sort((a,b)=>
-      (a.due||'9999-99-99').localeCompare(b.due||'9999-99-99') ||
-      String(a.client||'').localeCompare(String(b.client||''),'pt-BR')
+      String(a.client||'').localeCompare(String(b.client||''),'pt-BR',{sensitivity:'base'}) ||
+      (a.due||'9999-99-99').localeCompare(b.due||'9999-99-99')
     );
   }
 
