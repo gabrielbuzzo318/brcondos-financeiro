@@ -48,8 +48,7 @@ export async function gerarReceiptPdf(input={}){
     doc.moveTo(155,y).lineTo(440,y).strokeColor('#9eb8d9').stroke();
     doc.moveDown(0.8);
     doc.fillColor('#111111').font('Helvetica-Bold').fontSize(11)
-      .text('COMARC ADMINISTRAÇÃO DE CONDOMÍNIOS LTDA',{align:'center'})
-      .text('UNIDADE SÃO JOSÉ DO RIO PRETO',{align:'center'})
+      .text('BRCONDOS S. J. RIO PRETO',{align:'center'})
       .text('CNPJ 29.941.735/0001-00',{align:'center'});
 
     doc.end();
