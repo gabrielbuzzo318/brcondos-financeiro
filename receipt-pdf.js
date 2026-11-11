@@ -30,7 +30,7 @@ export async function gerarReceiptPdf(input={}){
 
     doc.font('Helvetica').fontSize(13).fillColor('#111111');
     const intro='RECEBEMOS DE '+client+', SITO A '+address+', A IMPORTÂNCIA DE '+brl(input.value)
-      +(amountWords?' ('+amountWords+')':'')+', REFERENTE AOS SERVIÇOS DA COMPETÊNCIA '+competence+':';
+      +(amountWords?' ('+amountWords+')':'')+', REFERENTE A:';
     doc.text(intro,{align:'justify',lineGap:4});
     doc.moveDown(2);
 
@@ -39,11 +39,11 @@ export async function gerarReceiptPdf(input={}){
       doc.moveDown(0.35);
     });
 
+    doc.moveDown(2);
+    doc.font('Helvetica').fontSize(11).text('COMPETÊNCIA: '+competence,{align:'left'});
     doc.moveDown(4);
     doc.font('Helvetica').fontSize(12.5).text('São José do Rio Preto/SP'+(dateLong?', '+dateLong:''),{align:'center'});
     doc.moveDown(5);
-    doc.font('Helvetica-Oblique').fontSize(18).text('Marco Antonio Dosualdo',{align:'center'});
-    doc.moveDown(0.5);
     const y=doc.y;
     doc.moveTo(155,y).lineTo(440,y).strokeColor('#9eb8d9').stroke();
     doc.moveDown(0.8);
