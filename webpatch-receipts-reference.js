@@ -44,7 +44,7 @@
     const description=String(document.getElementById('rec_reference')?.value||'').trim();
     if(!description)return alert('Informe a que se refere o recibo.');
     const due=getDue('new');
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(due))return alert('Informe a data de vencimento do recibo.');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(due))return alert('Informe a data de vencimento do recibo.');
     const before=new Set(receipts.map(r=>r.id));
     const result=prevSaveNew.apply(this,arguments);
     const created=receipts.find(r=>!before.has(r.id));
@@ -71,7 +71,7 @@
     const description=String(document.getElementById('rec_reference')?.value||'').trim();
     if(!description)return alert('Informe a que se refere o recibo.');
     const due=getDue('edit');
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(due))return alert('Informe a data de vencimento do recibo.');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(due))return alert('Informe a data de vencimento do recibo.');
     const result=prevSaveEdit.apply(this,arguments);
     const row=receipts.find(r=>r.id===id);
     if(row && !document.getElementById('rec_reference')){
@@ -86,7 +86,7 @@
     const c=receiptClient(row);
     const clientName=String(c?.name||row.client||'-').toUpperCase();
     const address=receiptAddress(c);
-    const description=String(row.description||'Honorários administrativos').split(/\r?\n/).map(s=>s.trim().replace(/^[•\\-*]\\s*/, '')).filter(Boolean).map(s=>'<div style="margin:5px 0;padding-left:20px;text-indent:-14px">• '+esc(s)+'</div>').join('');
+    const description=String(row.description||'Honorários administrativos').split(/\r?\n/).map(s=>s.trim().replace(/^[•\-*]\s*/, '')).filter(Boolean).map(s=>'<div style="margin:5px 0;padding-left:20px;text-indent:-14px">• '+esc(s)+'</div>').join('');
     return '<section class="receipt-page">'+
       '<div class="receipt-number">RECIBO Nº '+esc(row.receiptNumber||'-')+'</div>'+
       '<div class="receipt-logo-slot"></div>'+
