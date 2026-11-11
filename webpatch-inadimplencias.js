@@ -499,7 +499,9 @@
       if(!groups.has(key))groups.set(key,{name:String(x.client||'-').trim(),items:[]});
       const group=groups.get(key);
       // Prefere o nome cadastrado mais descritivo nas variacoes do mesmo condominio.
-      if(String(x.client||'').length>group.name.length)group.name=String(x.client||'').trim();
+      const candidate=String(x.client||'').trim();
+      if(/^EDIF[IÍ]CIO\s+/i.test(candidate)&&!/^EDIF[IÍ]CIO\s+/i.test(group.name))group.name=candidate;
+      else if(candidate.length>group.name.length&&!/^EDIF[IÍ]CIO\s+/i.test(group.name))group.name=candidate;
       group.items.push(x);
     });
     const rows=[];
@@ -507,7 +509,7 @@
       group.items.sort((a,b)=>String(a.due||'').localeCompare(String(b.due||'')));
       rows.push({__group:true,label:group.name});
       group.items.forEach(x=>rows.push([
-        esc(x.client||'-'),
+        esc(group.name||'-'),
         esc(originLabel(x.origin)),
         esc(x.document||'-'),
         x.due?formatDate(x.due):'-',
@@ -527,7 +529,7 @@
       origin?`Origem: ${originLabel(origin)}`:'',
       q?`Pesquisa aplicada`:''
     ].filter(Boolean).join(' • ');
-    const subtitle=filtros?`${period} • ${filtros}`:period;
+    const subtitle=(filtros?`${period} • ${filtros}`:period)+' • Agrupado por condomínio';
 
     closeModal();
     if(typeof printableReport==='function'){
