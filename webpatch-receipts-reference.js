@@ -65,8 +65,8 @@
       '<div style="margin-top:8mm">COMPETÊNCIA: '+esc(receiptCompetenceLabel(row.competence))+'</div></div>'+
       '<div class="receipt-date">São José do Rio Preto/SP, '+esc(receiptDateLong(row.issueDate))+'</div>'+
       '<div class="receipt-sign"><div class="receipt-line"></div>'+
-      '<div style="font-weight:700">COMARC ADMINISTRAÇÃO DE CONDOMÍNIOS LTDA</div>'+
-      '<div style="font-weight:700">UNIDADE SÃO JOSÉ DO RIO PRETO</div>'+
+      '<div style="font-weight:700">BRCONDOS S. J. RIO PRETO</div>'+
+      
       '<div style="font-weight:700">CNPJ 29.941.735/0001-00</div></div></section>';
   };
 })();
