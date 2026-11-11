@@ -3,8 +3,8 @@ import PDFDocument from 'pdfkit';
 function txt(v){return String(v??'').trim();}
 function brl(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
 function cleanLines(value){
-  if(Array.isArray(value))return value.map(txt).filter(Boolean);
-  return txt(value).split(/\r?\n/).map(txt).filter(Boolean);
+  const lines=Array.isArray(value)?value:txt(value).split(/\r?\n/);
+  return lines.map(v=>txt(v).replace(/^[•\\-*]\\s*/, '')).filter(Boolean);
 }
 
 export async function gerarReceiptPdf(input={}){
@@ -18,8 +18,7 @@ export async function gerarReceiptPdf(input={}){
     const client=txt(input.client||'CLIENTE').toUpperCase();
     const address=txt(input.address||'-').toUpperCase();
     const receiptNumber=txt(input.receiptNumber||'-');
-    const competence=txt(input.competenceLabel||input.competence||'-').toUpperCase();
-    const dateLong=txt(input.issueDateLong||input.issueDate||'');
+    const dateLong=txt(input.dueDateLong||input.issueDateLong||input.issueDate||'');
     const amountWords=txt(input.amountWords||'').toUpperCase();
     const lines=cleanLines(input.description);
 
@@ -39,8 +38,6 @@ export async function gerarReceiptPdf(input={}){
       doc.moveDown(0.35);
     });
 
-    doc.moveDown(2);
-    doc.font('Helvetica').fontSize(11).text('COMPETÊNCIA: '+competence,{align:'left'});
     doc.moveDown(4);
     doc.font('Helvetica').fontSize(12.5).text('São José do Rio Preto/SP'+(dateLong?', '+dateLong:''),{align:'center'});
     doc.moveDown(5);
