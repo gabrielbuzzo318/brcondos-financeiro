@@ -558,6 +558,44 @@ function normalizeNovemberImportDue(data) {
   return data;
 }
 
+// Evita que uma sessão aberta antes da importação do faturamento de dezembro
+// apague boletos recém-incluídos ao enviar um snapshot completo desatualizado.
+// Exclusões explícitas continuam respeitadas pelas tombstones do boleto.
+async function preserveDecemberImportedBills(data, token) {
+  const storage=data?.storage;
+  if(!storage || typeof storage!=='object')return data;
+  const incoming=parseArrayValue(storage,'brcondos_boletos');
+  if(!incoming)return data;
+
+  try {
+    const res=await supabaseFetch('/rest/v1/app_state?select=data&state_key=eq.main&limit=1',token,{
+      method:'GET',headers:{Accept:'application/json'}
+    });
+    if(!res.ok)return data;
+    const rows=await readJson(res);
+    const current=parseArrayValue((Array.isArray(rows)?rows[0]:null)?.data?.storage,'brcondos_boletos')||[];
+    const activeKeys=new Set(incoming.map(b=>String(b?.sourceKey||'')).filter(Boolean));
+    const activeIds=new Set(incoming.map(b=>String(b?.id??'')));
+    const deleted=new Set((parseArrayValue(storage,'brcondos_deletedBoletoKeys')||[]).map(String));
+    let added=0;
+    for(const b of current){
+      const source=String(b?.sourceKey||'');
+      // Protege somente o lote importado para vencimento em dezembro de 2026.
+      if(!source.startsWith('xlsx-2026-10-') || !String(b?.due||'').startsWith('2026-12-'))continue;
+      if(activeKeys.has(source)||activeIds.has(String(b?.id??'')))continue;
+      if(deleted.has(boletoDeleteKey(b)))continue;
+      incoming.push(b);
+      activeKeys.add(source);
+      activeIds.add(String(b?.id??''));
+      added++;
+    }
+    if(added)storage.brcondos_boletos=JSON.stringify(incoming);
+  } catch(e) {
+    console.error('BRCONDOS: proteção do lote dezembro indisponível',e?.message||e);
+  }
+  return data;
+}
+
 export async function getSharedState(req) {
   const token = tokenFrom(req);
   const res = await supabaseFetch('/rest/v1/app_state?select=state_key,data,updated_at,updated_by&state_key=eq.main&limit=1', token, {
@@ -604,6 +642,7 @@ export async function putSharedState(req, body = {}) {
   ensureTimeClient(data);
   applyDeletedBoletoTombstones(data,preservedDeletedBoletoKeys);
   repairBillingState(data);
+  await preserveDecemberImportedBills(data,token);
 
   const res = await supabaseFetch('/rest/v1/app_state?on_conflict=state_key', token, {
     method: 'POST',
