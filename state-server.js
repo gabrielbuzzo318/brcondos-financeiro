@@ -538,6 +538,26 @@ function normalizeOctoberCashFlow(data) {
   return data;
 }
 
+// Protege o lote importado em 20/11/2026 contra uma aba antiga ainda aberta
+// reenviar o mês incorreto de novembro ao salvar o estado compartilhado.
+function normalizeNovemberImportDue(data) {
+  const storage=data?.storage;
+  if(!storage || typeof storage!=='object')return data;
+  const bills=parseArrayValue(storage,'brcondos_boletos');
+  if(!bills)return data;
+  let changed=false;
+  for(const b of bills){
+    const id=Number(b?.id);
+    if(id<1795195317993000 || id>1795195317993999)continue;
+    if(!String(b?.sourceKey||'').startsWith('xlsx-2026-10-'))continue;
+    if(!/^2026-11-\d{2}$/.test(String(b?.due||'')))continue;
+    b.due='2026-12-'+String(b.due).slice(-2);
+    changed=true;
+  }
+  if(changed)storage.brcondos_boletos=JSON.stringify(bills);
+  return data;
+}
+
 export async function getSharedState(req) {
   const token = tokenFrom(req);
   const res = await supabaseFetch('/rest/v1/app_state?select=state_key,data,updated_at,updated_by&state_key=eq.main&limit=1', token, {
@@ -557,6 +577,7 @@ export async function getSharedState(req) {
     applyDeletedBoletoTombstones(row.data);
     repairBillingState(row.data);
     normalizeOctoberCashFlow(row.data);
+    normalizeNovemberImportDue(row.data);
   }
   return { ok: true, exists: true, ...row };
 }
@@ -579,6 +600,7 @@ export async function putSharedState(req, body = {}) {
   const preservedDeletedBoletoKeys=await currentDeletedBoletoKeys(token);
   repairFinancialState(data);
   normalizeOctoberCashFlow(data);
+  normalizeNovemberImportDue(data);
   ensureTimeClient(data);
   applyDeletedBoletoTombstones(data,preservedDeletedBoletoKeys);
   repairBillingState(data);
