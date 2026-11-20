@@ -113,7 +113,7 @@
     return out.sort((a,b)=>b.ym.localeCompare(a.ym));
   }
 
-  function chooseBillingRows(rows,competence){
+  function chooseBillingRows(rows,competence,defaultDueYm){
     return new Promise(resolve=>{
       const overlay=document.createElement('div');
       overlay.style.cssText='position:fixed;inset:0;background:rgba(10,20,35,.66);z-index:999999;display:flex;align-items:center;justify-content:center;padding:18px';
@@ -121,6 +121,15 @@
       panel.style.cssText='background:white;color:#17212f;width:min(850px,98vw);max-height:90vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;padding:18px;box-shadow:0 18px 55px #0005';
       const h=document.createElement('h2');h.textContent='Selecionar faturamentos — '+competence;h.style.margin='0 0 6px';
       const hint=document.createElement('p');hint.textContent='Marque somente os condomínios que deseja importar para emissão. Nenhum boleto será enviado ao banco nesta etapa.';hint.style.margin='0 0 12px';
+      const dueRow=document.createElement('label');
+      dueRow.style.cssText='display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px;margin-bottom:12px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-weight:600';
+      dueRow.textContent='Mês do vencimento (confira antes de importar):';
+      const dueInput=document.createElement('input');
+      dueInput.type='month';
+      dueInput.required=true;
+      dueInput.value=defaultDueYm;
+      dueInput.style.cssText='padding:7px 9px;font:inherit;border:1px solid #94a3b8;border-radius:6px;background:white';
+      dueRow.append(dueInput);
       const toolbar=document.createElement('div');toolbar.style.cssText='display:flex;gap:10px;align-items:center;margin-bottom:10px';
       const all=document.createElement('input');all.type='checkbox';all.checked=true;all.id='billing-select-all';
       const label=document.createElement('label');label.htmlFor=all.id;label.textContent=' Selecionar todos';
@@ -143,8 +152,8 @@
       const ok=document.createElement('button');ok.textContent='Importar selecionados';ok.style.cssText='background:#155abb;color:white;border:0;padding:10px 16px;border-radius:7px';
       const finish=result=>{overlay.remove();resolve(result);};
       cancel.onclick=()=>finish(null);
-      ok.onclick=()=>{if(!selected.size){alert('Selecione pelo menos um condomínio.');return;}finish(rows.filter((_,i)=>selected.has(i)));};
-      foot.append(cancel,ok);panel.append(h,hint,toolbar,list,foot);overlay.append(panel);document.body.append(overlay);update();
+      ok.onclick=()=>{if(!selected.size){alert('Selecione pelo menos um condomínio.');return;}if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(dueInput.value)){alert('Informe o mês de vencimento dos boletos.');return;}finish({rows:rows.filter((_,i)=>selected.has(i)),dueYm:dueInput.value});};
+      foot.append(cancel,ok);panel.append(h,hint,dueRow,toolbar,list,foot);overlay.append(panel);document.body.append(overlay);update();
     });
   }
 
@@ -226,11 +235,23 @@
       }
       if(!parsed.length)throw new Error(`A aba ${selected.name} não possui linhas com CLIENTE e TOTAL preenchidos.`);
 
-      const chosen=await chooseBillingRows(parsed,selected.name+' ('+pad2(selected.month)+'/'+selected.year+')');
-      if(!chosen)return;
-
-      const dueMonth=nextMonth(selected.year,selected.month);
-      const existing=new Set((boletos||[]).map(b=>b.sourceKey).filter(Boolean));
+      const inferredDue=nextMonth(selected.year,selected.month);
+      const now=new Date();
+      const nextCycleDue=nextMonth(now.getFullYear(),now.getMonth()+1);
+      // Ao importar novamente uma planilha de competência anterior,
+      // sugira o próximo mês, mas sempre exija a conferência no modal.
+      const inferredYm=`${inferredDue.year}-${pad2(inferredDue.month)}`;
+      const nextCycleYm=`${nextCycleDue.year}-${pad2(nextCycleDue.month)}`;
+      const defaultDueYm=inferredYm<nextCycleYm?nextCycleYm:inferredYm;
+      const selectedBilling=await chooseBillingRows(parsed,selected.name+' ('+pad2(selected.month)+'/'+selected.year+')',defaultDueYm);
+      if(!selectedBilling)return;
+      const chosen=selectedBilling.rows;
+      const dueYm=selectedBilling.dueYm;
+      const [dueYear,dueMonthNo]=dueYm.split('-').map(Number);
+      const dueMonth={year:dueYear,month:dueMonthNo};
+      // Combina chave e vencimento para aceitar uma nova competência de cobrança
+      // sem replicar lançamentos do mesmo mês (inclusive os de formato antigo).
+      const existing=new Set((boletos||[]).filter(b=>b.sourceKey).map(b=>`${b.sourceKey}|${b.due||''}`));
       let added=0,dups=0,noDue=0,admSeq=0,contSeq=0;
       const billingIdBase=Date.now()*1000;
       const historicoEmitidoNoBanco=selected.ym>='2026-01'&&selected.ym<='2026-07';
@@ -240,8 +261,9 @@
         if(!due)noDue++;
         const sectionCode=r.section==='CONTABIL'?'CONT':'ADM';
         const sectionSeq=r.section==='CONTABIL'?++contSeq:++admSeq;
-        const sourceKey=`xlsx-${selected.ym}-${sectionCode}-${norm(r.client)}-${r.total.toFixed(2)}-${r.day||'SEM'}-${norm(r.obs)}-${r.rowNo}`;
-        if(existing.has(sourceKey)){dups++;return;}
+        const legacySourceKey=`xlsx-${selected.ym}-${sectionCode}-${norm(r.client)}-${r.total.toFixed(2)}-${r.day||'SEM'}-${norm(r.obs)}-${r.rowNo}`;
+        const sourceKey=`xlsx-${selected.ym}-VENC${dueYm}-${sectionCode}-${norm(r.client)}-${r.total.toFixed(2)}-${r.day||'SEM'}-${norm(r.obs)}-${r.rowNo}`;
+        if(existing.has(`${sourceKey}|${due}`)||existing.has(`${legacySourceKey}|${due}`)){dups++;return;}
         const c=typeof findClientByLooseName==='function'?findClientByLooseName(r.client):null;
         boletos.push({
           id:billingIdBase+i,
@@ -270,12 +292,12 @@
             detalhes:r.detalhesOriginais
           }
         });
-        existing.add(sourceKey);added++;
+        existing.add(`${sourceKey}|${due}`);added++;
       });
 
       saveData('boletos',boletos);
       renderAll();
-      alert(`IMPORTAÇÃO CONCLUÍDA ✅\n\nCompetência: ${pad2(selected.month)}/${selected.year}\nBoletos criados: ${added}\nDuplicados ignorados: ${dups}\nSem vencimento: ${noDue}\n\nValor: coluna TOTAL.\nObservações: somente os campos que possuem valor.`);
+      alert(`IMPORTAÇÃO CONCLUÍDA ✅\n\nCompetência na planilha: ${pad2(selected.month)}/${selected.year}\nVencimento: ${pad2(dueMonth.month)}/${dueMonth.year}\nBoletos criados: ${added}\nDuplicados ignorados: ${dups}\nSem vencimento: ${noDue}\n\nValor: coluna TOTAL.\nObservações: somente os campos que possuem valor.`);
     }catch(e){
       alert(`Não consegui importar a planilha:\n${e?.message||e}`);
     }finally{
