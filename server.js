@@ -202,6 +202,16 @@ async function rawWsdlDiagnostic() {
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`BRCONDOS online na porta ${PORT}`);
 
+  // Diagnóstico somente leitura (GET) das APIs nacionais; NUNCA transmite DPS.
+  if (process.env.NFSE_NACIONAL_STARTUP_TEST === '1') {
+    testNationalConnection().then(d => {
+      console.log('NACIONAL TESTE SEM EMISSAO:', JSON.stringify({
+        ambiente:d.environment,sefin:d.sefin,adn:d.parametros,
+        configurado:d.configured,emissaoHabilitada:d.enabled
+      }));
+    }).catch(e => console.error('NACIONAL TESTE SEM EMISSAO: falha',String(e?.message||e)));
+  }
+
   if (String(process.env.GISS_STARTUP_TEST || '') === '1') {
     const status = getGissConfigStatus();
     console.log(`GISS config: ${status.configured ? 'OK' : 'INCOMPLETA'}`);
