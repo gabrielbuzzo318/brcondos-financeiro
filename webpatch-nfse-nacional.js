@@ -62,12 +62,19 @@
       const h=await api('/health');
       let t={connected:false};
       if(h.certificadoEncontrado)try{t=await api('/test');}catch(e){t.error=e.message;}
-      alert('PORTAL NACIONAL\nAmbiente: '+String(h.environment||'').toUpperCase()+
-        '\nCertificado: '+(h.certificadoEncontrado?'localizado':'ausente')+
-        '\nConexão: '+(t.connected?'OK':'não confirmada')+
-        '\nEmissão: '+(h.ready?'habilitada':'bloqueada para validação')+
-        (h.missing?.length?'\n\nPendências:\n'+h.missing.join('\n'):'')+
-        (t.error?'\n\nTeste: '+t.error:''));
+      const labels={
+        NFSE_NACIONAL_CTRIBNAC:'Código de Tributação Nacional do serviço (cTribNac)',
+        NFSE_NACIONAL_OP_SIMP_NAC:'Situação da COMARC no Simples Nacional (opSimpNac)',
+        NFSE_NACIONAL_REG_AP_TRIB_SN:'Regime de apuração do Simples Nacional (regApTribSN)'
+      };
+      const pending=(h.missing||[]).map(k=>labels[k]||k);
+      alert('PORTAL NACIONAL — TESTE SEM EMISSÃO\nAmbiente: '+String(h.environment||'').toUpperCase()+
+        '\nCertificado A1: '+(h.certificadoEncontrado?'arquivo localizado':'ausente')+
+        '\nConexão: '+(t.connected?'API respondeu corretamente':t.reachable?'Servidor respondeu HTTP '+t.httpStatus:'não confirmada')+
+        '\nEmissão: '+(h.ready?'habilitada':'BLOQUEADA até homologação')+
+        (pending.length?'\n\nParâmetros fiscais pendentes:\n'+pending.join('\n'):'')+
+        (t.error?'\n\nFalha de conectividade: '+t.error:'')+
+        '\n\nEsta consulta não envia DPS nem emite NFS-e.');
     }catch(e){alert('Falha ao testar Portal Nacional:\n'+e.message);}
   };
   window.previewNfseXml=async function(id){
