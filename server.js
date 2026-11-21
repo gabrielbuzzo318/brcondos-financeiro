@@ -5,6 +5,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
+import { nationalHealth, testNationalConnection, nationalPreview, emitNational, consultNationalDps, consultNationalNfse } from './nfse-nacional.js';
 import {
   buildGissPreview,
   cancelarNfseGiss,
@@ -94,6 +95,14 @@ app.post('/api/auth/first-access-complete', requireAuth, route((req, res) => mar
 // Todas as integrações bancárias/fiscais exigem uma sessão válida.
 app.use('/api/nfse', requireAuth);
 app.use('/api/boletos', requireAuth);
+
+// Portal Nacional: rotas separadas; o histórico da GISS fica intacto.
+app.get('/api/nfse/nacional/health', route(() => nationalHealth()));
+app.get('/api/nfse/nacional/test', route(() => testNationalConnection()));
+app.post('/api/nfse/nacional/preview', route(req => nationalPreview(req.body || {})));
+app.post('/api/nfse/nacional/emitir', requireWriteAccess, route(req => emitNational(req.body || {})));
+app.get('/api/nfse/nacional/dps/:id', route(req => consultNationalDps(req.params.id)));
+app.get('/api/nfse/nacional/nfse/:chave', route(req => consultNationalNfse(req.params.chave)));
 
 app.get('/api/nfse/health', route(() => getGissConfigStatus()));
 app.get('/api/nfse/wsdl-test', route(() => testGissWsdl()));
