@@ -206,7 +206,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   if (process.env.NFSE_NACIONAL_STARTUP_TEST === '1') {
     testNationalConnection().then(d => {
       console.log('NACIONAL TESTE SEM EMISSAO:', JSON.stringify({
-        ambiente:d.environment,sefin:d.sefin,adn:d.parametros,
+        ambiente:d.environment,sefin:d.sefin,sefinProbes:d.sefinProbes,adn:d.parametros,
         configurado:d.configured,emissaoHabilitada:d.enabled
       }));
     }).catch(e => console.error('NACIONAL TESTE SEM EMISSAO: falha',String(e?.message||e)));
