@@ -13,7 +13,7 @@
       headers:payload?{'Content-Type':'application/json'}:{},
       ...(payload?{body:JSON.stringify(payload)}:{})});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(errText(d)+(d.details?'\n'+JSON.stringify(d.details):''));
+    if(!r.ok){const e=new Error(errText(d)+(d.details?'\n'+JSON.stringify(d.details):''));e.status=r.status;throw e;}
     return d;
   }
   async function readiness(){
@@ -50,10 +50,10 @@
       saveData('nfse',nfse);
       return {ok:row.status==='emitida_nfse',ambiguous:row.status==='enviando_nfse'};
     }catch(e){
-      row.status='enviando_nfse';
-      row.lastError='REVISAR ANTES DE REENVIAR: '+e.message;
+      if(e.status===401){row.status='rascunho';row.lastError='Confirme novamente sua senha antes da emissão.';}
+      else{row.status='enviando_nfse';row.lastError='REVISAR ANTES DE REENVIAR: '+e.message;}
       saveData('nfse',nfse);
-      return {ok:false,ambiguous:true};
+      return {ok:false,ambiguous:e.status!==401};
     }
   }
   window.testNationalConnection=async function(){
@@ -80,6 +80,18 @@
         '<button class="btn primary" onclick="closeModal()">Fechar</button>');
     }catch(e){alert('Prévia DPS não gerada:\n'+e.message);}
   };
+  async function authorizeNationalEmission(){
+    // Reautenticação do usuário antes de qualquer transmissão fiscal.
+    const password=window.prompt('Confirme sua senha de login para emitir NFS-e no Portal Nacional:');
+    if(password===null||password==='')return false;
+    const r=await fetch('/api/auth/verify-nfse-password',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({password})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'Não foi possível validar a senha.');
+    return true;
+  }
   window.emitNfseOne=async function(id){
     const row=rowById(id);if(!row)return;
     try{
@@ -87,6 +99,7 @@
       if(!confirm('EMITIR PELO PORTAL NACIONAL?\n\nCliente: '+row.client+
         '\nValor: '+money(row.value)+'\nDPS: '+row.rpsNumber+
         '\n\nO sistema transmitirá apenas uma vez. Confirmar?'))return;
+      if(!(await authorizeNationalEmission()))return;
       const result=await emit(row);renderAll();
       alert(result.ok?'NFS-e confirmada na Sefin Nacional.\nChave: '+row.nationalKey:
         'Emissão não confirmada. NÃO reenviar sem consultar a DPS.\n'+row.lastError);
@@ -102,6 +115,7 @@
     if(!confirm('EMITIR TODAS • PORTAL NACIONAL\n\nNotas: '+eligible.length+
       '\nValor: '+money(total)+'\nIgnoradas/históricas: '+skipped.length+
       '\n\nEnvio sequencial, sem repetição automática. Confirmar?'))return;
+    try{if(!(await authorizeNationalEmission()))return;}catch(e){return alert(e.message);}
     openModal('Emissão Nacional',
       '<div class="notice">Enviando individualmente. Falha de comunicação interrompe o lote.</div>'+
       '<div id="nac-progress">Preparando...</div>'+
