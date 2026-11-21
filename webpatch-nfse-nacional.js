@@ -60,21 +60,31 @@
   window.testNationalConnection=async function(){
     try{
       const h=await api('/health');
-      let t={connected:false};
+      let t={};
       if(h.certificadoEncontrado)try{t=await api('/test');}catch(e){t.error=e.message;}
       const labels={
-        NFSE_NACIONAL_CTRIBNAC:'Código de Tributação Nacional do serviço (cTribNac)',
-        NFSE_NACIONAL_OP_SIMP_NAC:'Situação da COMARC no Simples Nacional (opSimpNac)',
-        NFSE_NACIONAL_REG_AP_TRIB_SN:'Regime de apuração do Simples Nacional (regApTribSN)'
+        NFSE_NACIONAL_CTRIBNAC:'Código de Tributação Nacional (cTribNac)',
+        NFSE_NACIONAL_OP_SIMP_NAC:'Situação no Simples Nacional (opSimpNac)',
+        NFSE_NACIONAL_REG_AP_TRIB_SN:'Regime de apuração do Simples (regApTribSN)'
       };
       const pending=(h.missing||[]).map(k=>labels[k]||k);
-      alert('PORTAL NACIONAL — TESTE SEM EMISSÃO\nAmbiente: '+String(h.environment||'').toUpperCase()+
-        '\nCertificado A1: '+(h.certificadoEncontrado?'arquivo localizado':'ausente')+
-        '\nConexão: '+(t.connected?'API respondeu corretamente':t.reachable?'Servidor respondeu HTTP '+t.httpStatus:'não confirmada')+
-        '\nEmissão: '+(h.ready?'habilitada':'BLOQUEADA até homologação')+
-        (pending.length?'\n\nParâmetros fiscais pendentes:\n'+pending.join('\n'):'')+
-        (t.error?'\n\nFalha de conectividade: '+t.error:'')+
-        '\n\nEsta consulta não envia DPS nem emite NFS-e.');
+      const describe=(v)=>{
+        if(!v)return 'não realizado';
+        if(v.connected)return 'conexão OK (HTTP '+v.httpStatus+')';
+        if(v.reachable)return 'servidor acessível (HTTP '+v.httpStatus+')'+(v.detail?' — '+v.detail:'');
+        return 'sem resposta'+(v.code?' ['+v.code+']':'')+(v.error?' — '+v.error:'');
+      };
+      alert(
+        'PORTAL NACIONAL — DIAGNÓSTICO SEM EMISSÃO\n\n'+
+        'Ambiente: '+String(h.environment||'').toUpperCase()+'\n'+
+        'Certificado A1: '+(h.certificadoEncontrado?'arquivo localizado':'ausente')+'\n'+
+        'SEFIN (API das notas): '+describe(t.sefin)+'\n'+
+        'ADN (parâmetros municipais): '+describe(t.parametros)+'\n'+
+        'Emissão: '+(h.ready?'habilitada':'BLOQUEADA até homologação')+
+        (pending.length?'\n\nParâmetros pendentes:\n'+pending.join('\n'):'\nParâmetros fiscais básicos: preenchidos')+
+        (t.error?'\n\nErro do teste: '+t.error:'')+
+        '\n\nEste diagnóstico NÃO transmite DPS nem emite NFS-e.'
+      );
     }catch(e){alert('Falha ao testar Portal Nacional:\n'+e.message);}
   };
   window.previewNfseXml=async function(id){
