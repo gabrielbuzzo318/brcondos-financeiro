@@ -4,7 +4,7 @@
   const apiRoot='/api/nfse/nacional';
   const locked=new Set(['emitida_nfse','cancelada_nfse']);
   const rowById=id=>(nfse||[]).find(x=>String(x.id)===String(id));
-  const legacy=x=>!!(x?.gissOrigin||x?.gissProtocol||x?.gissInternalId||(locked.has(x?.status)&&!x?.nationalKey));
+  const legacy=x=>!!((String(x?.competence||'')&&String(x.competence)<='2026-10')||x?.gissOrigin||x?.gissProtocol||x?.gissInternalId||(locked.has(x?.status)&&!x?.nationalKey));
   const errText=data=>{
     const list=Array.isArray(data?.erros)?data.erros:[];
     return [data?.error,data?.mensagem,...list.map(x=>[x.codigo,x.mensagem,x.correcao].filter(Boolean).join(' - '))].filter(Boolean).join('\n')||'Retorno não conclusivo';
