@@ -136,7 +136,7 @@ function tomadorXml(t){
  const doc=digits(t.documento);
  if(![11,14].includes(doc.length)||!trim(t.nome))fail('Tomador sem CPF/CNPJ ou nome válido.');
  const cMun=digits(t.codigoMunicipio),cep=digits(t.cep);
- if(!/^\d{7}$/.test(cMun)||!/^\\d{8}$/.test(cep)||!trim(t.endereco)||!trim(t.numero)||!trim(t.bairro)){
+ if(!/^\d{7}$/.test(cMun)||!/^\d{8}$/.test(cep)||!trim(t.endereco)||!trim(t.numero)||!trim(t.bairro)){
   fail('Complete endereço, número, bairro, CEP e município IBGE do tomador.');
  }
  return '<toma>'+tag(doc.length===14?'CNPJ':'CPF',doc)+tag('xNome',t.nome)+
