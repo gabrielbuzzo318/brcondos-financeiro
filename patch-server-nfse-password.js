@@ -19,5 +19,11 @@ src=src.replace(
   "app.post('/api/nfse/emitir', requireWriteAccess, requireRecentNfsePassword, route(req => emitirNfseGiss(req.body)));"
 );
 
+// O mesmo controle de reautenticação protege novas emissões na Sefin Nacional.
+src=src.replace(
+  "app.post('/api/nfse/nacional/emitir', requireWriteAccess, route(req => emitNational(req.body || {})));",
+  "app.post('/api/nfse/nacional/emitir', requireWriteAccess, requireRecentNfsePassword, route(req => emitNational(req.body || {})));"
+);
+
 fs.writeFileSync(file,src,'utf8');
 console.log('Proteção por senha da emissão NFS-e aplicada.');
