@@ -13,7 +13,7 @@ const digits=(v)=>trim(v).replace(/\D/g,'');
 const env=(name,def='')=>trim(process.env[name]??def);
 const xml=(v)=>trim(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
 const tag=(name,value)=>trim(value)?'<'+name+'>'+xml(value)+'</'+name+'>':'';
-const urlBase=()=>env('NFSE_NACIONAL_ENV','homologacao')==='producao'?'https://sefin.nfse.gov.br/SefinNacional':'https://sefin.producaorestrita.nfse.gov.br/SefinNacional';
+const urlBase=()=>env('NFSE_NACIONAL_ENV','homologacao')==='producao'?'https://sefin.nfse.gov.br/SefinNacional':'https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional';
 const docNamespace='http://www.sped.fazenda.gov.br/nfse';
 const dsNamespace='http://www.w3.org/2000/09/xmldsig#';
 const cryptoAlgo={
@@ -109,7 +109,12 @@ function http(method,path,body){
     resolve({status:response.statusCode||0,data});
    });
   });
-  request.on('timeout',()=>request.destroy(Object.assign(new Error('Timeout: confirme a DPS antes de tentar novamente.'),{status:504,ambiguous:method==='POST'})));
+  request.on('timeout',()=>request.destroy(Object.assign(
+    new Error(method==='POST'
+      ? 'Tempo de resposta esgotado durante a transmissão: consulte a DPS antes de tentar novamente.'
+      : 'Tempo de resposta esgotado na consulta de conectividade. Nenhuma DPS foi transmitida.'),
+    {status:504,ambiguous:method==='POST'}
+  )));
   request.on('error',reject);
   if(body)request.write(body);
   request.end();
@@ -120,8 +125,8 @@ export async function testNationalConnection(){
  if(!status.certificadoEncontrado)fail('Certificado A1 ainda não está disponível na aplicação.',400);
  const result=await http('GET','/parametros_municipais/'+settings().cLocEmi+'/convenio');
  return {provider:'Sefin Nacional',environment:status.environment,httpStatus:result.status,
-   connected:result.status>=200&&result.status<300,configured:status.configured,enabled:status.enabled,
-   missing:status.missing,summary:result.status>=400?result.data:null};
+   connected:result.status>=200&&result.status<300,reachable:result.status>0,configured:status.configured,enabled:status.enabled,
+   testOnly:true,transmitted:false,missing:status.missing,summary:result.status>=400?result.data:null};
 }
 function localTime(){
  const d=new Date();
