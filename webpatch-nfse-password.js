@@ -161,6 +161,8 @@
     return row;
   };
   document.addEventListener('click',function(e){
+    // A validação de emissão nacional substitui a lista histórica de três RPS da GISS.
+    if(window.brcondosNationalMode===true)return;
     const btn=e.target.closest('button');
     if(!btn||!btn.closest('#view-nfse')||!/Emitir NF/i.test(btn.textContent||''))return;
     e.preventDefault();e.stopImmediatePropagation();
