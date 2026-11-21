@@ -92,13 +92,14 @@ function certificate(){
  if(!keyBags[0]?.key||!certBags[0]?.cert)fail('Certificado A1 sem chave privada e certificado utilizáveis.',400);
  return {pfx:fs.readFileSync(p),key:forge.pki.privateKeyToPem(keyBags[0].key),cert:forge.pki.certificateToPem(certBags[0].cert)};
 }
-function http(method,path,body){
- const {pfx}=certificate(),u=new URL(urlBase()+path);
+function http(method,path,body,options={}){
+ const {pfx}=certificate(),u=new URL((options.baseUrl||urlBase())+path);
+ const timeoutMs=Number(options.timeoutMs||20000);
  return new Promise((resolve,reject)=>{
   const request=https.request({
    protocol:u.protocol,hostname:u.hostname,port:443,path:u.pathname+u.search,method,
-   pfx,passphrase:config.giss.certPassword,minVersion:'TLSv1.2',rejectUnauthorized:true,
-   timeout:20000,
+   family:4,pfx,passphrase:config.giss.certPassword,minVersion:'TLSv1.2',rejectUnauthorized:true,
+   timeout:timeoutMs,
    headers:{'Accept':'application/json','User-Agent':'BRCONDOS-Financeiro/2.0 (SEFIN Nacional)',...(body?{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}:{})}
   },response=>{
    const chunks=[];let size=0;
@@ -123,10 +124,34 @@ function http(method,path,body){
 export async function testNationalConnection(){
  const status=nationalHealth();
  if(!status.certificadoEncontrado)fail('Certificado A1 ainda não está disponível na aplicação.',400);
- const result=await http('GET','/parametros_municipais/'+settings().cLocEmi+'/convenio');
- return {provider:'Sefin Nacional',environment:status.environment,httpStatus:result.status,
-   connected:result.status>=200&&result.status<300,reachable:result.status>0,configured:status.configured,enabled:status.enabled,
-   testOnly:true,transmitted:false,missing:status.missing,summary:result.status>=400?result.data:null};
+ // Os parâmetros municipais foram migrados para a API ADN Parametrização.
+ // O GET na Sefin verifica conectividade; não consulta DPS nem envia nota.
+ const adnBase=status.environment==='producao'
+   ? 'https://adn.nfse.gov.br/parametrizacao'
+   : 'https://adn.producaorestrita.nfse.gov.br/parametrizacao';
+ const attempts=await Promise.allSettled([
+   http('GET','/docs/index',null,{timeoutMs:12000}),
+   http('GET','/'+settings().cLocEmi+'/convenio',null,{baseUrl:adnBase,timeoutMs:12000})
+ ]);
+ const decode=(res,system)=>{
+   if(res.status==='rejected'){
+     const cause=res.reason;
+     return {system,reachable:false,connected:false,error:String(cause?.message||'Falha na conexão.').slice(0,280),code:String(cause?.code||'')};
+   }
+   const out=res.value;
+   const statusCode=Number(out.status||0);
+   return {system,reachable:statusCode>0,connected:statusCode>=200&&statusCode<300,
+     httpStatus:statusCode,
+     detail:statusCode>=400?String(out.data?.mensagem||out.data?.message||'')?.slice(0,180):''};
+ };
+ const sefin=decode(attempts[0],'Sefin Nacional - API');
+ const parametros=decode(attempts[1],'ADN - Parâmetros Municipais');
+ return {provider:'Sefin Nacional',environment:status.environment,
+   configured:status.configured,enabled:status.enabled,missing:status.missing,
+   connected:sefin.connected,reachable:sefin.reachable,
+   httpStatus:sefin.httpStatus||0,testOnly:true,transmitted:false,
+   sefin,parametros,
+   message:'Diagnóstico somente leitura: nenhum XML/DPS/NFS-e foi enviado.'};
 }
 function localTime(){
  const d=new Date();
