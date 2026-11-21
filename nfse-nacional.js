@@ -56,7 +56,7 @@ function omissions(s){
  if(!s.im)missing.push('GISS_INSCRICAO_MUNICIPAL');
  if(!/^\d{6}$/.test(s.cTribNac))missing.push('NFSE_NACIONAL_CTRIBNAC');
  if(!/^\d{9}$/.test(s.cNBS))missing.push('NFSE_NACIONAL_NBS');
- if(!['1','2','3'].includes(s.opSimpNac))missing.push('NFSE_NACIONAL_OP_SIMP_NAC');
+ if(!['1','2','3','4'].includes(s.opSimpNac))missing.push('NFSE_NACIONAL_OP_SIMP_NAC');
  if(s.opSimpNac==='3'&&!['1','2','3'].includes(s.regApTribSN))missing.push('NFSE_NACIONAL_REG_AP_TRIB_SN');
  if(!/^[0-9]$/.test(s.regEspTrib))missing.push('NFSE_NACIONAL_REG_ESP_TRIB');
  if(!/^[12]$/.test(s.tribISSQN))missing.push('NFSE_NACIONAL_TRIB_ISSQN');
@@ -165,7 +165,7 @@ function buildXml(payload,s){
  const serv='<serv><locPrest>'+tag('cLocPrestacao',s.cLocEmi)+'</locPrest><cServ>'+tag('cTribNac',s.cTribNac)+tag('cTribMun',s.cTribMun)+tag('xDescServ',payload.discriminacao)+tag('cNBS',s.cNBS)+'</cServ></serv>';
  const ibs=(s.cIndOp&&s.cst&&s.cClassTrib)?'<IBSCBS>'+tag('finNFSe',s.finNFSe)+tag('cIndOp',s.cIndOp)+tag('indDest',s.indDest)+
  '<valores><trib><gIBSCBS>'+tag('CST',s.cst)+tag('cClassTrib',s.cClassTrib)+'</gIBSCBS></trib></valores></IBSCBS>':'';
- const trib='<trib><tribMun>'+tag('tribISSQN',s.tribISSQN)+tag('tpRetISSQN',s.tpRetISSQN)+((s.tribISSQN==='1'&&aliquota>0)?tag('pAliq',aliquota.toFixed(2)):'')+'</tribMun><totTrib>'+tag('indTotTrib',s.indTotTrib)+'</totTrib></trib>';
+ const trib='<trib><tribMun>'+tag('tribISSQN',s.tribISSQN)+tag('tpRetISSQN',s.tpRetISSQN)+((s.tribISSQN==='1'&&aliquota>0&&!(s.opSimpNac==='3'&&s.regApTribSN==='1'))?tag('pAliq',aliquota.toFixed(2)):'')+'</tribMun><totTrib>'+tag('indTotTrib',s.indTotTrib)+'</totTrib></trib>';
  const xmlText='<?xml version="1.0" encoding="UTF-8"?>'+
  '<DPS xmlns="'+docNamespace+'" versao="1.01"><infDPS Id="'+id+'">'+
  tag('tpAmb',s.environment==='producao'?'1':'2')+tag('dhEmi',now)+tag('verAplic','BRCONDOS-Financeiro-2.0')+
