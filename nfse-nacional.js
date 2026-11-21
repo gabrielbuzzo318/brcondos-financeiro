@@ -149,6 +149,7 @@ function buildXml(payload,s){
  const valor=Number(payload.valor),aliquota=Number(payload.aliquotaPct);
  if(!nDPS||nDPS.length>15)fail('Número da DPS deve ser numérico, entre 1 e 15 dígitos.');
  if(!/^\d{4}-\d{2}-\d{2}$/.test(competencia))fail('Data da competência da DPS inválida.');
+ if(competencia<'2026-11-01')fail('Competências até outubro/2026 devem permanecer no histórico GISS. Emissão nacional somente a partir de novembro/2026.',409);
  const now=localTime();
  if(competencia>now.slice(0,10))fail('Competência futura não permitida.');
  if(!Number.isFinite(valor)||valor<=0||!Number.isFinite(aliquota)||aliquota<0||aliquota>100)fail('Valor ou alíquota inválidos.');
