@@ -130,8 +130,15 @@ export async function testNationalConnection(){
    ? 'https://adn.nfse.gov.br/parametrizacao'
    : 'https://adn.producaorestrita.nfse.gov.br/parametrizacao';
  const attempts=await Promise.allSettled([
-   http('GET','/docs/index',null,{timeoutMs:12000}),
-   http('GET','/'+settings().cLocEmi+'/convenio',null,{baseUrl:adnBase,timeoutMs:12000})
+   http('GET','/docs/index',null,{timeoutMs:18000}),
+   http('GET','/ParametrosMunicipais',null,{timeoutMs:18000}),
+   http('GET','/docs/index',null,{
+     baseUrl:status.environment==='producao'
+       ? 'https://sefin.nfse.gov.br/SefinNacional'
+       : 'https://sefin.producaorestrita.nfse.gov.br/SefinNacional',
+     timeoutMs:18000
+   }),
+   http('GET','/'+settings().cLocEmi+'/convenio',null,{baseUrl:adnBase,timeoutMs:18000})
  ]);
  const decode=(res,system)=>{
    if(res.status==='rejected'){
@@ -144,13 +151,18 @@ export async function testNationalConnection(){
      httpStatus:statusCode,
      detail:statusCode>=400?String(out.data?.mensagem||out.data?.message||'')?.slice(0,180):''};
  };
- const sefin=decode(attempts[0],'Sefin Nacional - API');
- const parametros=decode(attempts[1],'ADN - Parâmetros Municipais');
+ const docsSefin=decode(attempts[0],'Sefin - Documentacao API');
+ const legacyParameters=decode(attempts[1],'Sefin - Endpoint de parametros migrado');
+ const oldSefin=decode(attempts[2],'Sefin - Rota alternativa');
+ const parametros=decode(attempts[3],'ADN - Parâmetros Municipais');
+ const sefin=[docsSefin,legacyParameters,oldSefin].find(p=>p.connected)
+   ||[docsSefin,legacyParameters,oldSefin].find(p=>p.reachable)
+   ||docsSefin;
  return {provider:'Sefin Nacional',environment:status.environment,
    configured:status.configured,enabled:status.enabled,missing:status.missing,
    connected:sefin.connected,reachable:sefin.reachable,
    httpStatus:sefin.httpStatus||0,testOnly:true,transmitted:false,
-   sefin,parametros,
+   sefin,parametros,sefinProbes:{docsSefin,legacyParameters,oldSefin},
    message:'Diagnóstico somente leitura: nenhum XML/DPS/NFS-e foi enviado.'};
 }
 function localTime(){
