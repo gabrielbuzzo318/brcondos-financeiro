@@ -1,4 +1,5 @@
 (function(){
+  window.brcondosNationalMode=true;
   // Emissões novas: Sefin Nacional. Documentos GISS: somente consulta histórica.
   const apiRoot='/api/nfse/nacional';
   const locked=new Set(['emitida_nfse','cancelada_nfse']);
