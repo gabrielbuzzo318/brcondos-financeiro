@@ -102,7 +102,7 @@ function http(method,path,body,options={}){
   const mark=p=>{phase=p;events.push(p)};
   const req=https.request({
    protocol:u.protocol,hostname:u.hostname,port:443,path:u.pathname+u.search,method,
-   family:4,...(pfx?{pfx,passphrase:config.giss.certPassword}:{}),
+   family:options.family===6?6:4,...(pfx?{pfx,passphrase:config.giss.certPassword}:{}),
    minVersion:'TLSv1.2',rejectUnauthorized:true,timeout:timeoutMs,
    signal:AbortSignal.timeout(timeoutMs+2000),
    headers:{Accept:'application/json','User-Agent':'BRCONDOS-Financeiro/2.0',
@@ -138,6 +138,7 @@ export async function testNationalConnection(){
  const probes=await Promise.allSettled([
   http('GET','/docs/index',null,{timeoutMs:16000}),
   http('GET','/docs/index',null,{timeoutMs:16000,anonymous:true}),
+  http('GET','/docs/index',null,{timeoutMs:16000,anonymous:true,family:6}),
   http('GET','/docs/index',null,{baseUrl:altSefin,timeoutMs:16000}),
   http('GET','/'+settings().cLocEmi+'/convenio',null,{baseUrl:adnBase,timeoutMs:16000})
  ]);
@@ -150,15 +151,16 @@ export async function testNationalConnection(){
   return {system,reachable:code>0,connected:code>=200&&code<300,httpStatus:code};
  };
  const docsSefin=decode(probes[0],'Sefin com A1');
- const anonymousDocs=decode(probes[1],'Sefin sem A1');
- const oldSefin=decode(probes[2],'Sefin rota alternativa');
- const parametros=decode(probes[3],'ADN Parametros Municipais');
- const options=[docsSefin,anonymousDocs,oldSefin];
+ const anonymousDocs=decode(probes[1],'Sefin sem A1 IPv4');
+ const docsIpv6=decode(probes[2],'Sefin sem A1 IPv6');
+ const oldSefin=decode(probes[3],'Sefin rota alternativa');
+ const parametros=decode(probes[4],'ADN Parametros Municipais');
+ const options=[docsSefin,anonymousDocs,docsIpv6,oldSefin];
  const sefin=options.find(p=>p.connected)||options.find(p=>p.reachable)||docsSefin;
  return {provider:'Sefin Nacional',environment:status.environment,configured:status.configured,
   enabled:status.enabled,missing:status.missing,connected:sefin.connected,reachable:sefin.reachable,
   httpStatus:sefin.httpStatus||0,testOnly:true,transmitted:false,
-  sefin,parametros,sefinProbes:{docsSefin,anonymousDocs,oldSefin},
+  sefin,parametros,sefinProbes:{docsSefin,anonymousDocs,docsIpv6,oldSefin},
   message:'Diagnóstico apenas leitura: nenhuma DPS enviada.'};
 }
 function localTime(){
